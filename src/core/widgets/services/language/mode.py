@@ -2,6 +2,7 @@ import ctypes
 
 
 TF_CONVERSIONMODE_NATIVE = 0x0001
+THREAD_MANAGER_COMPARTMENT_IID = "7DCF57AC-18AD-438B-824D-979BFFB74B7C"
 
 
 def callback_address(callback) -> ctypes.c_void_p:

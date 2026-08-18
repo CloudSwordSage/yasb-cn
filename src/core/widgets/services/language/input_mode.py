@@ -5,7 +5,7 @@ from ctypes import wintypes
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from core.widgets.services.language.mode import callback_address, format_probe, input_mode_key
+from core.widgets.services.language.mode import THREAD_MANAGER_COMPARTMENT_IID, callback_address, format_probe, input_mode_key
 
 
 _S_OK = 0
@@ -41,6 +41,7 @@ class _SinkObject(ctypes.Structure):
 
 
 _GUID_CONVERSION = _Guid.parse("CCF05DD8-4A87-11D7-A6E0-00065B84435C")
+_IID_COMPARTMENT_MANAGER = _Guid.parse(THREAD_MANAGER_COMPARTMENT_IID)
 _IID_SOURCE = _Guid.parse("4EA48A35-60AE-446F-8FD6-E6A8D82459F7")
 _IID_COMPARTMENT_EVENT_SINK = _Guid.parse("743ABD5F-F26D-48DF-8CC5-238492419B64")
 
@@ -128,7 +129,7 @@ class InputModeMonitor(QObject):
             client_id = wintypes.DWORD()
             if not self._succeeded("ITfThreadMgr.Activate", _call(self._thread_manager, 3, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)), ctypes.byref(client_id))):
                 return
-            if not self._succeeded("ITfThreadMgr.GetGlobalCompartment", _call(self._thread_manager, 13, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(self._compartment_manager))):
+            if not self._succeeded("ITfThreadMgr.QueryInterface(ITfCompartmentMgr)", _call(self._thread_manager, 0, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid), ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(_IID_COMPARTMENT_MANAGER), ctypes.byref(self._compartment_manager))):
                 return
             if not self._succeeded("ITfCompartmentMgr.GetCompartment", _call(self._compartment_manager, 3, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid), ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(_GUID_CONVERSION), ctypes.byref(self._compartment))):
                 return
