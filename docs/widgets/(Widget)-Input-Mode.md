@@ -1,7 +1,7 @@
 # Input Mode Widget
 
 Shows the active Windows IME conversion mode. It reacts to foreground, focus, and IME
-WinEvents, then reads `ImmGetConversionStatus` immediately and once 75 ms later; it does not
+WinEvents, then queries its default IME window immediately and once 75 ms later; it does not
 run a persistent polling loop.
 
 ```yaml
