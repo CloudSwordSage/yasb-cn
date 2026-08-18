@@ -1,7 +1,8 @@
 # Input Mode Widget
 
-Shows the active Windows IME conversion mode. It listens to `ITfCompartmentEventSink` on
-`GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION`; it does not poll.
+Shows the active Windows IME conversion mode. It reacts to foreground, focus, and IME
+WinEvents, then reads `ImmGetConversionStatus` immediately and once 75 ms later; it does not
+run a persistent polling loop.
 
 ```yaml
 input_mode:
