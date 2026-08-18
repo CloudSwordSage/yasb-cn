@@ -7,7 +7,6 @@ Shows your current keyboard language or layout - like EN, DE, or RU - and lets y
 | `label`          | string   | `"{lang[language_code]}-{lang[country_code]}"`              | The format string for the label. |
 | `label_alt`      | string   | `"{lang[full_name]}"`               | The alternative format string for the label. Useful for displaying the full language name. |
 | `update_interval`| integer  | `5`                            | The interval in seconds to update the language information. Must be between 1 and 3600. |
-| `input_mode_labels` | dict | `{'native': '中', 'alphanumeric': '英', 'unknown': '?'}` | Labels for the IME conversion mode. Updated through TSF events without polling. |
 | `class_name`      | string   | `""`                           | Additional CSS class name for the widget.                                    |
 | `callbacks`      | dict     | `{ 'on_left': 'toggle_label', 'on_middle': 'do_nothing', 'on_right': 'do_nothing' }` | The dictionary of callback functions for different mouse actions. |
 | `language_menu` | dict     | [See below](#language-menu-configuration) | Options for the language menu. |
@@ -44,10 +43,6 @@ language:
   type: "yasb.language.LanguageWidget"
   options:
     label: "{lang[language_code]}-{lang[country_code]}"
-    input_mode_labels:
-      native: "中"
-      alphanumeric: "英"
-      unknown: "?"
     label_alt: "{lang[full_name]}"
     update_interval: 5
     callbacks:
@@ -68,8 +63,7 @@ language:
 ```
 
 ## Description of Options
-- **label:** The format string for the label. You can use placeholders like `{lang[language_code]}`, `{lang[country_code]}`, `{lang[full_name]}`, `{lang[native_country_name]}`, `{lang[native_lang_name]}`, `{lang[layout_name]}`, `{lang[full_layout_name]}`, `{lang[layout_country_name]}`, `{lang[iso_language_code]}`, `{lang[input_mode_label]}`.
-- **input_mode_labels:** Labels selected by `GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION`: `native` when `TF_CONVERSIONMODE_NATIVE` is set, otherwise `alphanumeric`; `unknown` when TSF does not provide a value. The mode changes through `ITfCompartmentEventSink`, not a timer.
+- **label:** The format string for the label. You can use placeholders like `{lang[language_code]}`, `{lang[country_code]}`, `{lang[full_name]}`, `{lang[native_country_name]}`, `{lang[native_lang_name]}`, `{lang[layout_name]}`, `{lang[full_layout_name]}`, `{lang[layout_country_name]}`, `{lang[iso_language_code]}`.
 - **label_alt:** The alternative format string for the label. Useful for displaying the full language name.
 - **update_interval:** The interval in seconds to update the language information. Must be between 1 and 3600.
 - **class_name:** Additional CSS class name for the widget. This allows for custom styling.

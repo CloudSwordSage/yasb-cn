@@ -107,6 +107,7 @@ choco install yasb
 | [Home](https://github.com/amnweb/yasb/wiki/(Widget)-Home) | A customizable home widget menu. |
 | [Disk](https://github.com/amnweb/yasb/wiki/(Widget)-Disk) | Displays disk usage information. |
 | [Language](https://github.com/amnweb/yasb/wiki/(Widget)-Language) | Shows the current input language and allows switching between languages. |
+| [Input Mode](https://github.com/amnweb/yasb/wiki/(Widget)-Input-Mode) | Shows the active IME conversion mode. |
 | [Launchpad](https://github.com/amnweb/yasb/wiki/(Widget)-Launchpad) | A customizable launchpad for quick access to applications. |
 | [Libre Hardware Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Libre-HW-Monitor) | Connects to Libre Hardware Monitor to get sensor data. |
 | [Media](https://github.com/amnweb/yasb/wiki/(Widget)-Media) | Displays media controls and information. |
