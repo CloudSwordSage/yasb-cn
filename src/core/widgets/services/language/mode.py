@@ -26,3 +26,17 @@ def input_mode_key(conversion_mode: int | None) -> str:
     if conversion_mode is None:
         return "unknown"
     return "native" if conversion_mode & TF_CONVERSIONMODE_NATIVE else "alphanumeric"
+
+
+def format_probe(hr: int, variant_type: int | None, conversion_mode: int | None) -> str:
+    """Format a TSF conversion-compartment diagnostic record.
+
+    Args:
+        hr: HRESULT returned by ITfCompartment.GetValue.
+        variant_type: VARIANT type tag, when available.
+        conversion_mode: Raw conversion-mode bit field, when available.
+    Returns:
+        Compact debug text suitable for the YASB log.
+    """
+    conversion = "--" if conversion_mode is None else f"0x{conversion_mode:08X}"
+    return f"hr=0x{hr & 0xFFFFFFFF:08X} vt={variant_type} conversion={conversion} mode={input_mode_key(conversion_mode)}"

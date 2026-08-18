@@ -1,15 +1,17 @@
 import ctypes
+import logging
 import uuid
 from ctypes import wintypes
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from core.widgets.services.language.mode import callback_address, input_mode_key
+from core.widgets.services.language.mode import callback_address, format_probe, input_mode_key
 
 
 _S_OK = 0
 _VT_I4 = 3
 _VT_UI4 = 19
+logger = logging.getLogger("input_mode")
 
 
 class _Guid(ctypes.Structure):
@@ -95,12 +97,15 @@ class InputModeMonitor(QObject):
     def current(self) -> str:
         """Return the current conversion-mode label key."""
         if not self._compartment.value:
+            logger.debug("input_mode: compartment unavailable")
             return "unknown"
         value = _Variant()
         hr = _call(self._compartment, 4, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Variant)), ctypes.byref(value))
+        conversion = value.value.ulVal if value.vt in (_VT_I4, _VT_UI4) else None
+        logger.debug("input_mode: %s", format_probe(hr, value.vt, conversion))
         if hr < 0 or value.vt not in (_VT_I4, _VT_UI4):
             return "unknown"
-        return input_mode_key(value.value.ulVal)
+        return input_mode_key(conversion)
 
     def close(self) -> None:
         """Unsubscribe and release TSF interfaces."""
@@ -114,23 +119,33 @@ class InputModeMonitor(QObject):
                 pointer.value = None
 
     def _start(self) -> None:
-        create = ctypes.WinDLL("msctf").TF_CreateThreadMgr
-        create.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
-        create.restype = ctypes.c_long
-        if create(ctypes.byref(self._thread_manager)) < 0:
-            return
-        client_id = wintypes.DWORD()
-        if _call(self._thread_manager, 3, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)), ctypes.byref(client_id)) < 0:
-            return
-        if _call(self._thread_manager, 13, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(self._compartment_manager)) < 0:
-            return
-        if _call(self._compartment_manager, 3, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid), ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(_GUID_CONVERSION), ctypes.byref(self._compartment)) < 0:
-            return
-        if _call(self._compartment, 0, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid), ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(_IID_SOURCE), ctypes.byref(self._source)) < 0:
-            return
-        if _call(self._source, 3, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid), ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)), ctypes.byref(_IID_COMPARTMENT_EVENT_SINK), self._sink.pointer, ctypes.byref(self._cookie)) < 0:
-            return
-        self._active = True
+        try:
+            create = ctypes.WinDLL("msctf").TF_CreateThreadMgr
+            create.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+            create.restype = ctypes.c_long
+            if not self._succeeded("TF_CreateThreadMgr", create(ctypes.byref(self._thread_manager))):
+                return
+            client_id = wintypes.DWORD()
+            if not self._succeeded("ITfThreadMgr.Activate", _call(self._thread_manager, 3, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)), ctypes.byref(client_id))):
+                return
+            if not self._succeeded("ITfThreadMgr.GetGlobalCompartment", _call(self._thread_manager, 13, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(self._compartment_manager))):
+                return
+            if not self._succeeded("ITfCompartmentMgr.GetCompartment", _call(self._compartment_manager, 3, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid), ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(_GUID_CONVERSION), ctypes.byref(self._compartment))):
+                return
+            if not self._succeeded("ITfCompartment.QueryInterface(ITfSource)", _call(self._compartment, 0, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid), ctypes.POINTER(ctypes.c_void_p)), ctypes.byref(_IID_SOURCE), ctypes.byref(self._source))):
+                return
+            if not self._succeeded("ITfSource.AdviseSink", _call(self._source, 3, ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid), ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)), ctypes.byref(_IID_COMPARTMENT_EVENT_SINK), self._sink.pointer, ctypes.byref(self._cookie))):
+                return
+            self._active = True
+            logger.debug("input_mode: subscribed cookie=%d", self._cookie.value)
+        except OSError:
+            logger.debug("input_mode: TSF initialization raised", exc_info=True)
+
+    @staticmethod
+    def _succeeded(stage: str, hr: int) -> bool:
+        logger.debug("input_mode: %s hr=0x%08X", stage, hr & 0xFFFFFFFF)
+        return hr >= 0
 
     def _emit_current(self) -> None:
+        logger.debug("input_mode: ITfCompartmentEventSink.OnChange")
         self.changed.emit(self.current())
