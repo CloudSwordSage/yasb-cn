@@ -13,58 +13,58 @@ from core.widgets.services.quick_launch.providers.resources.icons import (
 
 _SYSTEM_COMMANDS = [
     {
-        "keywords": ["shutdown", "shut down", "power off", "turn off"],
-        "title": "Shutdown",
-        "description": "Shut down the computer",
+        "keywords": ["shutdown", "shut down", "power off", "turn off", "关机", "关闭电脑"],
+        "title": "关机",
+        "description": "关闭计算机",
         "icon": ICON_SHUTDOWN,
         "action": "shutdown",
     },
     {
-        "keywords": ["restart", "reboot"],
-        "title": "Restart",
-        "description": "Restart the computer",
+        "keywords": ["restart", "reboot", "重启", "重新启动"],
+        "title": "重新启动",
+        "description": "重新启动计算机",
         "icon": ICON_RESTART,
         "action": "restart",
     },
     {
-        "keywords": ["sleep", "stand by", "standby"],
-        "title": "Sleep",
-        "description": "Put the computer to sleep",
+        "keywords": ["sleep", "stand by", "standby", "睡眠", "待机"],
+        "title": "睡眠",
+        "description": "让计算机进入睡眠状态",
         "icon": ICON_SLEEP,
         "action": "sleep",
     },
     {
-        "keywords": ["hibernate"],
-        "title": "Hibernate",
-        "description": "Hibernate the computer",
+        "keywords": ["hibernate", "休眠"],
+        "title": "休眠",
+        "description": "让计算机进入休眠状态",
         "icon": ICON_HIBERNATE,
         "action": "hibernate",
     },
     {
-        "keywords": ["lock", "lock screen"],
-        "title": "Lock",
-        "description": "Lock the workstation",
+        "keywords": ["lock", "lock screen", "锁定", "锁屏"],
+        "title": "锁定",
+        "description": "锁定工作站",
         "icon": ICON_LOCK,
         "action": "lock",
     },
     {
-        "keywords": ["sign out", "signout", "log out", "logout", "log off", "logoff"],
-        "title": "Sign out",
-        "description": "Sign out of the current session",
+        "keywords": ["sign out", "signout", "log out", "logout", "log off", "logoff", "注销", "退出登录"],
+        "title": "注销",
+        "description": "注销当前会话",
         "icon": ICON_SIGN_OUT,
         "action": "signout",
     },
     {
-        "keywords": ["force shutdown", "force shut down"],
-        "title": "Force Shutdown",
-        "description": "Force shutdown (skip app close prompts)",
+        "keywords": ["force shutdown", "force shut down", "强制关机"],
+        "title": "强制关机",
+        "description": "强制关机（跳过应用关闭提示）",
         "icon": ICON_SHUTDOWN,
         "action": "force_shutdown",
     },
     {
-        "keywords": ["force restart", "force reboot"],
-        "title": "Force Restart",
-        "description": "Force restart (skip app close prompts)",
+        "keywords": ["force restart", "force reboot", "强制重启", "强制重新启动"],
+        "title": "强制重新启动",
+        "description": "强制重新启动（跳过应用关闭提示）",
         "icon": ICON_RESTART,
         "action": "force_restart",
     },
@@ -75,8 +75,8 @@ class SystemCommandsProvider(BaseProvider):
     """Provide system commands like shutdown, restart, lock, sleep."""
 
     name = "system_commands"
-    display_name = "System Commands"
-    input_placeholder = "Search system commands..."
+    display_name = "系统命令"
+    input_placeholder = "搜索系统命令..."
     icon = ICON_SYSTEM
 
     def __init__(self, config: dict | None = None):

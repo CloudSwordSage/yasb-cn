@@ -179,14 +179,14 @@ class VolumeWidget(BaseWidget):
             self.app_toggle_btn.setText(self.config.audio_menu.app_icons.toggle_up)
             self.app_toggle_btn.setProperty("class", "toggle-apps expanded")
             if self.config.tooltip:
-                set_tooltip(self.app_toggle_btn, "Collapse application volumes")
+                set_tooltip(self.app_toggle_btn, "收起应用音量")
         else:
             target_height = 0
             current_height = self.app_volumes_container.height()
             self.app_toggle_btn.setText(self.config.audio_menu.app_icons.toggle_down)
             self.app_toggle_btn.setProperty("class", "toggle-apps")
             if self.config.tooltip:
-                set_tooltip(self.app_toggle_btn, "Expand application volumes")
+                set_tooltip(self.app_toggle_btn, "展开应用音量")
 
         refresh_widget_style(self.app_toggle_btn)
 
@@ -392,7 +392,7 @@ class VolumeWidget(BaseWidget):
                 self.app_toggle_btn.setProperty("class", "toggle-apps")
                 self.app_toggle_btn.clicked.connect(lambda: self._toggle_app_volumes())
                 if self.config.tooltip:
-                    set_tooltip(self.app_toggle_btn, "Expand application volumes")
+                    set_tooltip(self.app_toggle_btn, "展开应用音量")
                 slider_row.addWidget(self.app_toggle_btn)
 
         global_layout.addLayout(slider_row)
@@ -542,8 +542,8 @@ class VolumeWidget(BaseWidget):
                 if self.config.icons
                 else ""
             )
-            mute_status, icon_volume, level_volume = None, fallback_icon, "No Device"
-            set_tooltip(self, "No audio device connected.")
+            mute_status, icon_volume, level_volume = None, fallback_icon, "无设备"
+            set_tooltip(self, "未连接音频设备。")
         else:
             try:
                 mute_status = self.volume.GetMute()
@@ -556,7 +556,7 @@ class VolumeWidget(BaseWidget):
 
             except Exception as e:
                 logging.error("Failed to get volume info: %s", e)
-                mute_status, icon_volume, level_volume = None, "", "No Device"
+                mute_status, icon_volume, level_volume = None, "", "无设备"
 
         label_options = {"{icon}": icon_volume, "{level}": level_volume}
 
@@ -609,7 +609,7 @@ class VolumeWidget(BaseWidget):
         current_mute_status = self.volume.GetMute()
         current_volume = round(self.volume.GetMasterVolumeLevelScalar() * 100)
         if self.config.tooltip:
-            set_tooltip(self, f"Volume {current_volume}% {'(Muted)' if current_mute_status == 1 else ''}")
+            set_tooltip(self, f"音量 {current_volume}% {'（已静音）' if current_mute_status == 1 else ''}")
 
         if isinstance(self.config.icons, dict):
             if current_mute_status == 1 and "muted" in self.config.icons:

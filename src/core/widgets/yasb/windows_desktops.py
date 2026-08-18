@@ -83,18 +83,18 @@ class WorkspaceButton(QPushButton):
         menu.setProperty("class", "context-menu")
         # Apply Windows rounded corners to the QMenu when it is shown
 
-        act_rename = QAction("Rename", self)
+        act_rename = QAction("重命名", self)
         act_rename.triggered.connect(self.rename_desktop)
         menu.addAction(act_rename)
 
         if len(WindowsDesktopService.get_desktops()) > 1:
-            act_delete = QAction("Delete", self)
+            act_delete = QAction("删除", self)
             act_delete.triggered.connect(self.delete_desktop)
             menu.addAction(act_delete)
 
         menu.addSeparator()
 
-        act_create = QAction("Create New Desktop", self)
+        act_create = QAction("新建桌面", self)
         act_create.triggered.connect(self.create_new_desktop)
         menu.addAction(act_create)
 
@@ -106,20 +106,20 @@ class WorkspaceButton(QPushButton):
             active_hwnd = app_view.hwnd
             menu.addSeparator()
 
-            act_move_here = QAction("Move Window Here", self)
+            act_move_here = QAction("将窗口移到此处", self)
             act_move_here.triggered.connect(
                 lambda checked=False, n=self.workspace_index, h=active_hwnd: self.move_active_window_to(n, h)
             )
             menu.addAction(act_move_here)
 
-            move_menu = QMenu("Move Window To", self.window())
+            move_menu = QMenu("将窗口移至", self.window())
             apply_qmenu_style(move_menu)
             move_menu.setProperty("class", "context-menu")
 
             try:
                 desktops = svc.get_desktops()
                 for desktop in desktops:
-                    desk_name = desktop.name.strip() if desktop.name.strip() else f"Desktop {desktop.number}"
+                    desk_name = desktop.name.strip() if desktop.name.strip() else f"桌面 {desktop.number}"
                     act = QAction(desk_name, self)
                     target_number = desktop.number
                     act.triggered.connect(
@@ -134,7 +134,7 @@ class WorkspaceButton(QPushButton):
                 is_win_pinned = app_view.is_pinned()
             except Exception:
                 is_win_pinned = False
-            act_pin = QAction("Unpin Window From All Desktops" if is_win_pinned else "Pin Window To All Desktops", self)
+            act_pin = QAction("从所有桌面取消固定窗口" if is_win_pinned else "将窗口固定到所有桌面", self)
             act_pin.triggered.connect(lambda checked=False, h=active_hwnd: self.toggle_pin_window(h))
             menu.addAction(act_pin)
 
@@ -142,17 +142,17 @@ class WorkspaceButton(QPushButton):
                 is_app_pinned = app_view.is_app_pinned()
             except Exception:
                 is_app_pinned = False
-            act_pin_app = QAction("Unpin App From All Desktops" if is_app_pinned else "Pin App To All Desktops", self)
+            act_pin_app = QAction("从所有桌面取消固定应用" if is_app_pinned else "将应用固定到所有桌面", self)
             act_pin_app.triggered.connect(lambda checked=False, h=active_hwnd: self.toggle_pin_app(h))
             menu.addAction(act_pin_app)
 
         if not is_windows_10():
             menu.addSeparator()
-            act_set_wall = QAction("Set Wallpaper On This Desktop", self)
+            act_set_wall = QAction("设为此桌面的壁纸", self)
             act_set_wall.triggered.connect(self.set_wallpaper)
             menu.addAction(act_set_wall)
 
-            act_set_wall_all = QAction("Set Wallpaper On All Desktops", self)
+            act_set_wall_all = QAction("设为所有桌面的壁纸", self)
             act_set_wall_all.triggered.connect(self.set_wallpaper_all)
             menu.addAction(act_set_wall_all)
 
@@ -161,7 +161,7 @@ class WorkspaceButton(QPushButton):
 
     def set_wallpaper(self):
         image_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Wallpaper Image", "", "Images (*.png *.jpg *.jpeg *.bmp *.gif)"
+            self, "选择壁纸图像", "", "图像 (*.png *.jpg *.jpeg *.bmp *.gif)"
         )
         if image_path:
             try:
@@ -171,7 +171,7 @@ class WorkspaceButton(QPushButton):
 
     def set_wallpaper_all(self):
         image_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Wallpaper Image", "", "Images (*.png *.jpg *.jpeg *.bmp *.gif)"
+            self, "选择壁纸图像", "", "图像 (*.png *.jpg *.jpeg *.bmp *.gif)"
         )
         if image_path:
             try:
@@ -206,26 +206,26 @@ class WorkspaceButton(QPushButton):
         container_layout = QVBoxLayout(container_frame)
         container_layout.setContentsMargins(0, 0, 0, 0)
 
-        title_label = QLabel("Rename Desktop")
+        title_label = QLabel("重命名桌面")
         title_label.setProperty("class", "popup-title")
         container_layout.addWidget(title_label)
 
-        desc_label = QLabel("Enter a new name for this desktop.")
+        desc_label = QLabel("请输入此桌面的新名称。")
         desc_label.setProperty("class", "popup-description")
         container_layout.addWidget(desc_label)
 
         name_edit = QLineEdit()
         name_edit.setProperty("class", "rename-input")
         name_edit.setText(current_name)
-        name_edit.setPlaceholderText("Desktop name")
+        name_edit.setPlaceholderText("桌面名称")
         name_edit.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         name_edit.selectAll()
         name_edit.setFocus()
         container_layout.addWidget(name_edit)
 
-        rename_btn = QPushButton("Rename")
+        rename_btn = QPushButton("重命名")
         rename_btn.setProperty("class", "button save")
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton("取消")
         cancel_btn.setProperty("class", "button cancel")
 
         def do_rename():

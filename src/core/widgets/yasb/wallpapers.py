@@ -31,7 +31,7 @@ class WallpapersWidget(BaseWidget):
         self.build_widget_label(self.config.label, None)
 
         if self.config.tooltip:
-            set_tooltip(self, "Change Wallpaper")
+            set_tooltip(self, "更换壁纸")
 
         self.register_callback("toggle_gallery", self._toggle_widget)
         self.register_callback("change_wallpaper", self._manager.change_background)

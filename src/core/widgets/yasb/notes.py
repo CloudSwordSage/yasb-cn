@@ -202,7 +202,7 @@ class NotesWidget(BaseWidget):
                 self._add_note_to_menu(note, self.scroll_layout)
         else:
             # Show empty state
-            empty_label = QLabel(f"{self.config.icons.note}  No notes yet!")
+            empty_label = QLabel(f"{self.config.icons.note}  暂无笔记！")
             empty_label.setProperty("class", "empty-list")
             empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.scroll_layout.addWidget(empty_label)
@@ -301,7 +301,7 @@ class NotesWidget(BaseWidget):
         header_layout.setSpacing(0)
         header_layout.setContentsMargins(8, 4, 8, 4)
 
-        header_title = QLabel("Notes")
+        header_title = QLabel("笔记")
         header_title.setProperty("class", "header-title")
         header_layout.addWidget(header_title)
 
@@ -313,7 +313,7 @@ class NotesWidget(BaseWidget):
             "float-button",
             self._floating_controller.toggle_floating,
         )
-        set_tooltip(self.float_btn, "Float window")
+        set_tooltip(self.float_btn, "浮动窗口")
         header_layout.addWidget(self.float_btn)
 
         self.close_btn = self._build_menu_button(
@@ -323,7 +323,7 @@ class NotesWidget(BaseWidget):
             self._close_menu,
             visible=False,
         )
-        set_tooltip(self.close_btn, "Close window")
+        set_tooltip(self.close_btn, "关闭窗口")
         header_layout.addWidget(self.close_btn)
 
         layout.addWidget(header_widget)
@@ -362,7 +362,7 @@ class NotesWidget(BaseWidget):
 
         # Text input field
         self.note_input = NoteTextEdit(self)
-        self.note_input.setPlaceholderText("Type your note here...")
+        self.note_input.setPlaceholderText("在此输入笔记…")
         self.note_input.setProperty("class", "note-input")
 
         # Restore pending content if any
@@ -388,13 +388,13 @@ class NotesWidget(BaseWidget):
         button_layout.setSpacing(5)
 
         # Add Note button
-        self.add_button = QPushButton("Add Note")
+        self.add_button = QPushButton("添加笔记")
         self.add_button.setProperty("class", "add-button")
         self.add_button.clicked.connect(self.add_note_from_input)
         button_layout.addWidget(self.add_button)
 
         # Cancel button (hidden by default)
-        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button = QPushButton("取消")
         self.cancel_button.setProperty("class", "cancel-button")
         self.cancel_button.clicked.connect(self._cancel_editing)
         self.cancel_button.hide()
@@ -402,7 +402,7 @@ class NotesWidget(BaseWidget):
 
         # If we are in edit mode, update buttons
         if self.editing_note:
-            self.add_button.setText("Save Changes")
+            self.add_button.setText("保存更改")
             self.cancel_button.show()
 
         input_layout.addWidget(button_container)
@@ -454,7 +454,7 @@ class NotesWidget(BaseWidget):
                 if current_pos is not None:
                     self.menu.move(current_pos)
                 self.float_btn.setText(self.icons["float_off"])
-                set_tooltip(self.float_btn, "Dock window")
+                set_tooltip(self.float_btn, "停靠窗口")
                 self.close_btn.setVisible(True)
             elif self._start_floating:
                 self._floating_controller.toggle_floating()
@@ -489,7 +489,7 @@ class NotesWidget(BaseWidget):
                     self.notes[i] = note_data
                     break
             self.editing_note = None  # Reset edit mode
-            self.add_button.setText("Add Note")
+            self.add_button.setText("添加笔记")
             self.cancel_button.hide()
         else:
             # Add new note
@@ -590,7 +590,7 @@ class NotesWidget(BaseWidget):
         self.note_input.setFocus()
 
         # Update UI to show we're in edit mode
-        self.add_button.setText("Save Changes")
+        self.add_button.setText("保存更改")
         self.cancel_button.show()
 
     def _delete_note(self, note: dict[str, str]) -> None:
@@ -610,7 +610,7 @@ class NotesWidget(BaseWidget):
         """Cancel editing mode"""
         self.editing_note = None
         self.note_input.clear()
-        self.add_button.setText("Add Note")
+        self.add_button.setText("添加笔记")
         self.cancel_button.hide()
 
     def _copy_note(self, note: dict[str, str]) -> None:

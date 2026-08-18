@@ -48,7 +48,7 @@ class GitHubAuthDialog(ViewBase, QDialog):
         QTimer.singleShot(100, self._start_device_flow)
 
     def _build_window(self) -> None:
-        self.setWindowTitle("GitHub Authorization - YASB")
+        self.setWindowTitle("GitHub 授权 - YASB")
         self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.setWindowFlag(Qt.WindowType.Window, True)
@@ -64,11 +64,11 @@ class GitHubAuthDialog(ViewBase, QDialog):
         layout.setSpacing(6)
 
         # Title
-        self._title_label = TextBlock("Sign in to GitHub", variant="subtitle", parent=self)
+        self._title_label = TextBlock("登录 GitHub", variant="subtitle", parent=self)
         layout.addWidget(self._title_label)
 
         # Instructions
-        self._instructions = TextBlock("Requesting authorization code...", variant="caption", parent=self)
+        self._instructions = TextBlock("正在请求授权码...", variant="caption", parent=self)
         self._instructions.setWordWrap(True)
         layout.addWidget(self._instructions)
 
@@ -89,7 +89,7 @@ class GitHubAuthDialog(ViewBase, QDialog):
         self._code_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         code_layout.addWidget(self._code_label, 1)
 
-        self._copy_btn = Button("Copy", font_size=12, font_weight="demibold", parent=self)
+        self._copy_btn = Button("复制", font_size=12, font_weight="demibold", parent=self)
         self._copy_btn.setFixedSize(80, 30)
         self._copy_btn.setEnabled(False)
         self._copy_btn.clicked.connect(self._copy_code)
@@ -99,7 +99,7 @@ class GitHubAuthDialog(ViewBase, QDialog):
         layout.addWidget(self._code_frame)
 
         # Status
-        self._status_label = TextBlock("Connecting to GitHub...", variant="caption", parent=self)
+        self._status_label = TextBlock("正在连接 GitHub...", variant="caption", parent=self)
         layout.addWidget(self._status_label)
 
         layout.addStretch()
@@ -115,11 +115,11 @@ class GitHubAuthDialog(ViewBase, QDialog):
         btn_row.setSpacing(8)
         btn_row.addStretch()
 
-        self._open_btn = Button("Open Browser", variant="accent", font_size=12, font_weight="demibold", parent=self)
+        self._open_btn = Button("打开浏览器", variant="accent", font_size=12, font_weight="demibold", parent=self)
         self._open_btn.clicked.connect(self._open_browser)
         btn_row.addWidget(self._open_btn)
 
-        self._cancel_btn = Button("Cancel", font_size=12, font_weight="demibold", parent=self)
+        self._cancel_btn = Button("取消", font_size=12, font_weight="demibold", parent=self)
         self._cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(self._cancel_btn)
 
@@ -166,8 +166,8 @@ class GitHubAuthDialog(ViewBase, QDialog):
         self._code_label.setText(self._user_code)
         self._copy_btn.setEnabled(True)
         self._apply_frame_styles()
-        self._status_label.setText("Waiting for authorization...")
-        self._instructions.setText("Your browser has been opened. Enter the code below at github.com/login/device:")
+        self._status_label.setText("正在等待授权...")
+        self._instructions.setText("浏览器已打开。请在 github.com/login/device 输入下方代码：")
 
         QDesktopServices.openUrl(QUrl("https://github.com/login/device"))
 
@@ -194,10 +194,10 @@ class GitHubAuthDialog(ViewBase, QDialog):
         self._result_label.setWordWrap(True)
         self._result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.layout().insertWidget(0, self._result_label, 1)
-        self._cancel_btn.setText("Close")
+        self._cancel_btn.setText("关闭")
 
     def _finish_success(self, token: str):
-        self._show_result_page("Authorization successful!")
+        self._show_result_page("授权成功！")
         self.auth_completed.emit(token)
         QTimer.singleShot(1800, self.accept)
 
@@ -207,8 +207,8 @@ class GitHubAuthDialog(ViewBase, QDialog):
     def _copy_code(self):
         if self._user_code:
             QApplication.clipboard().setText(self._user_code)
-            self._copy_btn.setText("Copied")
-            QTimer.singleShot(1000, lambda: self._copy_btn.setText("Copy"))
+            self._copy_btn.setText("已复制")
+            QTimer.singleShot(1000, lambda: self._copy_btn.setText("复制"))
 
     def _open_browser(self):
         QDesktopServices.openUrl(QUrl("https://github.com/login/device"))

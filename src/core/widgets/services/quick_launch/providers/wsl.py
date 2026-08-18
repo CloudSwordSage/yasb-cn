@@ -125,7 +125,7 @@ class WslProvider(BaseProvider):
 
     name = "wsl"
     display_name = "WSL"
-    input_placeholder = "Search WSL distributions..."
+    input_placeholder = "搜索 WSL 发行版..."
     icon = ICON_WSL
 
     def __init__(self, config: dict | None = None):
@@ -203,8 +203,8 @@ class WslProvider(BaseProvider):
                 self._fetch_in_background()
             return [
                 ProviderResult(
-                    title="Loading WSL distributions...",
-                    description="Please wait",
+                    title="正在加载 WSL 发行版...",
+                    description="请稍候",
                     icon_char=ICON_WSL,
                     provider=self.name,
                     is_loading=True,
@@ -215,8 +215,8 @@ class WslProvider(BaseProvider):
         if self._load_error == "not_installed":
             return [
                 ProviderResult(
-                    title="WSL is not installed",
-                    description="Press Enter to run: wsl --install",
+                    title="未安装 WSL",
+                    description="按 Enter 运行：wsl --install",
                     icon_char=ICON_WARNING,
                     provider=self.name,
                     action_data={"action": "wsl_install"},
@@ -227,8 +227,8 @@ class WslProvider(BaseProvider):
         if self._load_error == "timeout":
             return [
                 ProviderResult(
-                    title="WSL timed out",
-                    description="WSL is installed but not responding",
+                    title="WSL 响应超时",
+                    description="已安装 WSL，但没有响应",
                     icon_char=ICON_WARNING,
                     provider=self.name,
                 )
@@ -238,7 +238,7 @@ class WslProvider(BaseProvider):
         if self._load_error:
             return [
                 ProviderResult(
-                    title="WSL error",
+                    title="WSL 错误",
                     description=self._load_error,
                     icon_char=ICON_WARNING,
                     provider=self.name,
@@ -253,19 +253,20 @@ class WslProvider(BaseProvider):
             installed = [d for d in installed if query in d["name"].lower()]
 
         if self._installed:
-            results.append(ProviderResult(title="Installed Distributions", provider=self.name, is_separator=True))
+            results.append(ProviderResult(title="已安装的发行版", provider=self.name, is_separator=True))
 
         for d in installed:
             state = d["state"]
             is_running = state.lower() == "running"
             is_pending = d["name"] in self._pending
+            state_label = {"Running": "正在运行", "Stopped": "已停止", "Unknown": "未知"}.get(state, state)
             version_part = f" · WSL{d['version']}" if d["version"] else ""
-            badge = " · Default" if d["is_default"] else ""
-            enter_hint = "Stop" if is_running else "Start"
+            badge = " · 默认" if d["is_default"] else ""
+            enter_hint = "停止" if is_running else "启动"
             results.append(
                 ProviderResult(
                     title=d["name"],
-                    description=f"{state}{version_part}{badge} · Enter to {enter_hint}",
+                    description=f"{state_label}{version_part}{badge} · 按 Enter {enter_hint}",
                     icon_char=ICON_WSL_RUNNING if is_running else ICON_WSL_STOPPED,
                     provider=self.name,
                     id=f"installed:{d['name']}",
@@ -282,8 +283,8 @@ class WslProvider(BaseProvider):
         if not self._installed and not query:
             results.append(
                 ProviderResult(
-                    title="No distributions installed",
-                    description="Install one from the list below",
+                    title="未安装发行版",
+                    description="请从下方列表安装一个发行版",
                     icon_char=ICON_WSL,
                     provider=self.name,
                 )
@@ -294,7 +295,7 @@ class WslProvider(BaseProvider):
             if query:
                 online = [d for d in online if query in d["name"].lower() or query in d["friendly"].lower()]
             if online:
-                results.append(ProviderResult(title="Available Online", provider=self.name, is_separator=True))
+                results.append(ProviderResult(title="可在线安装", provider=self.name, is_separator=True))
                 for d in online:
                     results.append(
                         ProviderResult(
@@ -310,8 +311,8 @@ class WslProvider(BaseProvider):
         if not results or all(r.is_separator for r in results):
             return [
                 ProviderResult(
-                    title="No WSL distributions found",
-                    description="Try a different search term",
+                    title="未找到 WSL 发行版",
+                    description="请尝试其他搜索词",
                     icon_char=ICON_WSL,
                     provider=self.name,
                 )
@@ -346,15 +347,15 @@ class WslProvider(BaseProvider):
         is_default = result.action_data.get("is_default", False)
         actions: list[ProviderMenuAction] = []
         if state == "running":
-            actions.append(ProviderMenuAction(id="open_shell", label="Open shell"))
-            actions.append(ProviderMenuAction(id="stop", label="Stop", separator_before=True))
+            actions.append(ProviderMenuAction(id="open_shell", label="打开终端"))
+            actions.append(ProviderMenuAction(id="stop", label="停止", separator_before=True))
         else:
-            actions.append(ProviderMenuAction(id="start", label="Start"))
-            actions.append(ProviderMenuAction(id="open_shell", label="Open shell"))
+            actions.append(ProviderMenuAction(id="start", label="启动"))
+            actions.append(ProviderMenuAction(id="open_shell", label="打开终端"))
         if not is_default:
-            actions.append(ProviderMenuAction(id="set_default", label="Set as default", separator_before=True))
+            actions.append(ProviderMenuAction(id="set_default", label="设为默认", separator_before=True))
         actions.append(
-            ProviderMenuAction(id="unregister", label="Unregister (remove) distribution", separator_before=True)
+            ProviderMenuAction(id="unregister", label="注销（移除）发行版", separator_before=True)
         )
         return actions
 

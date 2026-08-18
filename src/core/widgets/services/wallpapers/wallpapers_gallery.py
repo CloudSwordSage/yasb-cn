@@ -332,13 +332,13 @@ class ImageGallery(QMainWindow):
             button_layout = QHBoxLayout()
             button_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            self.prev_button = QPushButton("Prev")
+            self.prev_button = QPushButton("上一页")
             self.prev_button.setProperty("class", "wallpapers-gallery-buttons")
             self.prev_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             self.prev_button.clicked.connect(self.load_prev_images)
             button_layout.addWidget(self.prev_button)
 
-            self.next_button = QPushButton("Next")
+            self.next_button = QPushButton("下一页")
             self.next_button.setProperty("class", "wallpapers-gallery-buttons")
             self.next_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             self.next_button.clicked.connect(self.load_next_images)
@@ -686,14 +686,14 @@ class ImageGallery(QMainWindow):
         apply_qmenu_style(menu)
         menu.setProperty("class", "context-menu")
 
-        action_all = menu.addAction("Set on all screens")
+        action_all = menu.addAction("设为所有显示器的壁纸")
         action_all.triggered.connect(lambda: self._apply_wallpaper(image_path, None))
 
         monitor_ids = WallpaperManager().get_monitor_ids()
         if len(monitor_ids) > 1:
             menu.addSeparator()
             for i, monitor_id in enumerate(monitor_ids):
-                action = menu.addAction(f"Set on screen {i + 1}")
+                action = menu.addAction(f"设为显示器 {i + 1} 的壁纸")
                 action.triggered.connect(partial(self._apply_wallpaper_on_monitor, image_path, monitor_id))
 
         self._menu_open = True

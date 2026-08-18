@@ -222,7 +222,7 @@ class PomodoroWidget(BaseWidget):
         try:
             for inst in PomodoroWidget._instances:
                 if hasattr(inst, "_dialog") and inst._dialog is not None and inst._dialog.isVisible():
-                    inst._toggle_button.setText("Pause")
+                    inst._toggle_button.setText("暂停")
                     inst._toggle_button.setProperty("class", "button pause")
                     refresh_widget_style(inst._toggle_button)
         except RuntimeError:
@@ -236,7 +236,7 @@ class PomodoroWidget(BaseWidget):
         try:
             for inst in PomodoroWidget._instances:
                 if hasattr(inst, "_dialog") and inst._dialog is not None and inst._dialog.isVisible():
-                    inst._toggle_button.setText("Start")
+                    inst._toggle_button.setText("开始")
                     inst._toggle_button.setProperty("class", "button start")
                     refresh_widget_style(inst._toggle_button)
                     inst._progress_gauge.setStatusText(f"Paused\n{inst._format_time(inst._remaining_time)}")
@@ -260,7 +260,7 @@ class PomodoroWidget(BaseWidget):
                     inst._progress_gauge.setValue(0, skip_animation=True)
                     inst._progress_gauge.setStatusText(f"Work\n{inst._format_time(self.config.work_duration * 60)}")
 
-                    inst._toggle_button.setText("Start")
+                    inst._toggle_button.setText("开始")
                     inst._toggle_button.setProperty("class", "button start")
                     refresh_widget_style(inst._toggle_button)
         except RuntimeError:
@@ -386,7 +386,7 @@ class PomodoroWidget(BaseWidget):
         header_widget.setLayout(header_layout)
 
         # Add header title
-        title_label = QLabel("Pomodoro Timer")
+        title_label = QLabel("番茄钟")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignCenter)
         title_label.setProperty("class", "header")
         header_layout.addWidget(title_label)
@@ -407,7 +407,7 @@ class PomodoroWidget(BaseWidget):
         self._progress_gauge.setBreakMode(self._is_break)  # Set correct mode
 
         # Set the status text directly on the circular widget
-        status_text = "Paused" if self._is_paused else ("Break" if self._is_break else "Work")
+        status_text = "已暂停" if self._is_paused else ("休息" if self._is_break else "专注")
 
         self._progress_gauge.setStatusText(f"{status_text}\n{self._format_time(self._remaining_time)}")
         self._status_label = self._progress_gauge._status_label
@@ -423,7 +423,7 @@ class PomodoroWidget(BaseWidget):
 
         # Session count
         self._session_label = QLabel(
-            f"Session: {self._session_count + 1}"
+            f"第 {self._session_count + 1} 轮"
             + (f"/{self.config.session_target}" if self.config.session_target > 0 else "")
         )
         self._session_label.setProperty("class", "session")
@@ -438,19 +438,19 @@ class PomodoroWidget(BaseWidget):
         button_widget.setLayout(button_layout)
 
         # Start/Pause button
-        self._toggle_button = QPushButton("Pause" if self._is_running else "Start")
+        self._toggle_button = QPushButton("暂停" if self._is_running else "开始")
         self._toggle_button.setProperty("class", "button " + ("pause" if self._is_running else "start"))
         self._toggle_button.clicked.connect(self._toggle_timer)
         button_layout.addWidget(self._toggle_button)
 
         # Reset button
-        reset_button = QPushButton("Reset")
+        reset_button = QPushButton("重置")
         reset_button.setProperty("class", "button reset")
         reset_button.clicked.connect(self._reset_timer)
         button_layout.addWidget(reset_button)
 
         # Skip button (to next phase)
-        skip_button = QPushButton("Skip")
+        skip_button = QPushButton("跳过")
         skip_button.setProperty("class", "button skip")
         skip_button.clicked.connect(self._skip_to_next_phase)
         button_layout.addWidget(skip_button)

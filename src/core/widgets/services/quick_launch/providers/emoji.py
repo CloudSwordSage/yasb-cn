@@ -43,8 +43,8 @@ class EmojiProvider(BaseProvider):
     """Search and copy emojis to clipboard."""
 
     name = "emoji"
-    display_name = "Emoji Search"
-    input_placeholder = "Search emojis..."
+    display_name = "表情搜索"
+    input_placeholder = "搜索表情..."
     icon = ICON_EMOJI
 
     def __init__(self, config: dict | None = None):
@@ -105,7 +105,7 @@ class EmojiProvider(BaseProvider):
                     results.append(
                         ProviderResult(
                             title=name,
-                            description="Pinned emoji - press Enter to copy",
+                            description="已固定的表情 - 按 Enter 复制",
                             icon_char=emoji_char,
                             provider=self.name,
                             action_data={"emoji": emoji_char, "name": name},
@@ -114,8 +114,8 @@ class EmojiProvider(BaseProvider):
                     )
             results.append(
                 ProviderResult(
-                    title="Emoji Search",
-                    description="Type a name to search emojis - e.g. smile, heart, fire",
+                    title="表情搜索",
+                    description="输入名称搜索表情 - 例如 smile、heart、fire",
                     icon_char=ICON_EMOJI,
                     provider=self.name,
                 )
@@ -126,8 +126,8 @@ class EmojiProvider(BaseProvider):
         if not emojis:
             return [
                 ProviderResult(
-                    title="Emoji data not available",
-                    description="The emoji.json data file could not be loaded",
+                    title="表情数据不可用",
+                    description="无法加载 emoji.json 数据文件",
                     icon_char=ICON_EMOJI,
                     provider=self.name,
                 )
@@ -144,7 +144,7 @@ class EmojiProvider(BaseProvider):
                 pinned = self.is_pinned(emoji_char)
                 result = ProviderResult(
                     title=name,
-                    description=f"{group}{' - pinned' if pinned else ''} - press Enter to copy",
+                    description=f"{group}{' - 已固定' if pinned else ''} - 按 Enter 复制",
                     icon_char=emoji_char,
                     provider=self.name,
                     action_data={"emoji": emoji_char, "name": name, "pinned": pinned},
@@ -187,8 +187,8 @@ class EmojiProvider(BaseProvider):
             return []
         pinned = self.is_pinned(emoji)
         return [
-            ProviderMenuAction(id="copy", label="Copy"),
-            ProviderMenuAction(id="toggle_pin", label="Unpin emoji" if pinned else "Pin emoji"),
+            ProviderMenuAction(id="copy", label="复制"),
+            ProviderMenuAction(id="toggle_pin", label="取消固定表情" if pinned else "固定表情"),
         ]
 
     def execute_context_menu_action(self, action_id: str, result: ProviderResult) -> ProviderMenuActionResult:

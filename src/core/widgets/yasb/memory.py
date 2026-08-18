@@ -101,26 +101,26 @@ class MemoryWidget(BaseWidget):
 
         stat_rows = [
             (
-                "In use",
+                "已使用",
                 "used",
                 format_size(data.virtual.used) if data else "\u2014",
-                "All memory",
+                "全部内存",
                 "total",
                 format_size(data.virtual.total) if data else "\u2014",
             ),
             (
-                "Cached",
+                "缓存",
                 "cached",
                 format_size(data.cached_bytes) if data else "\u2014",
-                "Available",
+                "可用",
                 "avail",
                 format_size(data.virtual.available) if data else "\u2014",
             ),
             (
-                "Swap used",
+                "已用交换空间",
                 "swap",
                 format_size(data.swap.used) if data else "\u2014",
-                "Utilization",
+                "使用率",
                 "util",
                 f"{data.virtual.percent:.0f}%" if data else "\u2014",
             ),
@@ -130,7 +130,7 @@ class MemoryWidget(BaseWidget):
             parent=self,
             menu_config=menu,
             popup_class_name="memory-popup",
-            title="<b>Memory</b> Usage",
+            title="<b>内存</b>使用率",
             history=self._history,
             stat_rows=stat_rows,
             graph_class="memory-graph",
@@ -141,7 +141,7 @@ class MemoryWidget(BaseWidget):
             main_layout = popup.layout()
             graph_container = popup._graph.parentWidget()
             graph_idx = main_layout.indexOf(graph_container)
-            util_label = QLabel("Utilization")
+            util_label = QLabel("使用率")
             util_label.setProperty("class", "graph-title")
             main_layout.insertWidget(graph_idx, util_label)
 

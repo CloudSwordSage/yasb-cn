@@ -71,7 +71,7 @@ class WeatherWidget(BaseWidget):
         self.build_widget_label(
             self._label_content,
             self._label_alt_content,
-            label_placeholder="weather update...",
+            label_placeholder="正在更新天气...",
             hide_icons=True,
         )
         self.register_callback("toggle_label", self._toggle_label)
@@ -115,7 +115,7 @@ class WeatherWidget(BaseWidget):
             icon_label.setStyleSheet("font-size: 72px;")
             icon_label.setProperty("class", "placeholder-icon")
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            info_label = QLabel("Weather data not available")
+            info_label = QLabel("天气数据不可用")
             info_label.setProperty("class", "label")
             info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(icon_label)
@@ -173,7 +173,7 @@ class WeatherWidget(BaseWidget):
                 btn = QLabel(icon)
                 btn.setProperty("class", f"hourly-data-button{' active' if data_type == default_data_type else ''}")
                 btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                set_tooltip(btn, data_type.capitalize(), delay=400, position="top")
+                set_tooltip(btn, {"temperature": "温度", "rain": "降雨", "snow": "降雪"}[data_type], delay=400, position="top")
                 buttons_layout.addWidget(btn)
                 buttons.append(btn)
 
@@ -199,14 +199,14 @@ class WeatherWidget(BaseWidget):
         today_label0.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         today_label1 = QLabel(
-            f"Feels like {self._weather_data['{feelslike}']} - {self._weather_data['{condition_text}']} - Humidity {self._weather_data['{humidity}']}\nPressure {self._weather_data['{pressure}']} - Visibility {self._weather_data['{vis}']} - Cloud {self._weather_data['{cloud}']}%\nRain chance {self._weather_data['{daily_chance_of_rain}']} - Snow chance {self._weather_data['{daily_chance_of_snow}']}"
+            f"体感温度 {self._weather_data['{feelslike}']} - {self._weather_data['{condition_text}']} - 湿度 {self._weather_data['{humidity}']}\n气压 {self._weather_data['{pressure}']} - 能见度 {self._weather_data['{vis}']} - 云量 {self._weather_data['{cloud}']}%\n降雨概率 {self._weather_data['{daily_chance_of_rain}']} - 降雪概率 {self._weather_data['{daily_chance_of_snow}']}"
         )
         today_label1.setProperty("class", "label")
         today_label1.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         today_label2 = QLabel(
             f"{self._weather_data['{alert_title}']}"
-            f"{'<br>Alert expires ' + self._weather_data['{alert_end_date}'] if self._weather_data['{alert_end_date}'] else ''}"
+                f"{'<br>警报将在 ' + self._weather_data['{alert_end_date}'] + ' 到期' if self._weather_data['{alert_end_date}'] else ''}"
             f"<br>{self._weather_data['{alert_desc}']}"
         )
         today_label2.setProperty("class", "label alert")
@@ -267,14 +267,14 @@ class WeatherWidget(BaseWidget):
                 frame_day.clicked.connect(partial(switch_hourly_data, i))
             frame_day.setProperty("class", "weather-card-day")
             if i == 0:
-                name = "Today"
+                name = "今天"
                 min_temp = self._weather_data["{min_temp}"]
                 max_temp = self._weather_data["{max_temp}"]
             else:
                 name = self._weather_data[f"{{day{i}_name}}"]
                 min_temp = self._weather_data[f"{{day{i}_min_temp}}"]
                 max_temp = self._weather_data[f"{{day{i}_max_temp}}"]
-            row_day_label = QLabel(f"{name}\nMin: {min_temp}\nMax: {max_temp}", frame_day)
+            row_day_label = QLabel(f"{name}\n最低：{min_temp}\n最高：{max_temp}", frame_day)
             row_day_label.setProperty("class", "label")
 
             # Create the icon label and pixmap
@@ -379,8 +379,8 @@ class WeatherWidget(BaseWidget):
 
         if self.config.tooltip:
             tooltip = (
-                f"<strong>{self._weather_data['{location}']}</strong><br><br>Temperature<br>"
-                f"Min {self._weather_data['{min_temp}']} / Max {self._weather_data['{max_temp}']}"
+                f"<strong>{self._weather_data['{location}']}</strong><br><br>温度<br>"
+                f"最低 {self._weather_data['{min_temp}']} / 最高 {self._weather_data['{max_temp}']}"
             )
 
             try:
@@ -390,10 +390,10 @@ class WeatherWidget(BaseWidget):
                 if rain != "N/A" and snow != "N/A" and (float(rain.rstrip("%")) > 0 or float(snow.rstrip("%")) > 0):
                     precip: list[str] = []
                     if float(rain.rstrip("%")) > 0:
-                        precip.append(f"Rain {rain}")
+                        precip.append(f"降雨 {rain}")
                     if float(snow.rstrip("%")) > 0:
-                        precip.append(f"Snow {snow}")
-                    tooltip += f"<br><br>Precipitation<br>{' / '.join(precip)}"
+                        precip.append(f"降雪 {snow}")
+                    tooltip += f"<br><br>降水<br>{' / '.join(precip)}"
             except (ValueError, KeyError) as e:
                 logging.debug("Could not parse precipitation for tooltip: %s", e)
 
@@ -436,9 +436,9 @@ class WeatherWidget(BaseWidget):
 
     def _format_alert_datetime(self, iso_datetime: str | None):
         if iso_datetime is None:
-            return "Unknown"
+            return "未知"
         dt = datetime.fromisoformat(iso_datetime)
-        return dt.strftime("%B %d, %Y at %H:%M")
+        return f"{dt.year}年{dt.month}月{dt.day}日 {dt:%H:%M}"
 
     def _format_temp(self, temp_f: float, temp_c: float) -> str:
         temp = temp_f if self.config.units == "imperial" else temp_c

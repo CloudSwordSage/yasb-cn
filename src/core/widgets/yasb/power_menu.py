@@ -99,13 +99,13 @@ class OverlayWidget(AnimatedWidget):
         minutes = (delta.seconds % 3600) // 60
         parts = []
         if days > 0:
-            parts.append(f"{days} day{'s' if days > 1 else ''}")
+            parts.append(f"{days} 天")
         if hours > 0:
-            parts.append(f"{hours} hour{'s' if hours > 1 else ''}")
+            parts.append(f"{hours} 小时")
         if minutes > 0:
-            parts.append(f"{minutes} min")
+            parts.append(f"{minutes} 分钟")
 
-        label = QLabel(f"Uptime {' '.join(parts)}", self)
+        label = QLabel(f"运行时间 {' '.join(parts)}", self)
         label.setProperty("class", "uptime")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout = QVBoxLayout(self)
@@ -244,7 +244,7 @@ class PowerMenuWidget(BaseWidget):
                     email_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                     profile_layout.addWidget(email_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-                manage_btn = QPushButton("Manage accounts")
+                manage_btn = QPushButton("管理账户")
                 manage_btn.setProperty("class", "manage-accounts")
                 manage_btn.clicked.connect(lambda: (self._popup.hide(), os.startfile("ms-settings:accounts")))
                 profile_layout.addWidget(manage_btn, alignment=Qt.AlignmentFlag.AlignCenter)

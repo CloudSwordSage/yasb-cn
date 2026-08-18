@@ -26,10 +26,10 @@ class ScreenshotToolbar(QFrame):
         self._icon_color = UI["text"]
         self._icon_size = QSize(16, 16)
         self._action_svgs = (
-            ("copy", SVG_COPY, "Copy"),
-            ("save", SVG_SAVE, "Save as"),
-            ("edit", SVG_EDIT, "Edit"),
-            ("cancel", SVG_CANCEL, "Cancel"),
+            ("copy", SVG_COPY, "复制"),
+            ("save", SVG_SAVE, "另存为"),
+            ("edit", SVG_EDIT, "编辑"),
+            ("cancel", SVG_CANCEL, "取消"),
         )
 
         layout = QHBoxLayout(self)

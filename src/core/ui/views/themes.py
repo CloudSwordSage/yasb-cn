@@ -657,7 +657,7 @@ class ThemeSidebarItemWidget(QWidget):
         row.addWidget(self.name_lbl, 1)
 
         if disabled:
-            badge = QLabel("disabled")
+            badge = QLabel("已禁用")
             badge.setFont(_ui_font(11))
             badge.setStyleSheet(
                 f"color: {t['disabled_badge_text']}; background: {t['disabled_badge_bg']};"
@@ -753,7 +753,7 @@ class ThemeDetailPanel(QWidget):
         links_group.addWidget(self.author_label, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.report_btn = Link(
-            "Report",
+            "报告问题",
             font_size=12,
         )
         self.report_btn.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
@@ -779,7 +779,7 @@ class ThemeDetailPanel(QWidget):
     def _build_info_bar(self, root: QVBoxLayout, _t: dict[str, str]) -> None:
         self._info_bar = InfoBar(
             title="",
-            message="This theme is temporarily disabled until the author fixes the problem.",
+            message="该主题暂时被禁用，直至作者修复问题。",
             severity=InfoBarSeverity.WARNING,
             parent=self,
         )
@@ -840,7 +840,7 @@ class ThemeDetailPanel(QWidget):
         self._not_found_widget.setStyleSheet("background: transparent;")
         layout = QVBoxLayout(self._not_found_widget)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._not_found_label = QLabel("Theme not found")
+        self._not_found_label = QLabel("未找到主题")
         self._not_found_label.setFont(_ui_font(19))
         self._not_found_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._not_found_label.setStyleSheet(f"color: {t['text_secondary']}; background: transparent;")
@@ -857,8 +857,8 @@ class ThemeDetailPanel(QWidget):
         footer_layout.setSpacing(10)
 
         footer_layout.addStretch()
-        self.download_btn = _make_btn("View on GitHub", "default", self._on_download)
-        self.install_btn = _make_btn("Install Theme", "accent", self._on_install)
+        self.download_btn = _make_btn("在 GitHub 上查看", "default", self._on_download)
+        self.install_btn = _make_btn("安装主题", "accent", self._on_install)
         footer_layout.addWidget(self.download_btn)
         footer_layout.addWidget(self.install_btn)
         root.addWidget(self.footer)
@@ -929,7 +929,7 @@ class ThemeDetailPanel(QWidget):
         self.name_label.setText(data.get("name", ""))
         author = html_escape(data.get("author", ""))
         self._author_url = data.get("homepage") or f"https://github.com/{author}"
-        self.author_label.setText(f"by {author}")
+        self.author_label.setText(f"作者：{author}")
         self.desc_label.setText(data.get("description", ""))
 
     def _on_author(self) -> None:
@@ -1071,14 +1071,14 @@ class ThemeDetailPanel(QWidget):
         name = self.theme_data.get("name", "")
         dlg = ContentDialog(
             parent=self.window(),
-            title="Install Theme",
+            title="安装主题",
             content=(
-                f"Are you sure you want to install {name}?\n"
-                "This will overwrite your current config and styles files.\n"
-                "Note: Some themes require additional fonts."
+                f"确定要安装 {name} 吗？\n"
+                "这会覆盖当前的配置和样式文件。\n"
+                "注意：部分主题需要额外字体。"
             ),
-            primary_button_text="Install",
-            close_button_text="Cancel",
+            primary_button_text="安装",
+            close_button_text="取消",
             default_button=ContentDialogButton.PRIMARY,
         )
         self._install_dialog = dlg
@@ -1109,20 +1109,20 @@ class ThemeDetailPanel(QWidget):
                     return
                 except Exception as exc:
                     last_err = exc
-            raise last_err or RuntimeError("Failed to download theme files")
+            raise last_err or RuntimeError("无法下载主题文件")
         except Exception as exc:
             ContentDialog(
                 parent=self.window(),
-                title="Installation Failed",
-                content=f"Failed to install theme:\n{exc}",
-                close_button_text="Close",
+                title="安装失败",
+                content=f"无法安装主题：\n{exc}",
+                close_button_text="关闭",
             ).show_dialog()
 
 
 class ThemeViewer(ViewBase, QMainWindow):
     def __init__(self, deep_link_theme_id: str | None = None):
         super().__init__()
-        self.setWindowTitle("YASB Themes")
+        self.setWindowTitle("YASB 主题")
         self.build_app_icon()
         screen = QApplication.primaryScreen().availableGeometry()
         h = max(600, min(int(screen.height() * 0.78), 1000))
@@ -1181,14 +1181,14 @@ class ThemeViewer(ViewBase, QMainWindow):
         header_layout.setSpacing(10)
 
         self._header_title = QLabel(
-            "<span style='letter-spacing:-1px'><span style='font-weight:bold'>YASB</span> Themes</span>"
+            "<span style='letter-spacing:-1px'><span style='font-weight:bold'>YASB</span> 主题</span>"
         )
         self._header_title.setFont(_ui_font(21))
         self._header_title.setStyleSheet(f"color: {t['text_primary']};")
         header_layout.addWidget(self._header_title)
         header_layout.addStretch()
 
-        self._header_info = QLabel("Backup your config before installing a theme.")
+        self._header_info = QLabel("安装主题前请备份配置。")
         self._header_info.setFont(_ui_font(12))
         self._header_info.setStyleSheet(f"color: {t['text_primary']};")
         info_opacity = QGraphicsOpacityEffect()
@@ -1196,9 +1196,9 @@ class ThemeViewer(ViewBase, QMainWindow):
         self._header_info.setGraphicsEffect(info_opacity)
         header_layout.addWidget(self._header_info)
 
-        self.backup_button = _make_btn("Backup", "default", slot=self._backup_config)
+        self.backup_button = _make_btn("备份", "default", slot=self._backup_config)
         header_layout.addWidget(self.backup_button)
-        self.restore_button = _make_btn("Restore", "default", slot=self._restore_config)
+        self.restore_button = _make_btn("还原", "default", slot=self._restore_config)
         header_layout.addWidget(self.restore_button)
 
         root.addWidget(self.header)
@@ -1229,7 +1229,7 @@ class ThemeViewer(ViewBase, QMainWindow):
         search_layout.setContentsMargins(8, 0, 16, 8)
         search_layout.setSpacing(0)
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search themes...")
+        self.search_box.setPlaceholderText("搜索主题…")
         self.search_box.setFont(_ui_font(13))
         self.search_box.setClearButtonEnabled(True)
         self.search_box.setStyleSheet(_search_box_style(t))
@@ -1280,7 +1280,7 @@ class ThemeViewer(ViewBase, QMainWindow):
 
     def _request_theme_index(self, index: int) -> None:
         if index >= len(self._theme_urls):
-            self._on_load_error("Failed to load themes.")
+            self._on_load_error("无法加载主题。")
             return
         reply = self._net.get(_network_request(self._theme_urls[index]))
         reply.finished.connect(
@@ -1319,7 +1319,7 @@ class ThemeViewer(ViewBase, QMainWindow):
         if not (self._themes_loaded and self._minimum_splash_elapsed):
             return
         if self._load_error is not None:
-            self.splash_screen.show_message(f"Failed to load themes.\n{self._load_error}")
+            self.splash_screen.show_message(f"无法加载主题。\n{self._load_error}")
             return
         opacity = QGraphicsOpacityEffect()
         self.splash_screen.setGraphicsEffect(opacity)
@@ -1372,7 +1372,7 @@ class ThemeViewer(ViewBase, QMainWindow):
             )
         total = len(self.theme_items)
         shown = self.theme_list.count()
-        self.count_label.setText(f"{shown} of {total} themes" if shown < total else f"{total} themes")
+        self.count_label.setText(f"显示 {shown}/{total} 个主题" if shown < total else f"{total} 个主题")
 
     def _refresh_selection(self) -> None:
         current_item = self.theme_list.currentItem()
@@ -1446,49 +1446,49 @@ class ThemeViewer(ViewBase, QMainWindow):
                 shutil.copy2(cfg, bcfg)
             if os.path.exists(sty):
                 shutil.copy2(sty, bsty)
-            self.backup_button.setText("Backup complete!")
+            self.backup_button.setText("备份完成！")
             self.backup_button.set_variant("accent")
             QTimer.singleShot(
                 2000,
                 lambda: (
-                    self.backup_button.setText("Backup"),
+                    self.backup_button.setText("备份"),
                     self.backup_button.set_variant("default"),
                 ),
             )
         except Exception as e:
             ContentDialog(
                 parent=self,
-                title="Backup Failed",
-                content=f"Backup failed:\n{e}",
-                close_button_text="Close",
+                title="备份失败",
+                content=f"备份失败：\n{e}",
+                close_button_text="关闭",
             ).show_dialog()
 
     def _restore_config(self):
-        self.restore_button.setText("Restoring\u2026")
+        self.restore_button.setText("正在还原…")
         QApplication.processEvents()
         cfg, sty, bcfg, bsty = self._config_paths()
         try:
             if not os.path.exists(bcfg) or not os.path.exists(bsty):
-                self.restore_button.setText("Restore")
+                self.restore_button.setText("还原")
                 ContentDialog(
                     parent=self,
-                    title="Restore Failed",
-                    content="Backup files are missing. Please create a backup first.",
-                    close_button_text="Close",
+                    title="还原失败",
+                    content="缺少备份文件。请先创建备份。",
+                    close_button_text="关闭",
                 ).show_dialog()
                 return
             _run_yasbc("stop")
             shutil.copy2(bcfg, cfg)
             shutil.copy2(bsty, sty)
-            self.restore_button.setText("Restore complete!")
+            self.restore_button.setText("还原完成！")
             _run_yasbc("start")
-            QTimer.singleShot(2000, lambda: self.restore_button.setText("Restore"))
+            QTimer.singleShot(2000, lambda: self.restore_button.setText("还原"))
         except Exception as e:
             ContentDialog(
                 parent=self,
-                title="Restore Failed",
-                content=f"Restore failed:\n{e}",
-                close_button_text="Close",
+                title="还原失败",
+                content=f"还原失败：\n{e}",
+                close_button_text="关闭",
             ).show_dialog()
 
     def closeEvent(self, event):

@@ -43,8 +43,8 @@ class ClipboardHistoryProvider(BaseProvider):
     """Browse and restore Windows Clipboard History entries."""
 
     name = "clipboard_history"
-    display_name = "Clipboard History"
-    input_placeholder = "Search clipboard history..."
+    display_name = "剪贴板历史记录"
+    input_placeholder = "搜索剪贴板历史记录..."
     icon = ICON_CLIPBOARD
 
     def __init__(self, config: dict | None = None):
@@ -166,7 +166,7 @@ class ClipboardHistoryProvider(BaseProvider):
                         entry.update(
                             kind="text",
                             title=self._trim(text, 90),
-                            description=f"{fmt_label} - {words} words",
+                            description=f"{fmt_label} - {words} 个词",
                             icon=ICON_CLIPBOARD_TEXT,
                             preview={
                                 "kind": "text",
@@ -190,8 +190,8 @@ class ClipboardHistoryProvider(BaseProvider):
                         size_label = f" - {self._format_bytes(len(blob))}" if blob else ""
                         entry.update(
                             kind="image",
-                            title=f"Image - {dim}",
-                            description=f"Bitmap{size_label}",
+                            title=f"图像 - {dim}",
+                            description=f"位图{size_label}",
                             icon=ICON_CLIPBOARD_IMAGE,
                             preview={
                                 "kind": "image",
@@ -208,8 +208,8 @@ class ClipboardHistoryProvider(BaseProvider):
             # Unknown format
             entry.update(
                 kind="unknown",
-                title="Clipboard item",
-                description="Unsupported format",
+                title="剪贴板项目",
+                description="不支持的格式",
                 icon=ICON_CLIPBOARD,
                 preview={},
             )
@@ -256,8 +256,8 @@ class ClipboardHistoryProvider(BaseProvider):
     def _clear_results(self) -> list[ProviderResult]:
         return [
             ProviderResult(
-                title="Clear clipboard history",
-                description="Delete all saved history items",
+                title="清除剪贴板历史记录",
+                description="删除所有已保存的历史项目",
                 icon_char=ICON_CLEAR,
                 provider=self.name,
                 action_data={"action": "clear_history"},
@@ -280,8 +280,8 @@ class ClipboardHistoryProvider(BaseProvider):
         if not items:
             return [
                 ProviderResult(
-                    title="Clipboard history is empty",
-                    description="Copy something to start",
+                    title="剪贴板历史记录为空",
+                    description="复制内容后即可开始使用",
                     icon_char=ICON_CLIPBOARD,
                     provider=self.name,
                 )
@@ -311,8 +311,8 @@ class ClipboardHistoryProvider(BaseProvider):
         if not results:
             return [
                 ProviderResult(
-                    title="No clipboard matches",
-                    description="Try a different search term",
+                    title="没有匹配的剪贴板内容",
+                    description="请尝试其他搜索词",
                     icon_char=ICON_CLIPBOARD,
                     provider=self.name,
                 )
@@ -360,9 +360,9 @@ class ClipboardHistoryProvider(BaseProvider):
         action = result.action_data.get("action")
         if action != "restore":
             return []
-        actions = [ProviderMenuAction(id="copy", label="Copy to clipboard")]
+        actions = [ProviderMenuAction(id="copy", label="复制到剪贴板")]
         if Clipboard is not None:
-            actions.append(ProviderMenuAction(id="delete", label="Delete from history", separator_before=True))
+            actions.append(ProviderMenuAction(id="delete", label="从历史记录中删除", separator_before=True))
         return actions
 
     def execute_context_menu_action(self, action_id: str, result: ProviderResult) -> ProviderMenuActionResult:

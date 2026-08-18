@@ -148,7 +148,7 @@ class AppDialog(QDialog):
         self.show_only_group = show_only_group
         self.default_group = default_group
 
-        self.setWindowTitle(title or ("Edit App" if self.is_edit_mode else "Add New App"))
+        self.setWindowTitle(title or ("编辑应用" if self.is_edit_mode else "添加新应用"))
         self.setMinimumSize(460, 200)
         self.setProperty("class", "app-dialog")
         self.setWindowFlags(
@@ -183,7 +183,7 @@ class AppDialog(QDialog):
         # Title field
         self.title_edit = QLineEdit()
         self.lineedit_context_menu(self.title_edit)
-        self.title_edit.setPlaceholderText("Enter application title...")
+        self.title_edit.setPlaceholderText("输入应用名称...")
         self.title_edit.setText(self.app_data.get("title", ""))
         self.title_edit.setProperty("class", "title-field")
         self.title_edit.returnPressed.connect(self._on_title_edit_return)
@@ -197,7 +197,7 @@ class AppDialog(QDialog):
             h1 = QHBoxLayout()
             self.path_edit = QLineEdit()
             self.lineedit_context_menu(self.path_edit)
-            self.path_edit.setPlaceholderText("Application executable, command or url...")
+            self.path_edit.setPlaceholderText("应用程序可执行文件、命令或 URL...")
             self.path_edit.setText(self.app_data.get("path", ""))
             self.path_edit.setProperty("class", "path-field")
             self.path_edit.returnPressed.connect(self.accept)
@@ -206,7 +206,7 @@ class AppDialog(QDialog):
             self.path_edit.editingFinished.connect(self._fetch_url_info)
             h1.addWidget(self.path_edit)
 
-            browse_btn = QPushButton("Browse")
+            browse_btn = QPushButton("浏览")
             browse_btn.setProperty("class", "button")
             browse_btn.clicked.connect(self.browse_path)
             h1.addWidget(browse_btn)
@@ -217,7 +217,7 @@ class AppDialog(QDialog):
             h2 = QHBoxLayout()
             self.icon_edit = QLineEdit()
             self.lineedit_context_menu(self.icon_edit)
-            self.icon_edit.setPlaceholderText("Icon file path...")
+            self.icon_edit.setPlaceholderText("图标文件路径...")
             self.icon_edit.setText(self.app_data.get("icon", ""))
             self.icon_edit.setProperty("class", "icon-field")
             self.icon_edit.returnPressed.connect(self.accept)
@@ -225,7 +225,7 @@ class AppDialog(QDialog):
             self.icon_edit.setPalette(self.icon_edit_palette)
             h2.addWidget(self.icon_edit)
 
-            browse_icon_btn = QPushButton("Browse Icon")
+            browse_icon_btn = QPushButton("浏览图标")
             browse_icon_btn.setProperty("class", "button")
             browse_icon_btn.clicked.connect(self.browse_icon)
             h2.addWidget(browse_icon_btn)
@@ -234,7 +234,7 @@ class AppDialog(QDialog):
         # Group field
         self.group_edit = QLineEdit()
         self.lineedit_context_menu(self.group_edit)
-        self.group_edit.setPlaceholderText("Group name..." if show_only_group else "Group (optional)...")
+        self.group_edit.setPlaceholderText("分组名称..." if show_only_group else "分组（可选）...")
         # Set group from app_data, or use default_group if provided
         group_value = self.app_data.get("group", "") or self.default_group or ""
         self.group_edit.setText(group_value)
@@ -275,12 +275,12 @@ class AppDialog(QDialog):
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton("取消")
         self.cancel_btn.setProperty("class", "button")
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
 
-        self.add_btn = QPushButton("Save" if self.is_edit_mode else "Add")
+        self.add_btn = QPushButton("保存" if self.is_edit_mode else "添加")
         self.add_btn.setProperty("class", f"button {'save' if self.is_edit_mode else 'add'}")
         self.add_btn.clicked.connect(self.accept)
         button_layout.addWidget(self.add_btn)
@@ -322,7 +322,7 @@ class AppDialog(QDialog):
                         if icon_path:
                             self.icon_edit.setText(icon_path)
                         else:
-                            self._show_warning("Could not extract icon for this Control Panel item.")
+                            self._show_warning("无法提取此控制面板项目的图标。")
                             self.icon_edit.setText("")
 
                     elif path.startswith("UWP::"):
@@ -335,7 +335,7 @@ class AppDialog(QDialog):
                             self.icon_edit.setText(shell_icon)
                         else:
                             self.icon_edit.setText("")
-                            self._show_warning("Could not locate icon for this UWP app.")
+                            self._show_warning("无法找到此 UWP 应用的图标。")
 
                     else:
                         self.path_edit.setText(path)
@@ -345,9 +345,9 @@ class AppDialog(QDialog):
                             if icon_path:
                                 self.icon_edit.setText(icon_path)
                             else:
-                                self._show_warning("Failed to extract icon for the selected application.")
+                                self._show_warning("无法提取所选应用的图标。")
                         else:
-                            self._show_warning("No valid icon source found for the selected application.")
+                            self._show_warning("未找到所选应用的有效图标来源。")
                     break
 
         self._completer.activated.connect(on_title_selected)
@@ -366,7 +366,7 @@ class AppDialog(QDialog):
             dialog_title = self.windowTitle()
             icon_path = self.icon_edit.text().strip()
             if not icon_path or not os.path.isfile(icon_path):
-                self.setWindowTitle("Fetching website info...")
+                self.setWindowTitle("正在获取网站信息...")
 
                 def on_icon_fetched(icon, title):
                     self.setWindowTitle(dialog_title)
@@ -375,7 +375,7 @@ class AppDialog(QDialog):
                         if title and not self.title_edit.text().strip():
                             self.title_edit.setText(title)
                     else:
-                        self._show_warning("Could not find an icon for this website.")
+                        self._show_warning("无法找到此网站的图标。")
 
                 self._url_fetch_worker = UrlFetchWorker(path, self.icons_dir)
                 self._url_fetch_worker.finished.connect(on_icon_fetched)
@@ -414,14 +414,14 @@ class AppDialog(QDialog):
 
     def browse_path(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Application", "", "Executable or Shortcut (*.exe *.lnk);;All Files (*)"
+            self, "选择应用", "", "可执行文件或快捷方式 (*.exe *.lnk);;所有文件 (*)"
         )
         if file_path:
             self.path_edit.setText(file_path)
 
     def browse_icon(self):
         icon_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Icon", "", "Image Files (*.png *.jpg *.jpeg *.gif *.bmp *.ico *.svg);;All Files (*)"
+            self, "选择图标", "", "图像文件 (*.png *.jpg *.jpeg *.gif *.bmp *.ico *.svg);;所有文件 (*)"
         )
         if icon_path:
             self.icon_edit.setText(icon_path)
@@ -474,7 +474,7 @@ class AppDialog(QDialog):
         if self.show_only_group:
             group = self.group_edit.text().strip()
             if not group:
-                self._show_warning("Please enter a group name.")
+                self._show_warning("请输入分组名称。")
                 self.group_edit.setFocus()
                 return
             super().accept()
@@ -485,17 +485,17 @@ class AppDialog(QDialog):
         icon = self.icon_edit.text().strip()
 
         if not title:
-            self._show_warning("Please enter a title.")
+            self._show_warning("请输入名称。")
             self.title_edit.setFocus()
             return
 
         if not path:
-            self._show_warning("The specified path does not exist.")
+            self._show_warning("指定的路径不存在。")
             self.path_edit.setFocus()
             return
 
         if not os.path.isfile(icon):
-            self._show_warning("The specified icon file does not exist.")
+            self._show_warning("指定的图标文件不存在。")
             self.icon_edit.setFocus()
             return
 
@@ -670,7 +670,7 @@ class LaunchpadWidget(BaseWidget):
         icon_label.setFixedSize(self._app_icon_size, self._app_icon_size)
         icon_label.setProperty("class", "icon")
 
-        title_label = QLabel(app_data.get("title", "Unknown"))
+        title_label = QLabel(app_data.get("title", "未知"))
         title_label.setProperty("class", "title")
         title_label.setWordWrap(True)
         title_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
@@ -883,17 +883,17 @@ class LaunchpadWidget(BaseWidget):
         menu.setProperty("class", "context-menu")
 
         if app_data:
-            edit_action = QAction("Edit", menu_parent)
+            edit_action = QAction("编辑", menu_parent)
             edit_action.triggered.connect(lambda: self._edit_app(app_data))
             menu.addAction(edit_action)
 
             path = app_data.get("path", "")
             if path and not path.startswith("http://") and not path.startswith("https://"):
-                admin_action = QAction("Run as Administrator", menu_parent)
+                admin_action = QAction("以管理员身份运行", menu_parent)
                 admin_action.triggered.connect(lambda: self._launch_app_elevated(app_data))
                 menu.addAction(admin_action)
 
-        add_action = QAction("Add New App", menu_parent)
+        add_action = QAction("添加新应用", menu_parent)
         add_action.triggered.connect(self._add_new_app)
         menu.addAction(add_action)
 
@@ -907,14 +907,14 @@ class LaunchpadWidget(BaseWidget):
                 menu.addSeparator()
 
                 # Direct "Remove from [GroupName]" action
-                remove_action = QAction(f"Remove from {self._current_group}", menu_parent)
+                remove_action = QAction(f"从 {self._current_group} 中移除", menu_parent)
                 remove_action.triggered.connect(lambda: self._set_app_group(app_data, None))
                 menu.addAction(remove_action)
 
                 # "Move to Group" submenu with other groups (exclude current)
                 other_groups = [g for g in all_groups if g != self._current_group]
                 if other_groups:
-                    move_menu = QMenu("Move to Group", menu)
+                    move_menu = QMenu("移动到分组", menu)
                     apply_qmenu_style(move_menu)
                     move_menu.setProperty("class", "context-menu")
 
@@ -929,7 +929,7 @@ class LaunchpadWidget(BaseWidget):
                 if all_groups:
                     menu.addSeparator()
 
-                    group_menu = QMenu("Add to Group", menu)
+                    group_menu = QMenu("添加到分组", menu)
                     apply_qmenu_style(group_menu)
                     group_menu.setProperty("class", "context-menu")
 
@@ -942,28 +942,28 @@ class LaunchpadWidget(BaseWidget):
 
         menu.addSeparator()
 
-        order_action_az = QAction("Order A-Z", menu_parent)
+        order_action_az = QAction("按名称升序", menu_parent)
         order_action_az.triggered.connect(lambda: self._order_apps("az"))
         menu.addAction(order_action_az)
-        order_action_za = QAction("Order Z-A", menu_parent)
+        order_action_za = QAction("按名称降序", menu_parent)
         order_action_za.triggered.connect(lambda: self._order_apps("za"))
         menu.addAction(order_action_za)
-        order_action_recent = QAction("Order by Recent", menu_parent)
+        order_action_recent = QAction("按最近添加排序", menu_parent)
         order_action_recent.triggered.connect(lambda: self._order_apps("recent"))
         menu.addAction(order_action_recent)
-        order_action_oldest = QAction("Order by Oldest", menu_parent)
+        order_action_oldest = QAction("按最早添加排序", menu_parent)
         order_action_oldest.triggered.connect(lambda: self._order_apps("oldest"))
         menu.addAction(order_action_oldest)
 
         menu.addSeparator()
 
         if app_data:
-            delete_action = QAction("Delete", menu_parent)
+            delete_action = QAction("删除", menu_parent)
             delete_action.triggered.connect(lambda: self._delete_app(app_data))
             menu.addAction(delete_action)
             menu.addSeparator()
 
-        exit_action = QAction("Exit Launchpad", menu_parent)
+        exit_action = QAction("退出启动器", menu_parent)
         exit_action.triggered.connect(self._hide_launchpad)
         menu.addAction(exit_action)
 
@@ -975,9 +975,9 @@ class LaunchpadWidget(BaseWidget):
     def _show_drop_overlay(self):
         """Show the drop overlay when dragging items over the launchpad"""
         if self._num_drag_items > 1:
-            overlay_label = f"Drop {self._num_drag_items} Apps Here"
+            overlay_label = f"将 {self._num_drag_items} 个应用拖放到此处"
         else:
-            overlay_label = "Drop App Here"
+            overlay_label = "将应用拖放到此处"
 
         if self._drop_overlay:
             # Update label text if overlay already exists
@@ -1193,7 +1193,7 @@ class LaunchpadWidget(BaseWidget):
             icon_png = IconExtractorUtil.extract_icon_from_path(icon_path, self._icons_dir, size=256)
             if not icon_png:
                 self._warning_dialog(
-                    f"Failed to extract icon for application<br><b>{file_path}</b><br>Please select an icon manually."
+                    f"无法提取应用图标<br><b>{file_path}</b><br>请选择图标文件。"
                 )
 
             app_data = (app_name, target_path, icon_png or "")
@@ -1201,13 +1201,13 @@ class LaunchpadWidget(BaseWidget):
         elif ext == ".exe":
             title = self._get_file_description(file_path)
             if not title:
-                self._warning_dialog(f"Failed to get description for executable: {file_path}")
+                self._warning_dialog(f"无法获取可执行文件的说明：{file_path}")
                 return
             icon_png = IconExtractorUtil.extract_icon_from_path(file_path, self._icons_dir, size=256)
 
             if not icon_png:
                 self._warning_dialog(
-                    f"Failed to extract icon for application<br><b>{file_path}</b><br>Please select an icon manually."
+                    f"无法提取应用图标<br><b>{file_path}</b><br>请选择图标文件。"
                 )
 
             app_data = (title, file_path, icon_png or "")
@@ -1406,7 +1406,7 @@ class LaunchpadWidget(BaseWidget):
 
         if not filtered_apps:
             no_apps_label = QLabel(
-                f"No applications found<div style='font-size:14pt;margin-top:12px;font-weight:400'>press <b>{self._shortcuts['add_app']}</b> to add new apps</div>"
+                f"未找到应用<div style='font-size:14pt;margin-top:12px;font-weight:400'>按 <b>{self._shortcuts['add_app']}</b> 添加新应用</div>"
             )
             no_apps_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             no_apps_label.setTextFormat(Qt.TextFormat.RichText)
@@ -1663,19 +1663,19 @@ class LaunchpadWidget(BaseWidget):
         apply_qmenu_style(menu)
         menu.setProperty("class", "context-menu")
 
-        open_action = QAction(f"Open {group_name}", menu_parent)
+        open_action = QAction(f"打开 {group_name}", menu_parent)
         open_action.triggered.connect(lambda: self._open_group(group_name, parent_widget.apps_in_group))
         menu.addAction(open_action)
 
         menu.addSeparator()
 
-        rename_action = QAction("Rename Group", menu_parent)
+        rename_action = QAction("重命名分组", menu_parent)
         rename_action.triggered.connect(lambda: self._rename_group(group_name))
         menu.addAction(rename_action)
 
         menu.addSeparator()
 
-        exit_action = QAction("Exit Launchpad", menu_parent)
+        exit_action = QAction("退出启动器", menu_parent)
         exit_action.triggered.connect(self._hide_launchpad)
         menu.addAction(exit_action)
 
@@ -1687,7 +1687,7 @@ class LaunchpadWidget(BaseWidget):
         dialog = AppDialog(
             parent=self._launchpad_popup,
             app_data={"group": old_group},
-            title="Rename Group",
+            title="重命名分组",
             all_groups=self._get_all_groups(),
             show_only_group=True,
         )
@@ -1903,7 +1903,7 @@ class LaunchpadWidget(BaseWidget):
     def _warning_dialog(self, message: str):
         """Show a warning dialog with a message"""
         dialog = QDialog(self._launchpad_popup if self._launchpad_popup else None)
-        dialog.setWindowTitle("Warning")
+        dialog.setWindowTitle("警告")
         dialog.setMinimumSize(400, 150)
         dialog.setWindowFlags(
             Qt.WindowType.Dialog
@@ -1935,7 +1935,7 @@ class LaunchpadWidget(BaseWidget):
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(0, 0, 0, 0)
 
-        ok_btn = QPushButton("OK")
+        ok_btn = QPushButton("确定")
         ok_btn.setProperty("class", "button")
         ok_btn.clicked.connect(dialog.accept)
         button_layout.addWidget(ok_btn)
@@ -1948,7 +1948,7 @@ class LaunchpadWidget(BaseWidget):
     def _delete_app(self, app_data: dict[str, Any]):
         """Delete an app with modern styled confirmation dialog"""
         dialog = QDialog(self._launchpad_popup if self._launchpad_popup else None)
-        dialog.setWindowTitle("Delete App")
+        dialog.setWindowTitle("删除应用")
         dialog.setMinimumSize(400, 150)
         dialog.setWindowFlags(
             Qt.WindowType.Dialog
@@ -1968,7 +1968,7 @@ class LaunchpadWidget(BaseWidget):
         content_layout.setContentsMargins(20, 20, 20, 0)
         content_layout.setSpacing(0)
 
-        message_label = QLabel(f"Are you sure you want to delete '{app_data.get('title', 'Unknown')}'?")
+        message_label = QLabel(f"确定要删除“{app_data.get('title', '未知')}”吗？")
         message_label.setWordWrap(True)
         message_label.setProperty("class", "message")
         content_layout.addWidget(message_label)
@@ -1979,12 +1979,12 @@ class LaunchpadWidget(BaseWidget):
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(0, 0, 0, 0)
 
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton("取消")
         cancel_btn.setProperty("class", "button")
         cancel_btn.clicked.connect(dialog.reject)
         button_layout.addWidget(cancel_btn)
 
-        delete_btn = QPushButton("Delete")
+        delete_btn = QPushButton("删除")
         delete_btn.setProperty("class", "button delete")
         delete_btn.clicked.connect(dialog.accept)
         button_layout.addWidget(delete_btn)

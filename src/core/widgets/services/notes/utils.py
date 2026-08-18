@@ -34,7 +34,7 @@ class FloatingWindowController:
                 self._widget.menu.move(center_x, center_y)
 
             self._widget.float_btn.setText(self._widget.icons["float_off"])
-            set_tooltip(self._widget.float_btn, "Dock window")
+            set_tooltip(self._widget.float_btn, "停靠窗口")
             self._widget.close_btn.setVisible(True)
         else:
             self._widget.is_floating = False
@@ -42,7 +42,7 @@ class FloatingWindowController:
             self._widget.adjust_menu_geometry()
 
             self._widget.float_btn.setText(self._widget.icons["float_on"])
-            set_tooltip(self._widget.float_btn, "Float window")
+            set_tooltip(self._widget.float_btn, "浮动窗口")
             self._widget.close_btn.setVisible(False)
 
     def header_mouse_press(self, event: QMouseEvent | None) -> None:
@@ -183,7 +183,7 @@ class NoteTextEdit(QTextEdit):
         self.copy_btn.setProperty("class", "input-copy-button")
         self.copy_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.copy_btn.clicked.connect(self._copy_to_clipboard)
-        set_tooltip(self.copy_btn, "Copy to clipboard")
+        set_tooltip(self.copy_btn, "复制到剪贴板")
 
         self.textChanged.connect(self._update_copy_btn_position)
 

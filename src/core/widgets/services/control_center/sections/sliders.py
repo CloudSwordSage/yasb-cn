@@ -156,17 +156,17 @@ class SlidersSectionWidget(QFrame):
             if key == "volume":
                 source_btn.clicked.connect(self._show_volume_source_menu)
                 if self._tooltip:
-                    set_tooltip(source_btn, "Select output device", position="top")
+                    set_tooltip(source_btn, "选择输出设备", position="top")
                 self._volume_source_btn = source_btn
             elif key == "microphone":
                 source_btn.clicked.connect(self._show_microphone_source_menu)
                 if self._tooltip:
-                    set_tooltip(source_btn, "Select input device", position="top")
+                    set_tooltip(source_btn, "选择输入设备", position="top")
                 self._microphone_source_btn = source_btn
             elif key == "brightness":
                 source_btn.clicked.connect(self._show_brightness_source_menu)
                 if self._tooltip:
-                    set_tooltip(source_btn, "Select monitor", position="top")
+                    set_tooltip(source_btn, "选择显示器", position="top")
                 self._brightness_source_btn = source_btn
             layout.addWidget(source_btn)
 

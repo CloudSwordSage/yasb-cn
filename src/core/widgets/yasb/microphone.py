@@ -84,7 +84,7 @@ class MicrophoneWidget(BaseWidget):
         # Handle no device case
         if self.audio_endpoint is None:
             min_icon = self._get_mic_icon()
-            min_level = "No Device"
+            min_level = "无设备"
             mute_status = None
         else:
             try:
@@ -197,17 +197,17 @@ class MicrophoneWidget(BaseWidget):
         """Get appropriate microphone icon based on mute status."""
         if self.audio_endpoint is None:
             if self.config.tooltip:
-                set_tooltip(self, "No microphone device connected")
+                set_tooltip(self, "未连接麦克风设备")
             return self.config.icons.muted
 
         current_mute_status = self.audio_endpoint.GetMute()
         current_level = round(self.audio_endpoint.GetMasterVolumeLevelScalar() * 100)
         if current_mute_status == 1:
             mic_icon = self.config.icons.muted
-            tooltip = f"Muted: Volume {current_level}%"
+            tooltip = f"已静音：音量 {current_level}%"
         else:
             mic_icon = self.config.icons.normal
-            tooltip = f"Volume {current_level}%"
+            tooltip = f"音量 {current_level}%"
         if self.config.tooltip:
             set_tooltip(self, tooltip)
         return mic_icon

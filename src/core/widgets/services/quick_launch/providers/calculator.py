@@ -80,8 +80,8 @@ class CalculatorProvider(BaseProvider):
     """Evaluate math expressions inline."""
 
     name = "calculator"
-    display_name = "Calculator"
-    input_placeholder = "Type a math expression..."
+    display_name = "计算器"
+    input_placeholder = "输入数学表达式..."
     icon = ICON_CALCULATOR
 
     def match(self, text: str) -> bool:
@@ -103,8 +103,8 @@ class CalculatorProvider(BaseProvider):
         if not query:
             return [
                 ProviderResult(
-                    title="Type a math expression",
-                    description="e.g. 2+2, sqrt(144), 15% of 200",
+                    title="输入数学表达式",
+                    description="例如：2+2、sqrt(144)、200 的 15%",
                     icon_char=ICON_CALCULATOR,
                     provider=self.name,
                 )
@@ -131,7 +131,7 @@ class CalculatorProvider(BaseProvider):
             return [
                 ProviderResult(
                     title=display,
-                    description=f"{query} - press Enter to copy",
+                    description=f"{query} - 按 Enter 复制",
                     icon_char=ICON_CALCULATOR,
                     provider=self.name,
                     action_data={"value": display},
@@ -141,7 +141,7 @@ class CalculatorProvider(BaseProvider):
             return [
                 ProviderResult(
                     title=query,
-                    description="Continue typing a valid expression",
+                    description="请继续输入有效表达式",
                     icon_char=ICON_CALCULATOR,
                     provider=self.name,
                 )

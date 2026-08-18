@@ -69,7 +69,7 @@ class ObsWidget(BaseWidget):
             self.toggle_record() if e.button() == Qt.MouseButton.LeftButton else None
         )
         if self._tooltip:
-            set_tooltip(self._record_btn, "Toggle Recording", position="top")
+            set_tooltip(self._record_btn, "切换录制", position="top")
         self._opacity_effect = QGraphicsOpacityEffect(self._record_btn)
         self._opacity_effect.setOpacity(1.0)
         self._record_btn.setGraphicsEffect(self._opacity_effect)
@@ -83,7 +83,7 @@ class ObsWidget(BaseWidget):
             self.toggle_virtual_cam() if e.button() == Qt.MouseButton.LeftButton else None
         )
         if self._tooltip:
-            set_tooltip(self._virtual_cam_btn, "Toggle Virtual Camera", position="top")
+            set_tooltip(self._virtual_cam_btn, "切换虚拟摄像头", position="top")
         self._widget_container_layout.addWidget(self._virtual_cam_btn)
         if not self._show_virtual_cam:
             self._virtual_cam_btn.hide()
@@ -96,7 +96,7 @@ class ObsWidget(BaseWidget):
             self.toggle_studio_mode() if e.button() == Qt.MouseButton.LeftButton else None
         )
         if self._tooltip:
-            set_tooltip(self._studio_mode_btn, "Toggle Studio Mode", position="top")
+            set_tooltip(self._studio_mode_btn, "切换工作室模式", position="top")
         self._widget_container_layout.addWidget(self._studio_mode_btn)
         if not self._show_studio_mode:
             self._studio_mode_btn.hide()
@@ -109,7 +109,7 @@ class ObsWidget(BaseWidget):
             self.toggle_stream() if e.button() == Qt.MouseButton.LeftButton else None
         )
         if self._tooltip:
-            set_tooltip(self._stream_btn, "Toggle Stream", position="top")
+            set_tooltip(self._stream_btn, "切换直播", position="top")
         self._stream_opacity_effect = QGraphicsOpacityEffect(self._stream_btn)
         self._stream_opacity_effect.setOpacity(1.0)
         self._stream_btn.setGraphicsEffect(self._stream_opacity_effect)
@@ -436,7 +436,7 @@ class ObsWidget(BaseWidget):
         kbps = (delta_bytes * 8) / 1000 if delta_bytes > 0 else 0
         skipped = data.get("outputSkippedFrames", 0)
         total = data.get("outputTotalFrames", 0)
-        self._stream_stats_label.setText(f"{kbps:.0f} kbps {skipped}/{total} dropped")
+        self._stream_stats_label.setText(f"{kbps:.0f} kbps {skipped}/{total} 丢帧")
         self._stream_stats_label.show()
 
     @staticmethod

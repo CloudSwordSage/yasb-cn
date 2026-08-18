@@ -109,11 +109,11 @@ class AlertDialog(QWidget):
 
         self._details_btn: Button | None = None
         if additional_details:
-            self._details_btn = Button("Show Details", variant="default", parent=self._btn_bar)
+            self._details_btn = Button("显示详细信息", variant="default", parent=self._btn_bar)
             self._details_btn.clicked.connect(self._toggle_details)
             button_layout.addWidget(self._details_btn)
 
-        self._close_btn = Button("Close", variant="accent", parent=self._btn_bar)
+        self._close_btn = Button("关闭", variant="accent", parent=self._btn_bar)
         self._close_btn.clicked.connect(self._close)
         button_layout.addWidget(self._close_btn)
 
@@ -191,7 +191,7 @@ class AlertDialog(QWidget):
         self._details_visible = not self._details_visible
         self._details_wrapper.setVisible(self._details_visible)
         if self._details_btn:
-            self._details_btn.setText("Hide details" if self._details_visible else "Show Details")
+            self._details_btn.setText("隐藏详细信息" if self._details_visible else "显示详细信息")
 
     def _center_on_screen(self) -> None:
         screen = QApplication.screenAt(self.pos()) or QApplication.primaryScreen()

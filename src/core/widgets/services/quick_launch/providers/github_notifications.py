@@ -29,19 +29,27 @@ from core.widgets.services.quick_launch.providers.resources.icons import (
 )
 
 _REASON_LABELS: dict[str, str] = {
-    "assign": "Assigned",
-    "author": "Author",
-    "comment": "Comment",
-    "ci_activity": "CI Activity",
-    "invitation": "Invitation",
-    "manual": "Manual",
-    "mention": "Mentioned",
-    "review_requested": "Review requested",
-    "security_alert": "Security alert",
-    "state_change": "State change",
-    "subscribed": "Subscribed",
-    "team_mention": "Team mention",
-    "approval_requested": "Approval requested",
+    "assign": "已分配",
+    "author": "作者",
+    "comment": "评论",
+    "ci_activity": "CI 活动",
+    "invitation": "邀请",
+    "manual": "手动订阅",
+    "mention": "提及了你",
+    "review_requested": "请求审查",
+    "security_alert": "安全警报",
+    "state_change": "状态变更",
+    "subscribed": "已订阅",
+    "team_mention": "团队提及",
+    "approval_requested": "请求批准",
+}
+
+_TYPE_LABELS: dict[str, str] = {
+    "CheckSuite": "检查套件",
+    "Discussion": "讨论",
+    "Issue": "议题",
+    "PullRequest": "拉取请求",
+    "Release": "发行版",
 }
 
 
@@ -80,7 +88,7 @@ class GithubNotificationsProvider(BaseProvider):
     name = "github_notifications"
     display_name = "GitHub"
     icon = ICON_GITHUB
-    input_placeholder = "GitHub Notifications"
+    input_placeholder = "GitHub 通知"
 
     def __init__(self, config: dict | None = None):
         super().__init__(config)
@@ -124,7 +132,7 @@ class GithubNotificationsProvider(BaseProvider):
                 logging.error("GitHub notifications provider: HTTP error: %s - %s", e.code, e.reason)
             except urllib.error.URLError:
                 self._cached_data = []
-                self._fetch_error = "No internet connection"
+                self._fetch_error = "无网络连接"
                 logging.error("GitHub notifications provider: no internet connection.")
             except Exception as e:
                 self._cached_data = []
@@ -152,8 +160,8 @@ class GithubNotificationsProvider(BaseProvider):
         if not token:
             return [
                 ProviderResult(
-                    title="Sign in to GitHub",
-                    description="Click to authorize YASB via GitHub OAuth",
+                    title="登录 GitHub",
+                    description="点击通过 GitHub OAuth 授权 YASB",
                     icon_char=ICON_GITHUB,
                     provider=self.name,
                     action_data={"action": "oauth"},
@@ -176,8 +184,8 @@ class GithubNotificationsProvider(BaseProvider):
                 self._fetch_in_background()
             return [
                 ProviderResult(
-                    title="Fetching notifications...",
-                    description="Loading from GitHub",
+                    title="正在获取通知...",
+                    description="正在从 GitHub 加载",
                     icon_char=ICON_GITHUB,
                     provider=self.name,
                     is_loading=True,
@@ -188,7 +196,7 @@ class GithubNotificationsProvider(BaseProvider):
         if self._fetch_error and not self._cached_data:
             return [
                 ProviderResult(
-                    title="Failed to fetch notifications",
+                    title="无法获取通知",
                     description=self._fetch_error,
                     icon_char=ICON_GITHUB,
                     provider=self.name,
@@ -222,7 +230,7 @@ class GithubNotificationsProvider(BaseProvider):
         if unread:
             results.append(
                 ProviderResult(
-                    title="Unread",
+                    title="未读",
                     provider=self.name,
                     is_separator=True,
                 )
@@ -235,7 +243,7 @@ class GithubNotificationsProvider(BaseProvider):
             if unread:
                 results.append(
                     ProviderResult(
-                        title="Read",
+                        title="已读",
                         provider=self.name,
                         is_separator=True,
                     )
@@ -246,8 +254,8 @@ class GithubNotificationsProvider(BaseProvider):
         if not results:
             return [
                 ProviderResult(
-                    title="No notifications",
-                    description="You're all caught up!",
+                    title="没有通知",
+                    description="全部处理完毕！",
                     icon_char=ICON_GITHUB,
                     provider=self.name,
                 )
@@ -303,11 +311,11 @@ class GithubNotificationsProvider(BaseProvider):
         data = result.action_data
         actions: list[ProviderMenuAction] = []
         if data.get("url"):
-            actions.append(ProviderMenuAction(id="copy_url", label="Copy URL"))
+            actions.append(ProviderMenuAction(id="copy_url", label="复制 URL"))
         if data.get("unread"):
-            actions.append(ProviderMenuAction(id="mark_read", label="Mark as read"))
-        actions.append(ProviderMenuAction(id="mark_all_read", label="Mark all as read", separator_before=True))
-        actions.append(ProviderMenuAction(id="refresh", label="Refresh"))
+            actions.append(ProviderMenuAction(id="mark_read", label="标记为已读"))
+        actions.append(ProviderMenuAction(id="mark_all_read", label="全部标记为已读", separator_before=True))
+        actions.append(ProviderMenuAction(id="refresh", label="刷新"))
         return actions
 
     def execute_context_menu_action(self, action_id: str, result: ProviderResult) -> ProviderMenuActionResult:
@@ -361,7 +369,7 @@ class GithubNotificationsProvider(BaseProvider):
         reason = _REASON_LABELS.get(notification.get("reason", ""), notification.get("reason", ""))
         updated_at = notification.get("updated_at", "")
         short_time = get_relative_time(updated_at, short=True)
-        ntype = notification.get("type", "")
+        ntype = _TYPE_LABELS.get(notification.get("type", ""), notification.get("type", ""))
 
         # Build description: #number · repo · Reason   time
         desc_parts: list[str] = []

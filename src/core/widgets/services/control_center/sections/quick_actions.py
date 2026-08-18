@@ -188,7 +188,7 @@ class QuickActionsSectionWidget(QFrame):
 
             if self._tooltip:
                 action_label = next((a.label for a in self.config.actions if a.id == action_id), action_id)
-                tooltip_text = f"{action_label} (Disabled)" if disabled else action_label
+                tooltip_text = f"{action_label}（已禁用）" if disabled else action_label
                 set_tooltip(button, tooltip_text, position="top")
 
             for child in button.findChildren(QWidget):

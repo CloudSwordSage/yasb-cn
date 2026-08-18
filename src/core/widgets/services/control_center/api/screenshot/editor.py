@@ -358,7 +358,7 @@ class ColorSwatchButton(_ColorChip):
     def __init__(self, color: str | QColor = _DEFAULT_COLOR, parent: QWidget | None = None):
         super().__init__(color, size=18, parent=parent)
         self._host = _PopupToggleHost(self)
-        set_tooltip(self, "Color")
+        set_tooltip(self, "颜色")
         self.clicked.connect(self._toggle_popup)
 
     def set_color(self, color: QColor | str) -> None:
@@ -1067,7 +1067,7 @@ class ScreenshotEditorDialog(ViewBase, QDialog):
         self._zoom.setMaximumWidth(180)
         self._zoom.valueChanged.connect(self._on_zoom)
         self._zoom.labelClicked.connect(self._reset_zoom)
-        set_tooltip(self._zoom, "Zoom (Ctrl+scroll)")
+        set_tooltip(self._zoom, "缩放（Ctrl + 滚动）")
         bar.addWidget(self._zoom)
 
         bar.addStretch(1)

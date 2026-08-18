@@ -75,8 +75,8 @@ class KillProcessProvider(BaseProvider):
     """Search and kill running processes."""
 
     name = "kill_process"
-    display_name = "Process Killer"
-    input_placeholder = "Type a process name to kill..."
+    display_name = "进程终止器"
+    input_placeholder = "输入要终止的进程名称..."
     icon = ICON_KILL_PROCESS
 
     def match(self, text: str) -> bool:
@@ -99,8 +99,8 @@ class KillProcessProvider(BaseProvider):
         if not query:
             return [
                 ProviderResult(
-                    title="Type a process name to kill",
-                    description="e.g. !notepad, !chrome, kill firefox",
+                    title="输入要终止的进程名称",
+                    description="例如：!notepad、!chrome、kill firefox",
                     icon_char=ICON_KILL_PROCESS,
                     provider=self.name,
                 )
@@ -132,10 +132,10 @@ class KillProcessProvider(BaseProvider):
             entry = proc_map[key]
             count = len(entry["pids"])
             mem_mb = entry["total_mem"] / (1024 * 1024)
-            count_str = f"{count} process{'es' if count > 1 else ''}"
+            count_str = f"{count} 个进程"
             results.append(
                 ProviderResult(
-                    title=f"Kill {entry['name']}",
+                    title=f"终止 {entry['name']}",
                     description=f"{count_str}, {mem_mb:.1f} MB",
                     icon_char=ICON_KILL_PROCESS,
                     provider=self.name,

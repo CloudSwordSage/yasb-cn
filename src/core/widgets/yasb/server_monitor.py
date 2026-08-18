@@ -187,7 +187,7 @@ class ServerMonitor(BaseWidget):
                 widget_index += 1
         if self.config.tooltip:
             set_tooltip(
-                self._widget_container, f"{online_count} online, {offline_count} offline of {total_count} servers"
+                self._widget_container, f"{total_count} 台服务器中，{online_count} 台在线，{offline_count} 台离线"
             )
 
     def _send_notification(self, run_id: int, offline_count: int, ssl_warning: bool, no_internet: bool = False) -> None:
@@ -199,9 +199,9 @@ class ServerMonitor(BaseWidget):
 
         toaster = ToastNotifier()
         if offline_count > 0 and self.config.desktop_notifications.offline and not no_internet:
-            toaster.show(self._icon_path, "Server Monitor", f"{offline_count} server(s) are offline")
+            toaster.show(self._icon_path, "服务器监控", f"{offline_count} 台服务器离线")
         if ssl_warning and self.config.desktop_notifications.ssl:
-            toaster.show(self._icon_path, "Server Monitor", "Some servers have SSL certificate expiring soon")
+            toaster.show(self._icon_path, "服务器监控", "部分服务器的 SSL 证书即将到期")
 
     def show_menu(self):
         self.dialog = PopupWidget(
@@ -228,8 +228,8 @@ class ServerMonitor(BaseWidget):
         header_layout.setSpacing(0)
 
         # Add refresh time
-        refresh_time = "Never" if not self._last_refresh_time else self._get_time_ago()
-        refresh_label = QLabel(f"Last check {refresh_time}")
+        refresh_time = "从未" if not self._last_refresh_time else self._get_time_ago()
+        refresh_label = QLabel(f"上次检查：{refresh_time}")
         refresh_label.setProperty("class", "refresh-time")
         header_layout.addWidget(refresh_label)
 
@@ -271,19 +271,19 @@ class ServerMonitor(BaseWidget):
 
     def _get_time_ago(self):
         if not self._last_refresh_time:
-            return "Never"
+            return "从未"
 
         diff = datetime.now() - self._last_refresh_time
         seconds = int(diff.total_seconds())
 
         if seconds < 60:
-            return f"{seconds} seconds ago"
+            return f"{seconds} 秒前"
 
         minutes = seconds // 60
         if minutes == 1:
-            return "1 minute ago"
+            return "1 分钟前"
         else:
-            return f"{minutes} minutes ago"
+            return f"{minutes} 分钟前"
 
     def _update_menu_content(self):
         layout = self.dialog.layout()
@@ -302,7 +302,7 @@ class ServerMonitor(BaseWidget):
             header_widget = layout.itemAt(0).widget()
             refresh_label = header_widget.layout().itemAt(0).widget()
             refresh_time = self._get_time_ago()
-            refresh_label.setText(f"Last check {refresh_time}")
+            refresh_label.setText(f"上次检查：{refresh_time}")
         except Exception:
             pass
 
@@ -336,7 +336,7 @@ class ServerMonitor(BaseWidget):
             loading_layout = QVBoxLayout(loading_widget)
             loading_layout.setContentsMargins(0, 0, 0, 0)
 
-            placeholder = QLabel("Checking servers...\nThis may take a few seconds.")
+            placeholder = QLabel("正在检查服务器...\n这可能需要几秒钟。")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             placeholder.setProperty("class", "placeholder")
 
@@ -401,15 +401,15 @@ class ServerMonitor(BaseWidget):
 
                 ssl_status = ""
                 if self.config.ssl_check and isinstance(server_data.get("ssl"), int):
-                    ssl_status = f", SSL expires in {server_data['ssl']} days"
+                    ssl_status = f"，SSL 证书将在 {server_data['ssl']} 天后到期"
                 if server_data["status"] == "Online":
                     details_text = (
-                        f"{server_data_response_time}{ssl_status}, response code: {server_data['response_code']}"
+                        f"{server_data_response_time}{ssl_status}，响应代码：{server_data['response_code']}"
                     )
                 elif server_data.get("no_internet"):
-                    details_text = "Server is unreachable (no internet)"
+                    details_text = "服务器无法访问（无网络）"
                 else:
-                    details_text = "Server is offline"
+                    details_text = "服务器离线"
 
                 details = QLabel(details_text)
                 details.setProperty("class", "details")

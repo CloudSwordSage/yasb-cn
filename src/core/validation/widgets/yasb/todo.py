@@ -14,9 +14,9 @@ class CategoryConfig(CustomBaseModel):
 
 
 class IconsConfig(CustomBaseModel):
-    add: str = "New Task"
-    edit: str = "Edit"
-    delete: str = "Delete"
+    add: str = "新建任务"
+    edit: str = "编辑"
+    delete: str = "删除"
     date: str = "\ue641"
     category: str = "\uf412"
     checked: str = "\udb80\udd34"
@@ -44,17 +44,17 @@ class CallbacksTodoConfig(CallbacksConfig):
 
 class TodoConfig(CustomBaseModel):
     label: str = "\uf4a0 {count}/{completed}"
-    label_alt: str = "\uf4a0 Tasks: {count}"
+    label_alt: str = "\uf4a0 任务：{count}"
     data_path: str = ""
     menu: MenuConfig = MenuConfig()
     icons: IconsConfig = IconsConfig()
     categories: dict[str, CategoryConfig] = Field(
         default={
-            "default": CategoryConfig(label="General"),
-            "urgent": CategoryConfig(label="Urgent"),
-            "important": CategoryConfig(label="Important"),
-            "soon": CategoryConfig(label="Complete soon"),
-            "today": CategoryConfig(label="End of day"),
+            "default": CategoryConfig(label="常规"),
+            "urgent": CategoryConfig(label="紧急"),
+            "important": CategoryConfig(label="重要"),
+            "soon": CategoryConfig(label="即将完成"),
+            "today": CategoryConfig(label="当天结束前"),
         }
     )
     keybindings: list[KeybindingConfig] = []

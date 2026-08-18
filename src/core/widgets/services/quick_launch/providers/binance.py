@@ -17,7 +17,7 @@ class BinanceProvider(BaseProvider):
 
     name = "binance"
     display_name = "Binance"
-    input_placeholder = "Search crypto prices..."
+    input_placeholder = "搜索加密货币价格..."
     icon = ICON_BINANCE
 
     def __init__(self, config: dict | None = None):
@@ -45,20 +45,20 @@ class BinanceProvider(BaseProvider):
             if self._is_fetching:
                 return [
                     ProviderResult(
-                        title="Loading crypto prices...",
-                        description="Fetching latest data from Binance",
+                        title="正在加载加密货币价格...",
+                        description="正在从 Binance 获取最新数据",
                         icon_char=ICON_BINANCE,
                         provider=self.name,
                         is_loading=True,
                     )
                 ]
             else:
-                desc = "Could not fetch prices from Binance"
+                desc = "无法从 Binance 获取价格"
                 if self._error_msg:
-                    desc = f"API Error: {self._error_msg}"
+                    desc = f"API 错误：{self._error_msg}"
                 return [
                     ProviderResult(
-                        title="Crypto prices unavailable",
+                        title="加密货币价格不可用",
                         description=desc,
                         icon_char=ICON_BINANCE,
                         provider=self.name,
@@ -107,7 +107,7 @@ class BinanceProvider(BaseProvider):
             results.append(
                 ProviderResult(
                     title=title,
-                    description=f"{'Open Binance' if self._open_url else 'Copy'}",
+                        description=f"{'打开 Binance' if self._open_url else '复制'}",
                     icon_char=ICON_BINANCE,
                     provider=self.name,
                     action_data={
@@ -122,8 +122,8 @@ class BinanceProvider(BaseProvider):
         if not results:
             return [
                 ProviderResult(
-                    title="No matching pairs",
-                    description=f"No results for '{symbol}' in configured pairs",
+                    title="没有匹配的交易对",
+                    description=f"配置的交易对中没有“{symbol}”的结果",
                     icon_char=ICON_BINANCE,
                     provider=self.name,
                 )
@@ -225,36 +225,36 @@ class BinanceProvider(BaseProvider):
 
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                self._error_msg = "Rate limit reached. Please wait a moment."
+                self._error_msg = "已达到速率限制，请稍候。"
             elif e.code == 403:
-                self._error_msg = "Access denied. Your IP might be blocked."
+                self._error_msg = "访问被拒绝，你的 IP 可能已被封禁。"
             elif e.code == 418:
-                self._error_msg = "IP banned due to rate limit violations."
+                self._error_msg = "因违反速率限制，IP 已被封禁。"
             elif e.code == 404:
-                self._error_msg = "Not found. Please verify the domain in the configuration file."
+                self._error_msg = "未找到。请检查配置文件中的域名。"
             elif e.code >= 500:
-                self._error_msg = f"Binance server error ({e.code})."
+                self._error_msg = f"Binance 服务器错误（{e.code}）。"
             else:
                 try:
                     data = json.loads(e.read().decode())
                     msg = data.get("msg")
-                    self._error_msg = msg if msg else f"Request failed (Status {e.code})"
+                    self._error_msg = msg if msg else f"请求失败（状态 {e.code}）"
                 except Exception:
-                    self._error_msg = f"HTTP Error {e.code}"
+                    self._error_msg = f"HTTP 错误 {e.code}"
             return None
 
         except urllib.error.URLError as e:
             reason_str = str(e.reason).lower()
             if "getaddrinfo" in reason_str or "not known" in reason_str:
                 self._error_msg = (
-                    "DNS lookup failed. Check your connection and verify the domain in the configuration file."
+                    "DNS 查询失败。请检查网络连接和配置文件中的域名。"
                 )
             elif "timed out" in reason_str or "timeout" in reason_str:
-                self._error_msg = "Connection timed out. Try again later."
+                self._error_msg = "连接超时，请稍后重试。"
             elif "ssl" in reason_str or "handshake" in reason_str:
-                self._error_msg = "SSL error. Check your system clock or network."
+                self._error_msg = "SSL 错误。请检查系统时钟或网络。"
             elif "refused" in reason_str:
-                self._error_msg = "Connection refused. Server might be down."
+                self._error_msg = "连接被拒绝，服务器可能不可用。"
             else:
                 clean_reason = str(e.reason)
                 if clean_reason.startswith("[Errno"):
@@ -262,5 +262,5 @@ class BinanceProvider(BaseProvider):
                         clean_reason = clean_reason.split("]", 1)[1].strip().capitalize()
                     except IndexError, AttributeError:
                         pass
-                self._error_msg = f"Network Error: {clean_reason}"
+                self._error_msg = f"网络错误：{clean_reason}"
             return None

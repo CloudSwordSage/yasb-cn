@@ -278,7 +278,7 @@ class KomorebiControlWidget(BaseWidget):
             # If the menu is open, show a transient starting message
             if hasattr(self, "_version_label") and getattr(self, "dialog", None) and self.dialog.isVisible():
                 try:
-                    self._version_label.setText("Starting...")
+                    self._version_label.setText("正在启动...")
                 except Exception:
                     pass
             self._run_komorebi_command(command)
@@ -299,7 +299,7 @@ class KomorebiControlWidget(BaseWidget):
             command = f"{self._komorebic._komorebic_path} stop {stop_flags} && {self._komorebic._komorebic_path} start {start_flags}"
             if hasattr(self, "_version_label") and getattr(self, "dialog", None) and self.dialog.isVisible():
                 try:
-                    self._version_label.setText("Reloading...")
+                    self._version_label.setText("正在重新加载...")
                 except Exception:
                     pass
             try:

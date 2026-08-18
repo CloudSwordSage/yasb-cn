@@ -241,12 +241,12 @@ def build_stat_popup(
     pin_btn = QPushButton(pin_icon)
     pin_btn.setCheckable(True)
     pin_btn.setProperty("class", "pin-btn")
-    set_tooltip(pin_btn, "Pin this window")
+    set_tooltip(pin_btn, "固定此窗口")
 
     def on_pin_toggled(checked: bool):
         pin_btn.setText(unpin_icon if checked else pin_icon)
         pin_btn.setProperty("class", "pin-btn pinned" if checked else "pin-btn")
-        set_tooltip(pin_btn, "Pin this window" if not checked else "Unpin this window")
+        set_tooltip(pin_btn, "固定此窗口" if not checked else "取消固定此窗口")
         refresh_widget_style(pin_btn)
         popup._is_pinned = checked
 

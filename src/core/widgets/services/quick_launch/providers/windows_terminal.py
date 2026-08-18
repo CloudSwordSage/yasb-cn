@@ -100,7 +100,7 @@ class WindowsTerminalProvider(BaseProvider):
     name = "windows_terminal"
     display_name = "Terminal"
     icon = ICON_WINDOWS_TERMINAL
-    input_placeholder = "Search terminal profiles..."
+    input_placeholder = "搜索终端配置文件..."
 
     def __init__(self, config: dict | None = None):
         super().__init__(config)
@@ -152,8 +152,8 @@ class WindowsTerminalProvider(BaseProvider):
         if not self._terminals:
             return [
                 ProviderResult(
-                    title="No Windows Terminal installation found",
-                    description="Install Windows Terminal from the Microsoft Store",
+                    title="未找到 Windows Terminal 安装",
+                    description="请从 Microsoft Store 安装 Windows Terminal",
                     icon_char=ICON_WINDOWS_TERMINAL,
                     provider=self.name,
                 )
@@ -216,8 +216,8 @@ class WindowsTerminalProvider(BaseProvider):
         if not results:
             return [
                 ProviderResult(
-                    title="No matching profiles",
-                    description="Try a different search term",
+                    title="没有匹配的配置文件",
+                    description="请尝试其他搜索词",
                     icon_char=ICON_WINDOWS_TERMINAL,
                     provider=self.name,
                 )
@@ -239,8 +239,8 @@ class WindowsTerminalProvider(BaseProvider):
         if not data.get("guid"):
             return []
         return [
-            ProviderMenuAction(id="open", label="Open"),
-            ProviderMenuAction(id="open_admin", label="Open as Administrator"),
+            ProviderMenuAction(id="open", label="打开"),
+            ProviderMenuAction(id="open_admin", label="以管理员身份打开"),
         ]
 
     def execute_context_menu_action(self, action_id: str, result: ProviderResult) -> ProviderMenuActionResult:

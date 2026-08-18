@@ -62,8 +62,8 @@ class CurrencyProvider(BaseProvider):
     """Convert between currencies using ECB daily rates (cached 12h)."""
 
     name = "currency"
-    display_name = "Currency Converter"
-    input_placeholder = "Convert currency, e.g. 100 usd eur..."
+    display_name = "货币转换器"
+    input_placeholder = "转换货币，例如：100 usd eur..."
     icon = ICON_CURRENCY
 
     def __init__(self, config: dict | None = None):
@@ -82,8 +82,8 @@ class CurrencyProvider(BaseProvider):
         if not query:
             return [
                 ProviderResult(
-                    title="Type currency conversion",
-                    description="e.g. 100 usd eur, 50 gbp jpy, usd eur",
+                    title="输入货币转换",
+                    description="例如：100 usd eur、50 gbp jpy、usd eur",
                     icon_char=ICON_CURRENCY,
                     provider=self.name,
                 )
@@ -93,8 +93,8 @@ class CurrencyProvider(BaseProvider):
         if rates is None:
             return [
                 ProviderResult(
-                    title="Currency rates unavailable",
-                    description="No internet connection and no cached rates",
+                    title="货币汇率不可用",
+                    description="无网络连接且没有缓存汇率",
                     icon_char=ICON_CURRENCY,
                     provider=self.name,
                 )
@@ -129,7 +129,7 @@ class CurrencyProvider(BaseProvider):
                     results.append(
                         ProviderResult(
                             title=f"{code}",
-                            description=f"{sym} · Type amount and target e.g. 100 {code.lower()} usd",
+                            description=f"{sym} · 输入金额和目标货币，例如：100 {code.lower()} usd",
                             icon_char=ICON_CURRENCY,
                             provider=self.name,
                         )
@@ -138,8 +138,8 @@ class CurrencyProvider(BaseProvider):
 
         return [
             ProviderResult(
-                title="Invalid format",
-                description="Use: [amount] SRC DST  e.g. 100 usd eur",
+                title="格式无效",
+                description="用法：[金额] 源货币 目标货币，例如：100 usd eur",
                 icon_char=ICON_CURRENCY,
                 provider=self.name,
             )
@@ -159,8 +159,8 @@ class CurrencyProvider(BaseProvider):
         if src_rate is None:
             return [
                 ProviderResult(
-                    title=f"Unknown currency: {src}",
-                    description="Check currency code",
+                    title=f"未知货币：{src}",
+                    description="请检查货币代码",
                     icon_char=ICON_CURRENCY,
                     provider=self.name,
                 )
@@ -168,8 +168,8 @@ class CurrencyProvider(BaseProvider):
         if dst_rate is None:
             return [
                 ProviderResult(
-                    title=f"Unknown currency: {dst}",
-                    description="Check currency code",
+                    title=f"未知货币：{dst}",
+                    description="请检查货币代码",
                     icon_char=ICON_CURRENCY,
                     provider=self.name,
                 )
@@ -196,7 +196,7 @@ class CurrencyProvider(BaseProvider):
         return [
             ProviderResult(
                 title=f"{dst_sym}{display} {dst}",
-                description=f"{amt_display} {src} -> {dst} · Rate: {rate:.6f}".rstrip("0").rstrip("."),
+                description=f"{amt_display} {src} -> {dst} · 汇率：{rate:.6f}".rstrip("0").rstrip("."),
                 icon_char=ICON_CURRENCY,
                 provider=self.name,
                 action_data={"copy_value": display},

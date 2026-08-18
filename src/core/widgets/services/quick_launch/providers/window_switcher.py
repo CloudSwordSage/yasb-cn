@@ -24,9 +24,9 @@ class WindowSwitcherProvider(BaseProvider):
     """Switch to currently open application windows."""
 
     name = "window"
-    display_name = "Window Switcher"
+    display_name = "窗口切换器"
     icon = ICON_WINDOWS_SWITCHER
-    input_placeholder = "Switch to window..."
+    input_placeholder = "切换到窗口..."
 
     def __init__(self, config: dict | None = None):
         super().__init__(config)
@@ -72,8 +72,8 @@ class WindowSwitcherProvider(BaseProvider):
         results_data = []
         for win in taskbar_windows:
             # Re-fetch title because the window might still have an old title in the dict
-            title = win.title or win._get_title() or "Unknown"
-            app_id = win.process_name or "Unknown"
+            title = win.title or win._get_title() or "未知"
+            app_id = win.process_name or "未知"
 
             if query_lower:
                 score_title = fuzzy_score(query_lower, title)
@@ -105,7 +105,7 @@ class WindowSwitcherProvider(BaseProvider):
             results.append(
                 ProviderResult(
                     title=title,
-                    description=f"Running - {os.path.splitext(app_id)[0]}",
+                    description=f"正在运行 - {os.path.splitext(app_id)[0]}",
                     icon_path=icon_path,
                     icon_char=self.icon if not icon_path else "",
                     provider=self.name,

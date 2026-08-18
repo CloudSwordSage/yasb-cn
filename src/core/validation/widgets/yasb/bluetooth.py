@@ -43,20 +43,20 @@ class BluetoothDeviceAliasConfig(CustomBaseModel):
 
 
 class BluetoothLabelsConfig(CustomBaseModel):
-    title: str = "Bluetooth"
-    your_devices: str = "Your devices"
-    new_devices: str = "New devices"
-    not_connected: str = "Not connected"
-    connected: str = "Connected"
-    more_settings: str = "More Bluetooth settings"
-    connect: str = "Connect"
-    disconnect: str = "Disconnect"
-    connecting: str = "Connecting"
-    disconnecting: str = "Disconnecting"
-    pair: str = "Pair"
-    manage: str = "Manage"
-    power_on: str = "On"
-    power_off: str = "Off"
+    title: str = "蓝牙"
+    your_devices: str = "你的设备"
+    new_devices: str = "新设备"
+    not_connected: str = "未连接"
+    connected: str = "已连接"
+    more_settings: str = "更多蓝牙设置"
+    connect: str = "连接"
+    disconnect: str = "断开连接"
+    connecting: str = "正在连接"
+    disconnecting: str = "正在断开连接"
+    pair: str = "配对"
+    manage: str = "管理"
+    power_on: str = "开启"
+    power_off: str = "关闭"
 
 
 class BluetoothMenuConfig(CustomBaseModel):
@@ -80,7 +80,7 @@ class BluetoothConfig(CustomBaseModel):
     label: str = "\ue702"
     label_alt: str = "\ue702"
     class_name: str = ""
-    label_no_device: str = "No devices connected"
+    label_no_device: str = "没有已连接的设备"
     label_device_separator: str = ", "
     max_length: int | None = None
     max_length_ellipsis: str = "..."

@@ -55,7 +55,7 @@ class PowerSectionWidget(QFrame):
         self._action_button.setProperty("class", "button plan-name")
         self._action_button.clicked.connect(self._show_power_plan_menu)
 
-        self._plan_label = ElidedLabel("Unknown")
+        self._plan_label = ElidedLabel("未知")
         self._setup_button_layout(
             self._action_button,
             config.power_plan_title,
@@ -179,7 +179,7 @@ class PowerSectionWidget(QFrame):
 
         active_name = next(
             (p.name for p in self._plans if active_guid and svc.guids_equal(p.guid, active_guid)),
-            "Unknown",
+            "未知",
         )
         if self._plan_label and is_valid_qobject(self._plan_label):
             self._plan_label.setText(active_name)
@@ -218,7 +218,7 @@ class PowerSectionWidget(QFrame):
         self._mode_button.setProperty("class", "button mode-name")
         self._mode_button.clicked.connect(self._show_power_mode_menu)
 
-        self._mode_label = ElidedLabel(mode[0] if mode else "Unknown")
+        self._mode_label = ElidedLabel(mode[0] if mode else "未知")
         self._setup_button_layout(
             self._mode_button,
             self.config.power_mode_title,
@@ -237,16 +237,16 @@ class PowerSectionWidget(QFrame):
 
             if not self._mode_enabled:
                 if self._mode_label and is_valid_qobject(self._mode_label):
-                    self._mode_label.setText("Automatic")
+                    self._mode_label.setText("自动")
             else:
                 mode = power_mode_api.get_active_mode()
                 if self._mode_label and is_valid_qobject(self._mode_label):
-                    self._mode_label.setText(mode[0] if mode else "Unknown")
+                    self._mode_label.setText(mode[0] if mode else "未知")
 
     def _refresh_mode_state(self) -> None:
         mode = power_mode_api.get_active_mode()
         if self._mode_label and is_valid_qobject(self._mode_label):
-            self._mode_label.setText(mode[0] if mode else "Unknown")
+            self._mode_label.setText(mode[0] if mode else "未知")
         self._mode_enabled = power_mode_api.is_mode_supported()
         self._apply_mode_button_state()
 

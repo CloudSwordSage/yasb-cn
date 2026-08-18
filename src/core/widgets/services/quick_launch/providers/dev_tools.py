@@ -30,36 +30,36 @@ _LOREM_WORDS = (
 
 _TOOLS: dict[str, dict[str, str]] = {
     "uuid": {
-        "name": "UUID Generator",
-        "description": "Generate random UUID v4 values",
+        "name": "UUID 生成器",
+        "description": "生成随机 UUID v4 值",
     },
     "hash": {
-        "name": "Hash Generator",
-        "description": "MD5, SHA1, SHA256, SHA512 hashes of text",
+        "name": "哈希生成器",
+        "description": "生成文本的 MD5、SHA1、SHA256、SHA512 哈希值",
     },
     "base64": {
-        "name": "Base64 Encode/Decode",
-        "description": "Encode or decode Base64 strings",
+        "name": "Base64 编码/解码",
+        "description": "编码或解码 Base64 字符串",
     },
     "url": {
-        "name": "URL Encode/Decode",
-        "description": "Percent-encode or decode URL strings",
+        "name": "URL 编码/解码",
+        "description": "对 URL 字符串进行百分号编码或解码",
     },
     "jwt": {
-        "name": "JWT Decoder",
-        "description": "Decode JWT token payload (no verification)",
+        "name": "JWT 解码器",
+        "description": "解码 JWT 令牌载荷（不验证）",
     },
     "lorem": {
         "name": "Lorem Ipsum",
-        "description": "Generate placeholder text",
+        "description": "生成占位文本",
     },
     "ts": {
-        "name": "Timestamp Converter",
-        "description": "Convert between unix timestamps and dates",
+        "name": "时间戳转换器",
+        "description": "在 Unix 时间戳与日期之间转换",
     },
     "pw": {
-        "name": "Password Generator",
-        "description": "Generate secure random passwords",
+        "name": "密码生成器",
+        "description": "生成安全的随机密码",
     },
 }
 
@@ -72,9 +72,9 @@ class DevToolsProvider(BaseProvider):
     """
 
     name = "dev_tools"
-    display_name = "Developer Tools"
+    display_name = "开发工具"
     icon = ICON_DEV_TOOLS
-    input_placeholder = "Pick a tool or type a command..."
+    input_placeholder = "选择工具或输入命令..."
 
     def __init__(self, config: dict | None = None):
         super().__init__(config)
@@ -128,7 +128,7 @@ class DevToolsProvider(BaseProvider):
         actions: list[ProviderMenuAction] = []
         data = result.action_data
         if data.get("copy") is not None:
-            actions.append(ProviderMenuAction(id="copy", label="Copy to clipboard"))
+            actions.append(ProviderMenuAction(id="copy", label="复制到剪贴板"))
         return actions
 
     def execute_context_menu_action(self, action_id, result):
@@ -192,12 +192,12 @@ class DevToolsProvider(BaseProvider):
         results: list[ProviderResult] = []
         for _ in range(count):
             val = str(uuid.uuid4())
-            results.append(self._make_result(val, "Click to copy UUID v4", val))
+            results.append(self._make_result(val, "点击复制 UUID v4", val))
         return results
 
     def _hash_results(self, arg: str) -> list[ProviderResult]:
         if not arg:
-            return [self._make_result("Type text after 'hash'", "e.g. dev hash hello world", "")]
+            return [self._make_result("在“hash”后输入文本", "例如：dev hash hello world", "")]
         data = arg.encode("utf-8")
         results: list[ProviderResult] = []
         for name, func in [
@@ -207,43 +207,43 @@ class DevToolsProvider(BaseProvider):
             ("SHA512", hashlib.sha512),
         ]:
             digest = func(data).hexdigest()
-            results.append(self._make_result(digest, f"{name} - Click to copy", digest))
+            results.append(self._make_result(digest, f"{name} - 点击复制", digest))
         return results
 
     def _base64_results(self, arg: str) -> list[ProviderResult]:
         if not arg:
-            return [self._make_result("Type text after 'base64'", "Encodes to Base64. Paste Base64 to decode.", "")]
+            return [self._make_result("在“base64”后输入文本", "编码为 Base64；粘贴 Base64 内容可解码。", "")]
         results: list[ProviderResult] = []
         encoded = base64.b64encode(arg.encode("utf-8")).decode("ascii")
-        results.append(self._make_result(encoded, "Base64 Encoded - Click to copy", encoded))
+        results.append(self._make_result(encoded, "Base64 已编码 - 点击复制", encoded))
         try:
             decoded = base64.b64decode(arg).decode("utf-8")
-            results.append(self._make_result(decoded, "Base64 Decoded - Click to copy", decoded))
+            results.append(self._make_result(decoded, "Base64 已解码 - 点击复制", decoded))
         except Exception:
             pass
         return results
 
     def _url_results(self, arg: str) -> list[ProviderResult]:
         if not arg:
-            return [self._make_result("Type text after 'url'", "URL encode/decode a string", "")]
+            return [self._make_result("在“url”后输入文本", "对字符串进行 URL 编码或解码", "")]
         results: list[ProviderResult] = []
         encoded = urllib.parse.quote(arg, safe="")
-        results.append(self._make_result(encoded, "URL Encoded - Click to copy", encoded))
+        results.append(self._make_result(encoded, "URL 已编码 - 点击复制", encoded))
         try:
             decoded = urllib.parse.unquote(arg)
             if decoded != arg:
-                results.append(self._make_result(decoded, "URL Decoded - Click to copy", decoded))
+                results.append(self._make_result(decoded, "URL 已解码 - 点击复制", decoded))
         except Exception:
             pass
         return results
 
     def _jwt_results(self, arg: str) -> list[ProviderResult]:
         if not arg:
-            return [self._make_result("Paste a JWT token after 'jwt'", "Decodes the payload (no verification)", "")]
+            return [self._make_result("在“jwt”后粘贴 JWT 令牌", "解码载荷（不验证）", "")]
         try:
             parts = arg.split(".")
             if len(parts) < 2:
-                return [self._make_result("Invalid JWT", "Expected header.payload.signature format", "")]
+                return [self._make_result("JWT 无效", "应为 header.payload.signature 格式", "")]
             payload_b64 = parts[1]
             padding = 4 - len(payload_b64) % 4
             if padding != 4:
@@ -252,7 +252,7 @@ class DevToolsProvider(BaseProvider):
             payload = json.loads(payload_bytes)
             pretty = json.dumps(payload, indent=2, ensure_ascii=False)
             results: list[ProviderResult] = []
-            results.append(self._make_result("JWT Payload", "Click to copy decoded JSON", pretty))
+            results.append(self._make_result("JWT 载荷", "点击复制已解码的 JSON", pretty))
             for key, value in payload.items():
                 display_val = str(value)
                 if key in ("exp", "iat", "nbf") and isinstance(value, (int, float)):
@@ -261,24 +261,24 @@ class DevToolsProvider(BaseProvider):
                         display_val = f"{value} ({dt.strftime('%Y-%m-%d %H:%M:%S UTC')})"
                     except Exception:
                         pass
-                results.append(self._make_result(f"{key}: {display_val}", "Click to copy value", str(value)))
+                results.append(self._make_result(f"{key}: {display_val}", "点击复制值", str(value)))
             return results
         except Exception:
-            return [self._make_result("Failed to decode JWT", "Make sure the token is valid", "")]
+            return [self._make_result("无法解码 JWT", "请确认令牌有效", "")]
 
     def _lorem_results(self, arg: str) -> list[ProviderResult]:
         results: list[ProviderResult] = []
         counts = [1, 2, 3, 5]
         for n in counts:
             text = self._generate_lorem(n)
-            label = f"{n} paragraph{'s' if n > 1 else ''}"
+            label = f"{n} 段"
             desc = text[:80] + "..." if len(text) > 80 else text
             results.append(self._make_result(label, desc, text))
         word_counts = [10, 25, 50]
         for n in word_counts:
             words = " ".join(random.choices(_LOREM_WORDS, k=n))
             words = words[0].upper() + words[1:] + "."
-            results.append(self._make_result(f"{n} words", words[:80] + "..." if len(words) > 80 else words, words))
+            results.append(self._make_result(f"{n} 个词", words[:80] + "..." if len(words) > 80 else words, words))
         return results
 
     def _generate_lorem(self, paragraphs: int) -> str:
@@ -302,22 +302,22 @@ class DevToolsProvider(BaseProvider):
 
         results.append(
             self._make_result(
-                f"Now: {now_int}",
+                f"当前：{now_int}",
                 now_dt.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 str(now_int),
             )
         )
         results.append(
             self._make_result(
-                f"Now (ms): {int(now * 1000)}",
-                "Millisecond timestamp",
+                f"当前（毫秒）：{int(now * 1000)}",
+                "毫秒时间戳",
                 str(int(now * 1000)),
             )
         )
         results.append(
             self._make_result(
                 f"ISO 8601: {now_dt.isoformat()}",
-                "Click to copy",
+                "点击复制",
                 now_dt.isoformat(),
             )
         )
@@ -332,22 +332,22 @@ class DevToolsProvider(BaseProvider):
                 local_dt = datetime.fromtimestamp(ts_val)
                 results.append(
                     self._make_result(
-                        f"UTC: {dt.strftime('%Y-%m-%d %H:%M:%S')}",
-                        f"Unix {int(ts_val)} - Click to copy",
+                        f"UTC：{dt.strftime('%Y-%m-%d %H:%M:%S')}",
+                        f"Unix {int(ts_val)} - 点击复制",
                         dt.strftime("%Y-%m-%d %H:%M:%S UTC"),
                     )
                 )
                 results.append(
                     self._make_result(
-                        f"Local: {local_dt.strftime('%Y-%m-%d %H:%M:%S')}",
-                        "Local timezone - Click to copy",
+                        f"本地：{local_dt.strftime('%Y-%m-%d %H:%M:%S')}",
+                        "本地时区 - 点击复制",
                         local_dt.strftime("%Y-%m-%d %H:%M:%S"),
                     )
                 )
                 results.append(
                     self._make_result(
                         f"ISO: {dt.isoformat()}",
-                        "Click to copy ISO 8601",
+                        "点击复制 ISO 8601",
                         dt.isoformat(),
                     )
                 )
@@ -358,15 +358,15 @@ class DevToolsProvider(BaseProvider):
                         ts_int = int(dt.timestamp())
                         results.append(
                             self._make_result(
-                                f"Unix: {ts_int}",
-                                f"From {arg_stripped} - Click to copy",
+                                f"Unix：{ts_int}",
+                                f"来自 {arg_stripped} - 点击复制",
                                 str(ts_int),
                             )
                         )
                         results.append(
                             self._make_result(
-                                f"Milliseconds: {ts_int * 1000}",
-                                "Click to copy",
+                                f"毫秒：{ts_int * 1000}",
+                                "点击复制",
                                 str(ts_int * 1000),
                             )
                         )
@@ -391,8 +391,8 @@ class DevToolsProvider(BaseProvider):
         pw_hex = "".join(secrets.choice(chars_hex) for _ in range(length))
         passphrase = "-".join("".join(random.choices(string.ascii_lowercase, k=random.randint(4, 7))) for _ in range(4))
 
-        results.append(self._make_result(pw_full, f"Full ({length} chars) - letters, digits, symbols", pw_full))
-        results.append(self._make_result(pw_alpha, f"Alphanumeric ({length} chars) - letters, digits", pw_alpha))
-        results.append(self._make_result(pw_hex, f"Hex ({length} chars)", pw_hex))
-        results.append(self._make_result(passphrase, "Passphrase - 4 random words", passphrase))
+        results.append(self._make_result(pw_full, f"完整（{length} 个字符）- 字母、数字和符号", pw_full))
+        results.append(self._make_result(pw_alpha, f"字母数字（{length} 个字符）- 字母和数字", pw_alpha))
+        results.append(self._make_result(pw_hex, f"十六进制（{length} 个字符）", pw_hex))
+        results.append(self._make_result(passphrase, "密码短语 - 4 个随机词", passphrase))
         return results

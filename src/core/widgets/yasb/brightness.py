@@ -172,7 +172,7 @@ class BrightnessWidget(BaseWidget):
 
         icon = self._get_brightness_icon(percent)
         if self.config.tooltip:
-            set_tooltip(self, f"Brightness {percent}%")
+            set_tooltip(self, f"亮度 {percent}%")
 
         label_options = {"{icon}": icon, "{percent}": percent}
 

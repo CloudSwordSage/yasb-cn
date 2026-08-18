@@ -740,7 +740,7 @@ class QuickLaunchWidget(BaseWidget):
         empty_icon.setProperty("class", "results-empty-icon")
         empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_inner.addWidget(empty_icon)
-        empty_hint = QLabel("Type to search...")
+        empty_hint = QLabel("输入以搜索…")
         empty_hint.setProperty("class", "results-empty-text")
         empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_inner.addWidget(empty_hint)
@@ -837,7 +837,7 @@ class QuickLaunchWidget(BaseWidget):
             results.append(
                 ProviderResult(
                     title=p.prefix,
-                    description=f"Activate {p.display_name or p.name}",
+                    description=f"启用 {p.display_name or p.name}",
                     icon_char=p.icon,
                     provider=p.name,
                     action_data={"_home": True, "prefix": p.prefix},
@@ -852,7 +852,7 @@ class QuickLaunchWidget(BaseWidget):
         if not results:
             has_text = bool(self._pending_search_text.strip())
             self._set_empty_icon(ICON_NO_RESULTS if has_text else ICON_SEARCH_MAIN)
-            self._popup.empty_hint.setText("No results found" if has_text else "Type to search...")
+            self._popup.empty_hint.setText("未找到结果" if has_text else "输入以搜索…")
             self._popup.results_view.setVisible(False)
             self._popup.empty_widget.setVisible(True)
             self._result_model.set_results([], 0, 1.0)
@@ -1146,9 +1146,9 @@ class QuickLaunchWidget(BaseWidget):
         btn_layout.setSpacing(4)
         btn_layout.addStretch()
 
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton("取消")
         cancel_btn.setProperty("class", "preview-btn")
-        save_btn = QPushButton("Save")
+        save_btn = QPushButton("保存")
         save_btn.setProperty("class", "preview-btn save")
 
         def collect_and_save(_checked=False, _result=result):
@@ -1335,30 +1335,30 @@ class QuickLaunchWidget(BaseWidget):
         clipboard_has_text = bool(clipboard and clipboard.text())
 
         # Text editing actions
-        cut_action = menu.addAction("Cut")
+        cut_action = menu.addAction("剪切")
         cut_action.setEnabled(has_selection)
-        copy_action = menu.addAction("Copy")
+        copy_action = menu.addAction("复制")
         copy_action.setEnabled(has_selection)
-        paste_action = menu.addAction("Paste")
+        paste_action = menu.addAction("粘贴")
         paste_action.setEnabled(clipboard_has_text)
 
         menu.addSeparator()
 
-        select_all_action = menu.addAction("Select All")
+        select_all_action = menu.addAction("全选")
         select_all_action.setEnabled(has_text)
 
         menu.addSeparator()
 
         # Lock / Unlock position
         if self._position_locked:
-            lock_action = menu.addAction("Unlock position")
+            lock_action = menu.addAction("解锁位置")
         else:
-            lock_action = menu.addAction("Lock position")
+            lock_action = menu.addAction("锁定位置")
 
         # Reset to centre (only visible when a custom position is saved)
         reset_action = None
         if self._saved_position is not None:
-            reset_action = menu.addAction("Reset position")
+            reset_action = menu.addAction("重置位置")
 
         global_pos = search.mapToGlobal(pos)
         # Native menus ignore widget setCursor - override is the only way

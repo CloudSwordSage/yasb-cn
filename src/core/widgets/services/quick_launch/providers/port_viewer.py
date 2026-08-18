@@ -282,8 +282,8 @@ class PortViewerProvider(BaseProvider):
     """View TCP/UDP ports (netstat) and optionally kill owning processes."""
 
     name = "port_viewer"
-    display_name = "Port Viewer"
-    input_placeholder = "Search open ports..."
+    display_name = "端口查看器"
+    input_placeholder = "搜索开放端口..."
     icon = ICON_PORT
 
     def __init__(self, config: dict | None = None):
@@ -297,8 +297,8 @@ class PortViewerProvider(BaseProvider):
         if not query:
             return [
                 ProviderResult(
-                    title="Port Viewer",
-                    description="e.g. pv 80, pv tcp 443, pv chrome, pv kill 80",
+                    title="端口查看器",
+                    description="例如：pv 80、pv tcp 443、pv chrome、pv kill 80",
                     icon_char=ICON_PORT,
                     provider=self.name,
                 )
@@ -357,8 +357,8 @@ class PortViewerProvider(BaseProvider):
         if not entries:
             return [
                 ProviderResult(
-                    title="No ports found",
-                    description="netstat returned no results or failed to run",
+                    title="未找到端口",
+                    description="netstat 没有返回结果或运行失败",
                     icon_char=ICON_PORT,
                     provider=self.name,
                 )
@@ -411,7 +411,7 @@ class PortViewerProvider(BaseProvider):
                     continue
 
             if kill_mode:
-                title = f"Kill {proc_display}"
+                title = f"终止 {proc_display}"
                 desc_bits = [e.protocol.upper(), e.local]
                 if e.state:
                     desc_bits.append(e.state)
@@ -474,8 +474,8 @@ class PortViewerProvider(BaseProvider):
         if not results:
             return [
                 ProviderResult(
-                    title="No matching ports",
-                    description="Try: pv 80, pv tcp 443, pv chrome, pv kill 80",
+                    title="没有匹配的端口",
+                    description="试试：pv 80、pv tcp 443、pv chrome、pv kill 80",
                     icon_char=ICON_PORT,
                     provider=self.name,
                 )

@@ -18,28 +18,28 @@ from core.widgets.services.quick_launch.providers.resources.icons import ICON_IP
 
 _TOOLS: dict[str, dict[str, str]] = {
     "info": {
-        "name": "My Interfaces",
-        "description": "Show local network interfaces with IP and MAC",
+        "name": "我的网络接口",
+        "description": "显示本地网络接口的 IP 和 MAC 地址",
     },
     "public": {
-        "name": "Public IP",
-        "description": "Fetch your external IP address (online)",
+        "name": "公网 IP",
+        "description": "获取外部 IP 地址（需要联网）",
     },
     "calc": {
-        "name": "Subnet Calculator",
-        "description": "Calculate network, broadcast, host range from CIDR",
+        "name": "子网计算器",
+        "description": "根据 CIDR 计算网络、广播地址和主机范围",
     },
     "check": {
-        "name": "IP Check",
-        "description": "Analyze an IP address (type, class, binary, hex)",
+        "name": "IP 检查",
+        "description": "分析 IP 地址（类型、类别、二进制、十六进制）",
     },
     "dns": {
-        "name": "DNS Lookup",
-        "description": "Resolve a hostname to IP addresses",
+        "name": "DNS 查询",
+        "description": "将主机名解析为 IP 地址",
     },
     "mac": {
-        "name": "MAC Addresses",
-        "description": "List MAC addresses of all network adapters",
+        "name": "MAC 地址",
+        "description": "列出所有网络适配器的 MAC 地址",
     },
 }
 
@@ -105,9 +105,9 @@ class IpInfoProvider(BaseProvider):
     """
 
     name = "ip_info"
-    display_name = "IP / Network Info"
+    display_name = "IP / 网络信息"
     icon = ICON_IP_INFO
-    input_placeholder = "Pick a tool or type a command..."
+    input_placeholder = "选择工具或输入命令..."
 
     def __init__(self, config: dict | None = None):
         super().__init__(config)
@@ -159,7 +159,7 @@ class IpInfoProvider(BaseProvider):
         actions: list[ProviderMenuAction] = []
         data = result.action_data
         if data.get("copy") is not None:
-            actions.append(ProviderMenuAction(id="copy", label="Copy to clipboard"))
+            actions.append(ProviderMenuAction(id="copy", label="复制到剪贴板"))
         return actions
 
     def execute_context_menu_action(self, action_id, result):
@@ -219,11 +219,11 @@ class IpInfoProvider(BaseProvider):
     def _info_results(self, arg: str) -> list[ProviderResult]:
         adapters = _parse_ipconfig()
         if not adapters:
-            return [self._make_result("No network interfaces found", "Could not read ipconfig output", "")]
+            return [self._make_result("未找到网络接口", "无法读取 ipconfig 输出", "")]
 
         results: list[ProviderResult] = []
         hostname = socket.gethostname()
-        results.append(self._make_result(f"Hostname: {hostname}", "Click to copy", hostname))
+        results.append(self._make_result(f"主机名：{hostname}", "点击复制", hostname))
 
         for adapter in adapters:
             name = adapter.get("name", "Unknown")
@@ -241,7 +241,7 @@ class IpInfoProvider(BaseProvider):
             if ipv4:
                 parts.append(ipv4)
             if mask:
-                parts.append(f"mask {mask}")
+                parts.append(f"掩码 {mask}")
             if mac:
                 parts.append(mac)
             detail = " | ".join(parts)
@@ -250,7 +250,7 @@ class IpInfoProvider(BaseProvider):
             results.append(self._make_result(label, detail, copy_val))
 
             if ipv6:
-                results.append(self._make_result(f"  IPv6: {ipv6}", f"{name} - Click to copy", ipv6))
+                results.append(self._make_result(f"  IPv6：{ipv6}", f"{name} - 点击复制", ipv6))
 
         return results
 
@@ -264,16 +264,16 @@ class IpInfoProvider(BaseProvider):
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
 
-            ip = data.get("query", "Unknown")
-            results.append(self._make_result(f"Public IP: {ip}", "Click to copy", ip))
+            ip = data.get("query", "未知")
+            results.append(self._make_result(f"公网 IP：{ip}", "点击复制", ip))
 
             isp = data.get("isp", "")
             if isp:
-                results.append(self._make_result(f"ISP: {isp}", "Click to copy", isp))
+                results.append(self._make_result(f"ISP：{isp}", "点击复制", isp))
 
             org = data.get("org", "")
             if org and org != isp:
-                results.append(self._make_result(f"Organization: {org}", "Click to copy", org))
+                results.append(self._make_result(f"组织：{org}", "点击复制", org))
 
             city = data.get("city", "")
             region = data.get("regionName", "")
@@ -281,39 +281,39 @@ class IpInfoProvider(BaseProvider):
             location_parts = [p for p in [city, region, country] if p]
             if location_parts:
                 loc = ", ".join(location_parts)
-                results.append(self._make_result(f"Location: {loc}", "Click to copy", loc))
+                results.append(self._make_result(f"位置：{loc}", "点击复制", loc))
 
             tz = data.get("timezone", "")
             if tz:
-                results.append(self._make_result(f"Timezone: {tz}", "Click to copy", tz))
+                results.append(self._make_result(f"时区：{tz}", "点击复制", tz))
 
             asn = data.get("as", "")
             if asn:
-                results.append(self._make_result(f"AS: {asn}", "Click to copy", asn))
+                results.append(self._make_result(f"AS：{asn}", "点击复制", asn))
 
         except urllib.error.URLError as e:
             reason = getattr(e, "reason", str(e))
             logging.warning("IP Info: failed to fetch public IP: %s", reason)
-            results.append(self._make_result("Could not fetch public IP", "Check your internet connection", ""))
+            results.append(self._make_result("无法获取公网 IP", "请检查网络连接", ""))
         except Exception as e:
             logging.debug("IP Info: unexpected error fetching public IP: %s", e)
-            results.append(self._make_result("Could not fetch public IP", str(e), ""))
+            results.append(self._make_result("无法获取公网 IP", str(e), ""))
 
         return results
 
     def _calc_results(self, arg: str) -> list[ProviderResult]:
         if not arg:
-            return [self._make_result("Type a CIDR notation after 'calc'", "e.g. ip calc 192.168.1.0/24", "")]
+            return [self._make_result("在“calc”后输入 CIDR 表示法", "例如：ip calc 192.168.1.0/24", "")]
 
         try:
             network = ipaddress.ip_network(arg.strip(), strict=False)
         except ValueError:
-            return [self._make_result("Invalid CIDR notation", f"Could not parse '{arg}'", "")]
+            return [self._make_result("CIDR 表示法无效", f"无法解析“{arg}”", "")]
 
         results: list[ProviderResult] = []
         results.append(
             self._make_result(
-                f"Network: {network.network_address}",
+                f"网络：{network.network_address}",
                 f"/{network.prefixlen}",
                 str(network.network_address),
             )
@@ -322,22 +322,22 @@ class IpInfoProvider(BaseProvider):
         if isinstance(network, ipaddress.IPv4Network):
             results.append(
                 self._make_result(
-                    f"Broadcast: {network.broadcast_address}",
-                    "Click to copy",
+                    f"广播地址：{network.broadcast_address}",
+                    "点击复制",
                     str(network.broadcast_address),
                 )
             )
             results.append(
                 self._make_result(
-                    f"Netmask: {network.netmask}",
-                    f"Wildcard: {network.hostmask}",
+                    f"子网掩码：{network.netmask}",
+                    f"通配符掩码：{network.hostmask}",
                     str(network.netmask),
                 )
             )
             results.append(
                 self._make_result(
-                    f"Wildcard: {network.hostmask}",
-                    "Click to copy",
+                    f"通配符掩码：{network.hostmask}",
+                    "点击复制",
                     str(network.hostmask),
                 )
             )
@@ -349,8 +349,8 @@ class IpInfoProvider(BaseProvider):
         )
         results.append(
             self._make_result(
-                f"Total Hosts: {num_hosts:,}",
-                f"Total addresses: {network.num_addresses:,}",
+                f"主机总数：{num_hosts:,}",
+                f"地址总数：{network.num_addresses:,}",
                 str(num_hosts),
             )
         )
@@ -363,8 +363,8 @@ class IpInfoProvider(BaseProvider):
                 range_str = f"{first} - {last}"
                 results.append(
                     self._make_result(
-                        f"Host Range: {range_str}",
-                        "Click to copy",
+                        f"主机范围：{range_str}",
+                        "点击复制",
                         range_str,
                     )
                 )
@@ -372,7 +372,7 @@ class IpInfoProvider(BaseProvider):
         results.append(
             self._make_result(
                 f"CIDR: {network.with_prefixlen}",
-                "Click to copy",
+                "点击复制",
                 network.with_prefixlen,
             )
         )
@@ -381,28 +381,28 @@ class IpInfoProvider(BaseProvider):
 
     def _check_results(self, arg: str) -> list[ProviderResult]:
         if not arg:
-            return [self._make_result("Type an IP address after 'check'", "e.g. ip check 192.168.1.1", "")]
+            return [self._make_result("在“check”后输入 IP 地址", "例如：ip check 192.168.1.1", "")]
 
         try:
             addr = ipaddress.ip_address(arg.strip())
         except ValueError:
-            return [self._make_result("Invalid IP address", f"Could not parse '{arg}'", "")]
+            return [self._make_result("IP 地址无效", f"无法解析“{arg}”", "")]
 
         results: list[ProviderResult] = []
-        results.append(self._make_result(str(addr), f"Version: IPv{addr.version}", str(addr)))
+        results.append(self._make_result(str(addr), f"版本：IPv{addr.version}", str(addr)))
 
         if addr.is_private:
-            results.append(self._make_result("Type: Private", "RFC 1918 private address", "Private"))
+            results.append(self._make_result("类型：私有", "RFC 1918 私有地址", "Private"))
         elif addr.is_loopback:
-            results.append(self._make_result("Type: Loopback", "Loopback address", "Loopback"))
+            results.append(self._make_result("类型：回送", "回送地址", "Loopback"))
         elif addr.is_link_local:
-            results.append(self._make_result("Type: Link-Local", "Link-local address", "Link-Local"))
+            results.append(self._make_result("类型：链路本地", "链路本地地址", "Link-Local"))
         elif addr.is_multicast:
-            results.append(self._make_result("Type: Multicast", "Multicast address", "Multicast"))
+            results.append(self._make_result("类型：多播", "多播地址", "Multicast"))
         elif addr.is_reserved:
-            results.append(self._make_result("Type: Reserved", "Reserved address", "Reserved"))
+            results.append(self._make_result("类型：保留", "保留地址", "Reserved"))
         else:
-            results.append(self._make_result("Type: Public", "Globally routable address", "Public"))
+            results.append(self._make_result("类型：公网", "可全局路由的地址", "Public"))
 
         if addr.version == 4:
             first_octet = int(str(addr).split(".")[0])
@@ -413,30 +413,30 @@ class IpInfoProvider(BaseProvider):
             elif first_octet <= 223:
                 ip_class = "C"
             elif first_octet <= 239:
-                ip_class = "D (Multicast)"
+                ip_class = "D（多播）"
             else:
-                ip_class = "E (Reserved)"
-            results.append(self._make_result(f"Class: {ip_class}", "Click to copy", ip_class))
+                ip_class = "E（保留）"
+            results.append(self._make_result(f"类别：{ip_class}", "点击复制", ip_class))
 
             octets = str(addr).split(".")
             binary = ".".join(format(int(o), "08b") for o in octets)
-            results.append(self._make_result(f"Binary: {binary}", "Click to copy", binary))
+            results.append(self._make_result(f"二进制：{binary}", "点击复制", binary))
 
             hex_str = ".".join(format(int(o), "02X") for o in octets)
-            results.append(self._make_result(f"Hex: {hex_str}", "Click to copy", hex_str))
+            results.append(self._make_result(f"十六进制：{hex_str}", "点击复制", hex_str))
 
             int_val = int(addr)
-            results.append(self._make_result(f"Integer: {int_val}", "Click to copy", str(int_val)))
+            results.append(self._make_result(f"整数：{int_val}", "点击复制", str(int_val)))
         else:
             expanded = addr.exploded
-            results.append(self._make_result(f"Expanded: {expanded}", "Click to copy", expanded))
+            results.append(self._make_result(f"展开形式：{expanded}", "点击复制", expanded))
             int_val = int(addr)
-            results.append(self._make_result(f"Integer: {int_val}", "Click to copy", str(int_val)))
+            results.append(self._make_result(f"整数：{int_val}", "点击复制", str(int_val)))
 
         results.append(
             self._make_result(
-                f"Reverse DNS: {addr.reverse_pointer}",
-                "Click to copy",
+                f"反向 DNS：{addr.reverse_pointer}",
+                "点击复制",
                 addr.reverse_pointer,
             )
         )
@@ -445,7 +445,7 @@ class IpInfoProvider(BaseProvider):
 
     def _dns_results(self, arg: str) -> list[ProviderResult]:
         if not arg:
-            return [self._make_result("Type a hostname after 'dns'", "e.g. ip dns google.com", "")]
+            return [self._make_result("在“dns”后输入主机名", "例如：ip dns google.com", "")]
 
         hostname = arg.strip()
         results: list[ProviderResult] = []
@@ -468,23 +468,23 @@ class IpInfoProvider(BaseProvider):
 
             results.append(
                 self._make_result(
-                    f"DNS: {hostname}",
-                    f"Found {len(ipv4_addrs)} IPv4, {len(ipv6_addrs)} IPv6 addresses",
+                    f"DNS：{hostname}",
+                    f"找到 {len(ipv4_addrs)} 个 IPv4 地址和 {len(ipv6_addrs)} 个 IPv6 地址",
                     hostname,
                 )
             )
 
             for ip in ipv4_addrs:
-                results.append(self._make_result(f"IPv4: {ip}", "Click to copy", ip))
+                results.append(self._make_result(f"IPv4：{ip}", "点击复制", ip))
 
             for ip in ipv6_addrs:
-                results.append(self._make_result(f"IPv6: {ip}", "Click to copy", ip))
+                results.append(self._make_result(f"IPv6：{ip}", "点击复制", ip))
 
         except socket.gaierror:
-            results.append(self._make_result(f"Could not resolve '{hostname}'", "DNS lookup failed", ""))
+            results.append(self._make_result(f"无法解析“{hostname}”", "DNS 查询失败", ""))
         except Exception as e:
             logging.debug("IP Info: DNS lookup error: %s", e)
-            results.append(self._make_result("DNS lookup failed", str(e), ""))
+            results.append(self._make_result("DNS 查询失败", str(e), ""))
 
         return results
 
@@ -493,11 +493,11 @@ class IpInfoProvider(BaseProvider):
         mac_adapters = [a for a in adapters if a.get("mac")]
 
         if not mac_adapters:
-            return [self._make_result("No MAC addresses found", "Could not read network adapters", "")]
+            return [self._make_result("未找到 MAC 地址", "无法读取网络适配器", "")]
 
         results: list[ProviderResult] = []
         for adapter in mac_adapters:
-            name = adapter.get("name", "Unknown")
+            name = adapter.get("name", "未知")
             mac = adapter.get("mac", "")
             desc = adapter.get("desc", "")
             detail = desc if desc else name

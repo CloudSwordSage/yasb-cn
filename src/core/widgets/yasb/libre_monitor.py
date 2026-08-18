@@ -170,7 +170,7 @@ class LibreHardwareMonitorWidget(BaseWidget):
                 value_label.setText(f"{value:.{self.config.libre_menu.precision}f} {unit}")
             else:
                 # Sensor missing or not found
-                value_label.setText("N/A")
+                value_label.setText("不适用")
         reply.deleteLater()
 
     def _is_menu_visible(self):

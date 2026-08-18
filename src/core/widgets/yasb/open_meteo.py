@@ -224,18 +224,18 @@ class OpenMeteoWidget(BaseWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
 
-        title = QLabel("Setup Location")
+        title = QLabel("设置位置")
         title.setProperty("class", "search-head")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        info = QLabel("Search for a location to set your weather widget")
+        info = QLabel("搜索地点以设置天气小组件")
         info.setProperty("class", "search-description")
         info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(info)
 
         search_input = QLineEdit()
-        search_input.setPlaceholderText("Search location...")
+        search_input.setPlaceholderText("搜索地点…")
         search_input.setProperty("class", "search-input")
         search_input.setMinimumWidth(280)
         layout.addWidget(search_input)
@@ -301,7 +301,7 @@ class OpenMeteoWidget(BaseWidget):
                 # Update all instances sharing this widget_id
                 for inst in OpenMeteoWidget._shared_instances.get(self._widget_id, []):
                     inst._location_data = location
-                    inst._set_label_text("Fetching data...")
+                    inst._set_label_text("正在获取数据…")
                 # Close the dialog and start fetching weather data
                 self.dialog.hide()
                 self._start_weather_fetcher()
@@ -330,7 +330,7 @@ class OpenMeteoWidget(BaseWidget):
         icon_label.setProperty("class", "no-data-icon")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        info_label = QLabel("Weather data not available")
+        info_label = QLabel("天气数据不可用")
         info_label.setProperty("class", "no-data-text")
         info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -413,7 +413,7 @@ class OpenMeteoWidget(BaseWidget):
         today_label0 = QLabel(f"{self._weather_data['{location}']} {self._weather_data['{temp}']}")
         today_label0.setProperty("class", "label location")
         today_label0.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        set_tooltip(today_label0, "Click to change location", delay=400, position="bottom")
+        set_tooltip(today_label0, "点击更改位置", delay=400, position="bottom")
 
         today_label0.mousePressEvent = self.reset_location
 

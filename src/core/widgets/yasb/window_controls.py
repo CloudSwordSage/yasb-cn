@@ -274,11 +274,11 @@ class WindowControlsWidget(BaseWidget):
             if maximized:
                 btn.setText(self.config.button_labels.restore)
                 btn.setProperty("class", "btn restore")
-                set_tooltip(btn, "Restore")
+                set_tooltip(btn, "还原")
             else:
                 btn.setText(self.config.button_labels.maximize)
                 btn.setProperty("class", "btn maximize")
-                set_tooltip(btn, "Maximize")
+                set_tooltip(btn, "最大化")
             refresh_widget_style(btn)
 
     def _on_poll_result(self, result: _ForegroundPollResult) -> None:

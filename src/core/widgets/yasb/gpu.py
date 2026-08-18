@@ -216,10 +216,10 @@ class GpuWidget(BaseWidget):
 
         stat_rows = [
             (
-                "Usage",
+                "使用率",
                 "usage",
                 f"{data.utilization:.0f}%" if data else "\u2014",
-                "Memory",
+                "显存",
                 "mem",
                 f"{format_size(data.mem_used)} / {format_size(data.mem_total)}" if data else "\u2014",
             ),
@@ -228,10 +228,10 @@ class GpuWidget(BaseWidget):
         if has_temp or has_power:
             stat_rows.append(
                 (
-                    "Temperature" if has_temp else None,
+                    "温度" if has_temp else None,
                     "temp",
                     f"{data.temp}°C" if has_temp else "",
-                    "Power draw" if has_power else None,
+                    "功耗" if has_power else None,
                     "power",
                     f"{data.power_draw:.1f} W" if has_power else "",
                 )
@@ -240,10 +240,10 @@ class GpuWidget(BaseWidget):
         if has_fan or has_shared:
             stat_rows.append(
                 (
-                    "Fan speed" if has_fan else None,
+                    "风扇转速" if has_fan else None,
                     "fan",
                     f"{data.fan_speed}%" if has_fan else "",
-                    "Shared memory" if has_shared else None,
+                    "共享内存" if has_shared else None,
                     "mem_shared",
                     f"{format_size(data.mem_shared_used)} / {format_size(data.mem_shared_total)}" if has_shared else "",
                 )
@@ -253,7 +253,7 @@ class GpuWidget(BaseWidget):
             parent=self,
             menu_config=menu,
             popup_class_name="gpu-popup",
-            title="<b>GPU</b> Usage",
+            title="<b>GPU</b> 使用率",
             history=self._history,
             stat_rows=stat_rows,
             graph_class="gpu-graph",
@@ -265,7 +265,7 @@ class GpuWidget(BaseWidget):
             main_layout = popup.layout()
             graph_container = popup._graph.parentWidget()
             graph_idx = main_layout.indexOf(graph_container)
-            util_label = QLabel("Utilization")
+            util_label = QLabel("使用率")
             util_label.setProperty("class", "graph-title first")
             main_layout.insertWidget(graph_idx, util_label)
 
@@ -275,7 +275,7 @@ class GpuWidget(BaseWidget):
             main_layout = popup.layout()
             stats_index = main_layout.count() - 1
 
-            temp_label = QLabel("Temperature")
+            temp_label = QLabel("温度")
             temp_label.setProperty("class", "graph-title")
             main_layout.insertWidget(stats_index, temp_label)
             stats_index += 1

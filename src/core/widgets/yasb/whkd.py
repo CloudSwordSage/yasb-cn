@@ -33,7 +33,7 @@ class KeybindsDialog(QDialog):
         self.special_keys = (
             {item.key: item.key_replace for item in self.config.special_keys} if self.config.special_keys else {}
         )
-        self.setWindowTitle("WHKD Keybinds")
+        self.setWindowTitle("WHKD 快捷键")
         self.setProperty("class", "whkd-popup")
 
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
@@ -50,7 +50,7 @@ class KeybindsDialog(QDialog):
         # Filter input
         self.filter_input = QLineEdit()
         self.filter_input.setProperty("class", "filter-input")
-        self.filter_input.setPlaceholderText("Type to filter keybinds...")
+        self.filter_input.setPlaceholderText("筛选快捷键...")
         self.filter_input.textChanged.connect(self.update_display)
         self.main_layout.addWidget(self.filter_input)
 
@@ -108,7 +108,7 @@ class KeybindsDialog(QDialog):
         self.scroll_area.setWidget(self.container)
 
         # Edit config file button
-        self.btn_open = QPushButton("Edit Config File")
+        self.btn_open = QPushButton("编辑配置文件")
         self.btn_open.setProperty("class", "edit-config-button")
         self.btn_open.clicked.connect(lambda: os.startfile(self.file_path))
         self.main_layout.addWidget(self.btn_open)
@@ -275,9 +275,9 @@ class WhkdWidget(BaseWidget):
         if not os.path.exists(file_path):
             logging.error("File not found: %s", file_path)
             raise_info_alert(
-                title="Error",
-                msg=f"The specified file does not exist\n{file_path}",
-                informative_msg="Please make sure the file exists and try again.",
+                title="错误",
+                msg=f"指定的文件不存在\n{file_path}",
+                informative_msg="请确认文件存在后重试。",
                 rich_text=True,
             )
             return

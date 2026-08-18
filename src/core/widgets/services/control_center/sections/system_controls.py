@@ -46,14 +46,14 @@ class SystemControlsSectionWidget(QFrame):
         self._settings_btn.setProperty("class", "button settings")
         self._settings_btn.clicked.connect(self._show_settings_menu)
         if self._tooltip:
-            set_tooltip(self._settings_btn, "Settings", position="top")
+            set_tooltip(self._settings_btn, "设置", position="top")
         layout.addWidget(self._settings_btn)
 
         self._power_btn = QPushButton(config.power_icon, self)
         self._power_btn.setProperty("class", "button power")
         self._power_btn.clicked.connect(self._show_power_menu)
         if self._tooltip:
-            set_tooltip(self._power_btn, "Power", position="top")
+            set_tooltip(self._power_btn, "电源", position="top")
         layout.addWidget(self._power_btn)
 
     def _build_profile_controls(self, layout: QHBoxLayout):
@@ -132,17 +132,17 @@ class SystemControlsSectionWidget(QFrame):
 
         menu = self._create_context_menu()
         links = [
-            ("Windows Update", "ms-settings:windowsupdate"),
-            ("Network && Internet", "ms-settings:network"),
-            ("Bluetooth && Devices", "ms-settings:bluetooth"),
-            ("Sound", "ms-settings:sound"),
-            ("Notifications", "ms-settings:notifications"),
-            ("Power && Battery", "ms-settings:powersleep"),
-            ("Apps", "ms-settings:appsfeatures"),
-            ("Accounts", "ms-settings:yourinfo"),
-            ("Privacy && Security", "ms-settings:privacy"),
+            ("Windows 更新", "ms-settings:windowsupdate"),
+            ("网络和 Internet", "ms-settings:network"),
+            ("蓝牙和设备", "ms-settings:bluetooth"),
+            ("声音", "ms-settings:sound"),
+            ("通知", "ms-settings:notifications"),
+            ("电源和电池", "ms-settings:powersleep"),
+            ("应用", "ms-settings:appsfeatures"),
+            ("账户", "ms-settings:yourinfo"),
+            ("隐私和安全性", "ms-settings:privacy"),
             None,
-            ("All Settings", "ms-settings:"),
+            ("所有设置", "ms-settings:"),
         ]
         self._populate_menu(
             menu,
@@ -168,8 +168,8 @@ class SystemControlsSectionWidget(QFrame):
         self._populate_menu(
             menu,
             [
-                ("Lock", self._power_ops.lock),
-                ("Sign Out", self._power_ops.signout),
+                ("锁定", self._power_ops.lock),
+                ("注销", self._power_ops.signout),
             ],
         )
 
@@ -189,10 +189,10 @@ class SystemControlsSectionWidget(QFrame):
         self._populate_menu(
             menu,
             [
-                ("Sleep", self._power_ops.sleep),
-                ("Hibernate", self._power_ops.hibernate),
-                ("Restart", self._power_ops.restart),
-                ("Shut Down", self._power_ops.shutdown),
+                ("睡眠", self._power_ops.sleep),
+                ("休眠", self._power_ops.hibernate),
+                ("重新启动", self._power_ops.restart),
+                ("关机", self._power_ops.shutdown),
             ],
         )
 

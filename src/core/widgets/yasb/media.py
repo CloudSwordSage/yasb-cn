@@ -266,7 +266,7 @@ class MediaWidget(BaseWidget):
                 title_text = (
                     self._format_max_field_size(self.current_session.title, "popup_title")
                     if self.current_session.title
-                    else "Unknown Title"
+                    else "未知标题"
                 )
                 self._popup_title_label = QLabel(title_text)
                 self._popup_title_label.setContentsMargins(0, 0, 0, 0)
@@ -375,7 +375,7 @@ class MediaWidget(BaseWidget):
                 logger.error("Error setting thumbnail in menu: %s", e)
         else:
             # No media playing message
-            no_media_label = QLabel("No media playing")
+            no_media_label = QLabel("没有正在播放的媒体")
             no_media_label.setProperty("class", "no-media")
             no_media_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             content_layout.addWidget(no_media_label)
@@ -788,7 +788,7 @@ class MediaWidget(BaseWidget):
                 if self.current_session and self.current_session.title:
                     formatted_label = self._format_max_field_size(self.current_session.title)
                 else:
-                    formatted_label = "No media"
+                    formatted_label = "没有媒体"
             active_label.setText(formatted_label)
 
         # If we don't want the thumbnail, stop here

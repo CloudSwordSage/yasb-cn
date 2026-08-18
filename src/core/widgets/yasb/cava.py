@@ -412,7 +412,7 @@ class CavaWidget(BaseWidget):
 
         # Check if cava is available
         if shutil.which("cava") is None:
-            error_label = QLabel("Cava not installed")
+            error_label = QLabel("未安装 Cava")
             self._widget_container_layout.addWidget(error_label)
             return
 

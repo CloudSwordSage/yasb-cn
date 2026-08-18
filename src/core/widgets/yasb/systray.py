@@ -237,7 +237,7 @@ class SystrayWidget(BaseWidget):
         menu.setProperty("class", "context-menu")
         menu.setContentsMargins(0, 0, 0, 0)
         menu.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
-        refresh_action = menu.addAction("Refresh Systray")
+        refresh_action = menu.addAction("刷新系统托盘")
         if not refresh_action:
             return
         refresh_action.triggered.connect(self.refresh_systray)

@@ -184,8 +184,8 @@ class MediaSectionWidget(QFrame):
         session_changed = app_id != self._current_app_id
         self._current_app_id = app_id
 
-        title = session.title or "Unknown Title"
-        artist = session.artist or "Unknown Artist"
+        title = session.title or "未知标题"
+        artist = session.artist or "未知艺术家"
         if title != self._current_title:
             self._current_title = title
             self._title_label.setText(title)

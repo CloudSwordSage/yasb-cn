@@ -287,27 +287,27 @@ def show_context_menu(taskbar_widget, hwnd: int, pos) -> QMenu | None:
 
         # Open App (only show for pinned apps, not for running non-pinned apps)
         if is_pinned and not is_explorer:
-            open_action = menu.addAction("Open app")
+            open_action = menu.addAction("打开应用")
             open_action.triggered.connect(lambda: taskbar_widget._launch_pinned_app(hwnd))
 
         # Pin/Unpin
         if is_pinned:
             menu.addSeparator()
-            pin_action = menu.addAction("Unpin from taskbar")
+            pin_action = menu.addAction("从任务栏取消固定")
             if is_pinned_only:
                 pin_action.triggered.connect(lambda: taskbar_widget._unpin_pinned_only_app(unique_id, hwnd))
             else:
                 pin_action.triggered.connect(lambda: taskbar_widget._unpin_app(hwnd))
         else:
-            pin_action = menu.addAction("Pin to taskbar")
+            pin_action = menu.addAction("固定到任务栏")
             pin_action.triggered.connect(lambda: taskbar_widget._pin_app(hwnd))
             menu.addSeparator()
 
         # End task and Close window (only for running apps)
         if not is_pinned_only and win32gui.IsWindow(hwnd):
-            end_task_action = menu.addAction("End task")
+            end_task_action = menu.addAction("结束任务")
             end_task_action.triggered.connect(lambda: close_application(hwnd, force=True))
-            close_action = menu.addAction("Close window")
+            close_action = menu.addAction("关闭窗口")
             close_action.triggered.connect(lambda: close_application(hwnd))
 
         # Adjust menu position so it appears just outside the bar
@@ -370,26 +370,26 @@ def _add_recycle_bin_menu_items(menu: QMenu, on_launch_callback) -> None:
     # Add info item only if there are items in the recycle bin
     if num_items > 0:
         info_text = (
-            f"{num_items} item{'s' if num_items != 1 else ''} ({naturalsize(size_bytes, binary=True, format='%.2f')})"
+            f"{num_items} 个项目 ({naturalsize(size_bytes, binary=True, format='%.2f')})"
         )
         info_action = menu.addAction(info_text)
         info_action.setEnabled(False)
         menu.addSeparator()
 
     # Add "Open" option to open Recycle Bin
-    open_action = menu.addAction("Open")
+    open_action = menu.addAction("打开")
     open_action.triggered.connect(lambda: on_launch_callback(f"explorer:::{{{KnownCLSID.RECYCLE_BIN}}}"))
 
     menu.addSeparator()
 
     # Add "Empty Recycle Bin" option
-    empty_action = menu.addAction("Empty Recycle Bin")
+    empty_action = menu.addAction("清空回收站")
 
     # Check if Recycle Bin is empty and disable the option if it is
     is_empty = num_items == 0 and size_bytes == 0
     empty_action.setEnabled(not is_empty)
     if is_empty:
-        empty_action.setToolTip("Recycle Bin is already empty")
+        empty_action.setToolTip("回收站已为空")
 
     empty_action.triggered.connect(_empty_recycle_bin)
     menu.addSeparator()
@@ -409,7 +409,7 @@ def _add_explorer_menu_items(menu: QMenu, on_launch_callback) -> None:
         menu.addSeparator()
 
     # Always add "File Explorer" option - opens "This PC"
-    menu.addAction("File Explorer").triggered.connect(
+    menu.addAction("文件资源管理器").triggered.connect(
         lambda: on_launch_callback("explorer:::{20D04FE0-3AEA-1069-A2D8-08002B30309D}")
     )
     menu.addSeparator()
@@ -422,9 +422,9 @@ def _add_chromium_browser_menu_items(menu: QMenu, identifier: str | None, on_lau
         check_str = identifier.lower()
         is_chrome = "chrome.exe" in check_str or "chrome" in check_str
         private_flag = "--incognito" if is_chrome else "--inprivate"
-        private_label = "New Incognito Window" if is_chrome else "New InPrivate Window"
+        private_label = "新建无痕窗口" if is_chrome else "新建 InPrivate 窗口"
 
-        menu.addAction("New Window").triggered.connect(lambda _: on_launch_callback(identifier, extra_arguments=""))
+        menu.addAction("新建窗口").triggered.connect(lambda _: on_launch_callback(identifier, extra_arguments=""))
         menu.addAction(private_label).triggered.connect(
             lambda _, flag=private_flag: on_launch_callback(identifier, extra_arguments=flag)
         )
@@ -439,16 +439,16 @@ def _add_firefox_browser_menu_items(menu: QMenu, identifier: str | None, on_laun
 
         if is_uwp:
             # For UWP browsers, format AUMID directly with suffix
-            menu.addAction("New Window").triggered.connect(lambda _: on_launch_callback(identifier))
-            menu.addAction("New Private Window").triggered.connect(
+            menu.addAction("新建窗口").triggered.connect(lambda _: on_launch_callback(identifier))
+            menu.addAction("新建隐私窗口").triggered.connect(
                 lambda _: on_launch_callback(f"{identifier};PrivateBrowsingAUMID")
             )
         else:
             # For Win32 browsers, use command-line arguments
-            menu.addAction("New Window").triggered.connect(
+            menu.addAction("新建窗口").triggered.connect(
                 lambda _: on_launch_callback(identifier, extra_arguments="-new-window")
             )
-            menu.addAction("New Private Window").triggered.connect(
+            menu.addAction("新建隐私窗口").triggered.connect(
                 lambda _: on_launch_callback(identifier, extra_arguments="-private-window")
             )
         menu.addSeparator()
@@ -457,7 +457,7 @@ def _add_firefox_browser_menu_items(menu: QMenu, identifier: str | None, on_laun
 def _add_vscode_menu_items(menu: QMenu, identifier: str | None, on_launch_callback) -> None:
     """Add VS Code specific menu items (VS Code and VS Code Insiders)."""
     if identifier:
-        menu.addAction("New Window").triggered.connect(lambda _: on_launch_callback(identifier, extra_arguments="-n"))
+        menu.addAction("新建窗口").triggered.connect(lambda _: on_launch_callback(identifier, extra_arguments="-n"))
         menu.addSeparator()
 
 
@@ -483,5 +483,5 @@ def _add_terminal_menu_items(menu: QMenu, identifier: str | None, on_launch_call
             menu.addSeparator()
 
         # Add "New Window" option
-        menu.addAction("New Window").triggered.connect(lambda _: on_launch_callback(identifier, extra_arguments=""))
+        menu.addAction("新建窗口").triggered.connect(lambda _: on_launch_callback(identifier, extra_arguments=""))
         menu.addSeparator()

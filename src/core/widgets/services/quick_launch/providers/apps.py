@@ -238,11 +238,11 @@ class DescriptionResolverWorker(QThread):
             pass
         for _name, path, extra in self._apps:
             if path.startswith("CPL::"):
-                cache[path] = extra if extra else "Control Panel"
+                cache[path] = extra if extra else "控制面板"
             elif path.startswith("UWP::"):
                 aumid = path[5:]
                 family = aumid.split("!")[0] if "!" in aumid else aumid
-                cache[path] = uwp_lookup.get(family, "Windows App")
+                cache[path] = uwp_lookup.get(family, "Windows 应用")
             elif path.lower().endswith(".lnk") and os.path.isfile(path):
                 cache[path] = _get_lnk_description(path) or path
             elif os.path.isfile(path):
@@ -264,8 +264,8 @@ class AppsProvider(BaseProvider):
     """Search and launch installed applications."""
 
     name = "apps"
-    display_name = "Applications"
-    input_placeholder = "Search applications..."
+    display_name = "应用"
+    input_placeholder = "搜索应用..."
     icon = ICON_APPS
 
     def __init__(self, config: dict | None = None):
@@ -417,28 +417,28 @@ class AppsProvider(BaseProvider):
         actions: list[ProviderMenuAction] = []
 
         if not is_url:
-            actions.append(ProviderMenuAction(id="run_as_admin", label="Run as administrator"))
+            actions.append(ProviderMenuAction(id="run_as_admin", label="以管理员身份运行"))
         if not is_url and not is_uwp and not is_cpl:
-            actions.append(ProviderMenuAction(id="run_as_diff_user", label="Run as different user"))
+            actions.append(ProviderMenuAction(id="run_as_diff_user", label="以其他用户身份运行"))
 
         if not is_uwp and not is_cpl and not is_url and os.path.isfile(path):
-            actions.append(ProviderMenuAction(id="open_file_location", label="Open file location"))
+            actions.append(ProviderMenuAction(id="open_file_location", label="打开文件所在位置"))
 
         if is_uwp:
-            actions.append(ProviderMenuAction(id="copy_app_id", label="Copy App ID"))
+            actions.append(ProviderMenuAction(id="copy_app_id", label="复制应用 ID"))
         elif is_cpl:
-            actions.append(ProviderMenuAction(id="copy_canonical_name", label="Copy canonical name"))
+            actions.append(ProviderMenuAction(id="copy_canonical_name", label="复制规范名称"))
         elif not is_url:
-            actions.append(ProviderMenuAction(id="copy_path", label="Copy path"))
+            actions.append(ProviderMenuAction(id="copy_path", label="复制路径"))
 
         app_key = result.id or f"{result.action_data.get('name', '')}::{path}"
         if app_key in self._history.data:
             actions.append(
-                ProviderMenuAction(id="remove_from_recent", label="Remove from recent", separator_before=True)
+                ProviderMenuAction(id="remove_from_recent", label="从最近使用中移除", separator_before=True)
             )
 
         if not is_url and not is_cpl:
-            actions.append(ProviderMenuAction(id="uninstall", label="Uninstall", separator_before=True))
+            actions.append(ProviderMenuAction(id="uninstall", label="卸载", separator_before=True))
 
         return actions
 

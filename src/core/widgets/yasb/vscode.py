@@ -141,8 +141,8 @@ class VSCodeWidget(BaseWidget):
         header_layout.addStretch()
 
         self._pill_buttons = {}
-        for filter_name in ("all", "folders", "files", "remotes"):
-            btn = QPushButton(filter_name.title())
+        for filter_name, label in (("all", "全部"), ("folders", "文件夹"), ("files", "文件"), ("remotes", "远程")):
+            btn = QPushButton(label)
             btn.setProperty("class", "filter-button active" if filter_name == self._active_filter else "filter-button")
             btn.clicked.connect(lambda checked, name=filter_name: self._set_filter(name))
             header_layout.addWidget(btn)
@@ -158,7 +158,7 @@ class VSCodeWidget(BaseWidget):
 
         self._search_input = QLineEdit()
         self._search_input.setProperty("class", "input")
-        self._search_input.setPlaceholderText("Search...")
+        self._search_input.setPlaceholderText("搜索...")
         self._search_input.setClearButtonEnabled(True)
         self._search_input.textChanged.connect(self._on_search_changed)
         search_bar_layout.addWidget(self._search_input)
@@ -218,7 +218,7 @@ class VSCodeWidget(BaseWidget):
         return scroll_area
 
     def _create_no_recents_label(self):
-        no_recent_label = QLabel("No recent workspaces found.")
+        no_recent_label = QLabel("未找到最近的工作区。")
         no_recent_label.setProperty("class", "no-recent")
         no_recent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         no_recent_label.setContentsMargins(0, 20, 0, 20)
@@ -279,23 +279,23 @@ class VSCodeWidget(BaseWidget):
                 auth_lower = authority.lower()
                 if auth_lower.startswith("wsl+"):
                     distro = authority[4:]
-                    date_str = f"WSL ({distro})" if distro else "WSL Connection"
+                    date_str = f"WSL ({distro})" if distro else "WSL 连接"
                 elif auth_lower.startswith("ssh-remote+"):
                     host = authority[11:]
-                    date_str = f"SSH ({host})" if host else "SSH Connection"
+                    date_str = f"SSH ({host})" if host else "SSH 连接"
                 elif auth_lower.startswith("dev-container+"):
-                    date_str = "Dev Container"
+                    date_str = "开发容器"
                 else:
-                    date_str = f"Remote: {authority}"
+                    date_str = f"远程：{authority}"
             else:
-                date_str = "Remote Connection"
+                date_str = "远程连接"
         else:
             try:
                 mod_time = os.path.getmtime(path)
                 mod_date = datetime.datetime.fromtimestamp(mod_time)
                 date_str = mod_date.strftime(self.config.modified_date_format)
             except OSError:
-                date_str = "Unknown"
+                date_str = "未知"
 
         date_label = ElidedLabel(date_str)
         date_label.setProperty("class", "modified-date")

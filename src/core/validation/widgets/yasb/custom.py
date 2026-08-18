@@ -27,7 +27,7 @@ class CustomConfig(CustomBaseModel):
     class_name: str
     label: str
     label_alt: str = ""
-    label_placeholder: str = "Loading..."
+    label_placeholder: str = "正在加载..."
     label_max_length: int | None = Field(default=None, ge=1)
     tooltip: bool = False
     tooltip_label: str | None = None

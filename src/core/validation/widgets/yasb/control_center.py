@@ -28,12 +28,12 @@ class QuickActionsSectionConfig(CustomBaseModel):
     columns: int = 3
     label_position: Literal["default", "inline"] = "default"
     actions: list[ControlCenterActionConfig] = [
-        ControlCenterActionConfig(id="toggle_dnd", label="Do Not Disturb", icon="\uf285"),
-        ControlCenterActionConfig(id="toggle_theme", label="Dark Mode", icon="\ue708"),
-        ControlCenterActionConfig(id="touch_keyboard", label="Keyboard", icon="\ue765"),
-        ControlCenterActionConfig(id="toggle_mute", label="Mute", icon="\ue74f"),
-        ControlCenterActionConfig(id="toggle_mic_mute", label="Mic Mute", icon="\uf12e"),
-        ControlCenterActionConfig(id="screenshot", label="Screenshot", icon="\ue91b"),
+        ControlCenterActionConfig(id="toggle_dnd", label="免打扰", icon="\uf285"),
+        ControlCenterActionConfig(id="toggle_theme", label="深色模式", icon="\ue708"),
+        ControlCenterActionConfig(id="touch_keyboard", label="键盘", icon="\ue765"),
+        ControlCenterActionConfig(id="toggle_mute", label="静音", icon="\ue74f"),
+        ControlCenterActionConfig(id="toggle_mic_mute", label="麦克风静音", icon="\uf12e"),
+        ControlCenterActionConfig(id="screenshot", label="截取屏幕截图", icon="\ue91b"),
     ]
 
     @field_validator("actions")
@@ -63,8 +63,8 @@ class SlidersSectionConfig(CustomBaseModel):
 
 class PowerSectionConfig(CustomBaseModel):
     show: bool = True
-    power_plan_title: str = "Power Plan"
-    power_mode_title: str = "Power Mode"
+    power_plan_title: str = "电源计划"
+    power_mode_title: str = "电源模式"
     button_menu_icon: str = "\ue76c"
 
 

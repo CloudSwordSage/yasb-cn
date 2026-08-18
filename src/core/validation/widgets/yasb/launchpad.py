@@ -41,7 +41,7 @@ class LaunchpadCallbacksConfig(CallbacksConfig):
 
 class LaunchpadConfig(CustomBaseModel):
     label: str = "\udb85\udcde"
-    search_placeholder: str = "Search applications..."
+    search_placeholder: str = "搜索应用..."
     app_icon_size: int = 64
     group_apps: bool = False
     window: WindowConfig = WindowConfig()

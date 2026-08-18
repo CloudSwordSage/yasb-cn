@@ -124,13 +124,13 @@ class WifiItem(QFrame):
         self.status_label.setProperty("class", "status")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignRight)
         self.status_label.setContentsMargins(0, 0, 0, 0)
-        self.status_label.setText("N/A")
+        self.status_label.setText("不适用")
 
         self.wifi_strength = QLabel(self)
         self.wifi_strength.setProperty("class", "strength")
         self.wifi_strength.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignRight)
         self.wifi_strength.setContentsMargins(0, 0, 0, 0)
-        self.wifi_strength.setText("N/A")
+        self.wifi_strength.setText("不适用")
 
         self.right_container_layout.addWidget(self.status_label)
         self.right_container_layout.addWidget(self.wifi_strength)
@@ -154,14 +154,14 @@ class WifiItem(QFrame):
         self.ssid_field.returnPressed.connect(self._manage_connection_click)  # pyright: ignore[reportUnknownMemberType]
 
         self.password_field = QLineEdit(self)
-        self.password_field.setPlaceholderText("Password")
+        self.password_field.setPlaceholderText("密码")
         self.password_field.setProperty("class", "password")
         self.password_field.returnPressed.connect(self._manage_connection_click)  # pyright: ignore[reportUnknownMemberType]
         self.password_field.setEchoMode(QLineEdit.EchoMode.Password)
 
         self.connect_button = QPushButton(self)
         self.connect_button.setProperty("class", "connect")
-        self.connect_button.setText("Connect")
+        self.connect_button.setText("连接")
         self.connect_button.clicked.connect(self._manage_connection_click)  # pyright: ignore[reportUnknownMemberType]
 
         self.wifi_controls_container_layout.addWidget(self.ssid_field)
@@ -179,7 +179,7 @@ class WifiItem(QFrame):
         apply_qmenu_style(menu)  # pyright: ignore[reportUnknownMemberType]
 
         # Auto-connect checkbox
-        self.auto_connect_checkbox = QCheckBox("Auto-connect")
+        self.auto_connect_checkbox = QCheckBox("自动连接")
         self.auto_connect_checkbox.setChecked(self.data.auto_connect)
         self.auto_connect_checkbox.clicked.connect(self._toggle_auto_connect)  # pyright: ignore[reportUnknownMemberType]
         self.auto_connect_checkbox.setProperty("class", "checkbox")
@@ -216,7 +216,7 @@ class WifiItem(QFrame):
         menu.addAction(auto_connect_action)  # pyright: ignore[reportUnknownMemberType]
 
         # Forget button
-        forget_button_widget = menu.addAction("Forget Network")  # type: ignore
+        forget_button_widget = menu.addAction("忘记网络")  # type: ignore
         if forget_button_widget:
             forget_button_widget.setEnabled(self.data.profile_exists)
             forget_button_widget.triggered.connect(lambda: (self.forget_pressed.emit(self.data), menu.close()))  # pyright: ignore[reportUnknownMemberType]
@@ -276,16 +276,16 @@ class WifiItem(QFrame):
             requires_pass = bool(not self.state & WifiState.CONNECTED) and bool(self.state & WifiState.SECURED)
             known_profile = self.data.profile_exists
             self.password_field.setVisible(requires_pass and not known_profile)
-            self.connect_button.setText("Disconnect" if self.state & WifiState.CONNECTED else "Connect")
+            self.connect_button.setText("断开连接" if self.state & WifiState.CONNECTED else "连接")
         # Update the status label
         if self.state == WifiState.CONNECTED:
-            self.status_label.setText("Connected")
+            self.status_label.setText("已连接")
         elif self.state == WifiState.CONNECTED | WifiState.SECURED:
-            self.status_label.setText("Connected, Secured")
+            self.status_label.setText("已连接，已加密")
         elif self.state == WifiState.SECURED:
-            self.status_label.setText("Secured")
+            self.status_label.setText("已加密")
         else:
-            self.status_label.setText("Unsecured")
+            self.status_label.setText("未加密")
         # Set the SSID field visibility for hidden network
         self.ssid_field.setVisible(self.data.ssid == "<Hidden Network>")
         # Update the style
@@ -453,7 +453,7 @@ class WifiMenu(QObject):
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        header_label = QLabel("WiFi Networks")
+        header_label = QLabel("Wi-Fi 网络")
         header_label.setProperty("class", "header")
 
         self.menu_progress_bar = LoaderLine(self.popup_window)
@@ -479,7 +479,7 @@ class WifiMenu(QObject):
         footer_layout.setSpacing(0)
         footer_layout.setContentsMargins(0, 0, 0, 0)
 
-        more_settings_button = QPushButton("More Wi-Fi settings")
+        more_settings_button = QPushButton("更多 Wi-Fi 设置")
         more_settings_button.setProperty("class", "settings-button")
 
         more_settings_button.clicked.connect(partial(self._run_and_hide, "ms-settings:network-wifi"))  # pyright: ignore[reportUnknownMemberType]
@@ -555,9 +555,9 @@ class WifiMenu(QObject):
     def _on_connection_attempt_completed(self, result: WiFiConnectionStatus, profile_name: str, network: NetworkInfo):
         if result != WiFiConnectionStatus.SUCCESS:
             if result == WiFiConnectionStatus.INVALID_CREDENTIAL:
-                self.show_errror_message_briefly("Invalid password")
+                self.show_errror_message_briefly("密码无效")
             elif result == WiFiConnectionStatus.NETWORK_NOT_AVAILABLE:
-                self.show_errror_message_briefly("Network not available")
+                self.show_errror_message_briefly("网络不可用")
             else:
                 logger.error("Connection failed to wifi network. Reason: %s", result.name)
             return
@@ -645,7 +645,7 @@ class WifiMenu(QObject):
         if is_valid_qobject(self.popup_window):
             if result != ScanResultStatus.SUCCESS:
                 if result == ScanResultStatus.ACCESS_DENIED:
-                    self.error_message.setText("Error: Location services are disabled...")
+                    self.error_message.setText("错误：定位服务已禁用…")
                     self.error_message.clickable = True
                     if self.error_connection:
                         self.error_message.disconnect(self.error_connection)
@@ -653,7 +653,7 @@ class WifiMenu(QObject):
                         partial(self._run_and_hide, "ms-settings:privacy-location"),
                     )
                 elif result == ScanResultStatus.POWER_STATE_INVALID:
-                    self.error_message.setText("Error: WiFi adapter is disabled...")
+                    self.error_message.setText("错误：Wi-Fi 适配器已禁用…")
                     self.error_message.clickable = True
                     if self.error_connection:
                         self.error_message.disconnect(self.error_connection)
@@ -662,10 +662,10 @@ class WifiMenu(QObject):
                     )
                 elif result == ScanResultStatus.SERVICE_UNAVAILABLE:
                     self.error_message.clickable = False
-                    self.error_message.setText("Wi-Fi is not available")
+                    self.error_message.setText("Wi-Fi 不可用")
                 elif result == ScanResultStatus.ERROR:
                     self.error_message.clickable = False
-                    self.error_message.setText("Unknown error...")
+                    self.error_message.setText("未知错误…")
                 self.menu_wifi_list.clear_items()
                 WifiMenu._networks_cache = {}
                 self.menu_progress_bar.setVisible(False)

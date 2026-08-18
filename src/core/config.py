@@ -103,9 +103,9 @@ def get_config(show_error_dialog: bool = False) -> YasbConfig | None:
             )
             if show_error_dialog:
                 raise_info_alert(
-                    title="Failed to load recently updated config file.",
-                    msg=f"The file '{config_path}' contains validation error(s) and has not been loaded.",
-                    informative_msg="For more information, click 'Show Details'.",
+                    title="无法加载最近更新的配置文件",
+                    msg=f"文件“{config_path}”包含验证错误，未被加载。",
+                    informative_msg="如需了解详细信息，请点击“显示详细信息”。",
                     additional_details=validation_errors,
                 )
             return None
@@ -128,9 +128,9 @@ def get_stylesheet(show_error_dialog: bool = False) -> str | None:
         logging.error("The file '%s' contains Syntax Error(s). Please fix:\n%s", styles_path, e)
         if show_error_dialog:
             raise_info_alert(
-                title="Failed to load recently updated stylesheet file.",
-                msg=f"The file '{styles_path}' contains syntax error(s) and has not been loaded.",
-                informative_msg="For more information, click 'Show Details'.",
+                title="无法加载最近更新的样式表文件",
+                msg=f"文件“{styles_path}”包含语法错误，未被加载。",
+                informative_msg="如需了解详细信息，请点击“显示详细信息”。",
                 additional_details=str(e),
             )
     except FileNotFoundError:
@@ -146,11 +146,11 @@ def get_config_and_stylesheet() -> tuple[YasbConfig, str]:
     error_msg: str | None = None
 
     if not config:
-        error_msg = "User config file could not be loaded. Exiting Application."
+        error_msg = "无法加载用户配置文件，正在退出应用程序。"
     elif not stylesheet:
-        error_msg = "User stylesheet could not be loaded. Exiting Application."
+        error_msg = "无法加载用户样式表，正在退出应用程序。"
     elif not config.bars:
-        error_msg = "No bars have been configured. Please edit the config to add a status bar."
+        error_msg = "未配置任何栏。请编辑配置文件以添加状态栏。"
     else:
         return config, stylesheet
 

@@ -810,8 +810,8 @@ class ColorProvider(BaseProvider):
     """Pick colors and convert between HEX, RGB, HSL, HSV, HWB, LAB, LCH, OKLAB, and OKLCH."""
 
     name = "color"
-    display_name = "Color"
-    input_placeholder = "Enter a color value..."
+    display_name = "颜色"
+    input_placeholder = "输入颜色值..."
     icon = ICON_COLOR
 
     _picker_overlay = None
@@ -827,55 +827,55 @@ class ColorProvider(BaseProvider):
         if not query:
             return [
                 ProviderResult(
-                    title="Color Converter",
-                    description="Type a color: #hex, rgb(), hsl(), hwb(), lab(), lch(), oklab(), oklch(), or name",
+                    title="颜色转换器",
+                    description="输入颜色：#hex、rgb()、hsl()、hwb()、lab()、lch()、oklab()、oklch() 或名称",
                     icon_char=ICON_COLOR,
                     provider=self.name,
                 ),
                 ProviderResult(
-                    title="Pick Color from Screen",
-                    description="Open a magnifying loupe to pick any color from the desktop",
+                    title="从屏幕拾取颜色",
+                    description="打开放大镜，从桌面拾取任意颜色",
                     icon_char=ICON_COLOR_PICKER,
                     provider=self.name,
                     action_data={"_pick_color": True},
                 ),
                 ProviderResult(
-                    title="Random Color",
-                    description="Generate a random color with all conversions",
+                    title="随机颜色",
+                    description="生成随机颜色及其所有转换格式",
                     icon_char=ICON_COLOR,
                     provider=self.name,
                     action_data={"_replace_input": "random"},
                 ),
                 ProviderResult(
-                    title="Contrast Check",
+                    title="对比度检查",
                     description="Type: contrast #fff vs #333",
                     icon_char=ICON_COLOR,
                     provider=self.name,
                     action_data={"_replace_input": "contrast "},
                 ),
                 ProviderResult(
-                    title="Mix / Blend",
+                    title="混合/融合",
                     description="Type: mix #ff0000 + #0000ff",
                     icon_char=ICON_COLOR,
                     provider=self.name,
                     action_data={"_replace_input": "mix "},
                 ),
                 ProviderResult(
-                    title="Lighten / Darken",
+                    title="变亮/变暗",
                     description="Type: lighten #ff6347 20 or darken #ff6347 20",
                     icon_char=ICON_COLOR,
                     provider=self.name,
                     action_data={"_replace_input": "lighten "},
                 ),
                 ProviderResult(
-                    title="Color Harmonies",
+                    title="配色方案",
                     description="Type: harmony #ff6347",
                     icon_char=ICON_COLOR,
                     provider=self.name,
                     action_data={"_replace_input": "harmony "},
                 ),
                 ProviderResult(
-                    title="Color Blindness Simulation",
+                    title="色觉障碍模拟",
                     description="Type: blind #ff6347",
                     icon_char=ICON_COLOR,
                     provider=self.name,
@@ -892,7 +892,7 @@ class ColorProvider(BaseProvider):
                 results.append(
                     ProviderResult(
                         title=rand_hex,
-                        description=f"rgb({rr}, {rg}, {rb}) - press Enter to view all conversions",
+                        description=f"rgb({rr}, {rg}, {rb}) - 按 Enter 查看所有转换格式",
                         icon_char=_color_swatch_svg(rand_hex),
                         provider=self.name,
                         action_data={"_replace_input": rand_hex},
@@ -948,7 +948,7 @@ class ColorProvider(BaseProvider):
         if parsed is None:
             return [
                 ProviderResult(
-                    title="Invalid color",
+                    title="颜色无效",
                     description="Try: #FF550090, rgba(255,85,0,0.5), hsl(20,100,50), lab(50,0,0), oklab(0.5,0,0)",
                     icon_char=ICON_COLOR,
                     provider=self.name,
@@ -996,7 +996,7 @@ class ColorProvider(BaseProvider):
         results = [
             ProviderResult(
                 title=val,
-                description=f"{label} - press Enter to copy",
+                description=f"{label} - 按 Enter 复制",
                 icon_char=swatch,
                 provider=self.name,
                 action_data={"value": val},
@@ -1055,7 +1055,7 @@ class ColorProvider(BaseProvider):
         """Return a single-item error list for an unparseable color string."""
         return [
             ProviderResult(
-                title=f"Cannot parse: {text}",
+                title=f"无法解析：{text}",
                 description=hint,
                 icon_char=ICON_COLOR,
                 provider=self.name,
@@ -1080,21 +1080,21 @@ class ColorProvider(BaseProvider):
         results = [
             ProviderResult(
                 title=f"{ratio:.2f}:1",
-                description=f"WCAG Contrast - {grade}",
+                description=f"WCAG 对比度 - {grade}",
                 icon_char=swatch,
                 provider=self.name,
                 action_data={"value": f"{ratio:.2f}:1"},
             ),
             ProviderResult(
                 title=hex1,
-                description=f"rgb({r1}, {g1}, {b1}) - press Enter to view conversions",
+                description=f"rgb({r1}, {g1}, {b1}) - 按 Enter 查看转换格式",
                 icon_char=_color_swatch_svg(hex1),
                 provider=self.name,
                 action_data={"_replace_input": hex1},
             ),
             ProviderResult(
                 title=hex2,
-                description=f"rgb({r2}, {g2}, {b2}) - press Enter to view conversions",
+                description=f"rgb({r2}, {g2}, {b2}) - 按 Enter 查看转换格式",
                 icon_char=_color_swatch_svg(hex2),
                 provider=self.name,
                 action_data={"_replace_input": hex2},
@@ -1120,7 +1120,7 @@ class ColorProvider(BaseProvider):
             results.append(
                 ProviderResult(
                     title=m_hex,
-                    description=f"rgb({mr}, {mg}, {mb}) - {pct}% blend - press Enter to view conversions",
+                    description=f"rgb({mr}, {mg}, {mb}) - {pct}% 混合 - 按 Enter 查看转换格式",
                     icon_char=swatch,
                     provider=self.name,
                     action_data={"_replace_input": m_hex},

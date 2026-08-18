@@ -86,8 +86,8 @@ class WebSearchProvider(BaseProvider):
     """
 
     name = "web_search"
-    display_name = "Web Search"
-    input_placeholder = "Search the web..."
+    display_name = "网页搜索"
+    input_placeholder = "搜索网页..."
     icon = ICON_WEB_SEARCH
 
     def __init__(self, config=None):
@@ -125,8 +125,8 @@ class WebSearchProvider(BaseProvider):
             preferred_name = engines[0][1]["name"] if engines else "the web"
             return [
                 ProviderResult(
-                    title=f"Search {preferred_name}...",
-                    description="Type your search query",
+                    title=f"搜索 {preferred_name}...",
+                    description="输入搜索内容",
                     icon_char=ICON_WEB_SEARCH,
                     provider=self.name,
                 )
@@ -137,7 +137,7 @@ class WebSearchProvider(BaseProvider):
             icon = info["icon"]
             results.append(
                 ProviderResult(
-                    title=f'Search {info["name"]} for "{query}"',
+                    title=f'在 {info["name"]} 中搜索“{query}”',
                     description=info["description"],
                     icon_char=ICON_WEB_SEARCH if not icon else icon,
                     provider=self.name,

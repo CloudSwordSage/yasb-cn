@@ -352,11 +352,11 @@ class MediaWidget(BaseWidget):
         control_layout.setContentsMargins(0, 0, 0, 0)
 
         icons = menu.icons
-        self._popup_shuffle_label = self._make_btn("btn shuffle", icons.shuffle, self.media.toggle_shuffle, "Shuffle")
-        self._popup_prev_label = self._make_btn("btn prev", icons.prev_track, self.media.prev, "Previous")
-        self._popup_play_button = self._make_btn("btn play", icons.play, self.media.play_pause, "Play")
-        self._popup_next_label = self._make_btn("btn next", icons.next_track, self.media.next, "Next")
-        self._popup_repeat_label = self._make_btn("btn repeat", icons.repeat, self.media.cycle_repeat, "Repeat")
+        self._popup_shuffle_label = self._make_btn("btn shuffle", icons.shuffle, self.media.toggle_shuffle, "随机播放")
+        self._popup_prev_label = self._make_btn("btn prev", icons.prev_track, self.media.prev, "上一首")
+        self._popup_play_button = self._make_btn("btn play", icons.play, self.media.play_pause, "播放")
+        self._popup_next_label = self._make_btn("btn next", icons.next_track, self.media.next, "下一首")
+        self._popup_repeat_label = self._make_btn("btn repeat", icons.repeat, self.media.cycle_repeat, "重复播放")
 
         control_layout.addStretch(1)
         control_layout.addWidget(self._popup_shuffle_label)
@@ -380,7 +380,7 @@ class MediaWidget(BaseWidget):
         set_tooltip(widget, text)
 
     def _update_bar_tooltip(self, session: SessionState) -> None:
-        title = (session.title or "").strip() or "Unknown Title"
+        title = (session.title or "").strip() or "未知标题"
         artist = (session.artist or "").strip()
         source = resolve_source_app_name(session.app_id) or ""
         tip = [f"<strong>{title}</strong>"]
@@ -433,7 +433,7 @@ class MediaWidget(BaseWidget):
         if self._title_label is None or self._artist_label is None:
             return
         if self.config.show_title:
-            self._title_label.setText(self._format_max_field_size(title) if title else "Unknown Title")
+            self._title_label.setText(self._format_max_field_size(title) if title else "未知标题")
             self._title_label.setVisible(True)
         if self.config.show_artist:
             if artist:
@@ -447,12 +447,12 @@ class MediaWidget(BaseWidget):
         """One scrolling line: title, artist, or 'title - artist' when both enabled."""
         parts: list[str] = []
         if self.config.show_title:
-            parts.append(title or "Unknown Title")
+            parts.append(title or "未知标题")
         if self.config.show_artist:
             if artist:
                 parts.append(artist)
             elif not self.config.show_title:
-                parts.append("Unknown Artist")
+                parts.append("未知艺术家")
         return _SCROLL_JOIN.join(parts)
 
     def _apply_popup_text(self, session: SessionState) -> None:
@@ -460,8 +460,8 @@ class MediaWidget(BaseWidget):
             return
         title = (session.title or "").strip()
         artist = (session.artist or "").strip()
-        self._popup_title_label.setText(title or "Unknown Title")
-        self._popup_artist_label.setText(artist or "Unknown Artist")
+        self._popup_title_label.setText(title or "未知标题")
+        self._popup_artist_label.setText(artist or "未知艺术家")
 
     def _apply_artwork(self, session: SessionState) -> None:
         cover = session.thumbnail

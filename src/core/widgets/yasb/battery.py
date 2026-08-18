@@ -138,7 +138,7 @@ class BatteryWidget(BaseWidget):
                 if widget_index < len(active_widgets):
                     if "<span" in part and "</span>" in part:
                         active_widgets[widget_index].hide()
-                    active_widgets[widget_index].setText("Battery info not available")
+                    active_widgets[widget_index].setText("电池信息不可用")
                     widget_index += 1
             return
 

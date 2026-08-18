@@ -175,7 +175,7 @@ class SshProvider(BaseProvider):
     name = "ssh"
     display_name = "SSH"
     icon = ICON_SSH
-    input_placeholder = "Search SSH hosts..."
+    input_placeholder = "搜索 SSH 主机..."
 
     def __init__(self, config: dict | None = None):
         super().__init__(config)
@@ -194,11 +194,11 @@ class SshProvider(BaseProvider):
             "kind": "edit",
             "action": "save_ssh_connection",
             "fields": [
-                f("host", "Host alias", "e.g. myserver"),
-                f("hostname", "Hostname / IP", "e.g. 192.168.1.10"),
-                f("user", "User", "e.g. root"),
-                f("port", "Port", "22"),
-                f("identityfile", "Identity file", "e.g. ~/.ssh/id_rsa  (leave blank for default)"),
+                f("host", "主机别名", "例如 myserver"),
+                f("hostname", "主机名 / IP", "例如 192.168.1.10"),
+                f("user", "用户", "例如 root"),
+                f("port", "端口", "22"),
+                f("identityfile", "私钥文件", "例如 ~/.ssh/id_rsa（留空使用默认值）"),
             ],
         }
 
@@ -224,8 +224,8 @@ class SshProvider(BaseProvider):
         if not self._hosts:
             return [
                 ProviderResult(
-                    title="No SSH hosts found",
-                    description="Add Host entries to ~/.ssh/config to see them here",
+                    title="未找到 SSH 主机",
+                    description="在 ~/.ssh/config 中添加 Host 条目后将在此显示",
                     icon_char=ICON_SSH,
                     provider=self.name,
                 ),
@@ -247,8 +247,8 @@ class SshProvider(BaseProvider):
         if not filtered:
             return [
                 ProviderResult(
-                    title="No matching SSH hosts",
-                    description="Try a different search term",
+                    title="没有匹配的 SSH 主机",
+                    description="请尝试其他搜索词",
                     icon_char=ICON_SSH,
                     provider=self.name,
                 )
@@ -266,9 +266,9 @@ class SshProvider(BaseProvider):
             if hostname and hostname != host:
                 desc_parts.append(hostname)
             if user:
-                desc_parts.append(f"user: {user}")
+                desc_parts.append(f"用户：{user}")
             if port:
-                desc_parts.append(f"port: {port}")
+                desc_parts.append(f"端口：{port}")
             description = " · ".join(desc_parts) if desc_parts else ssh_cmd
 
             # If this host is currently being edited, show the edit form
@@ -299,8 +299,8 @@ class SshProvider(BaseProvider):
     def _new_connection_result(self) -> ProviderResult:
         """Return the fixed 'Add new connection' result with an inline edit form."""
         return ProviderResult(
-            title="Add new connection",
-            description="Create a new SSH host entry",
+            title="添加新连接",
+            description="创建新的 SSH 主机条目",
             icon_char=ICON_SSH,
             provider=self.name,
             action_data={"action": "create"},
@@ -323,10 +323,10 @@ class SshProvider(BaseProvider):
         if not result.action_data.get("ssh_cmd"):
             return []
         return [
-            ProviderMenuAction(id="open", label="Open"),
-            ProviderMenuAction(id="open_admin", label="Open as Administrator"),
-            ProviderMenuAction(id="copy_cmd", label="Copy SSH Command"),
-            ProviderMenuAction(id="edit", label="Edit connection", separator_before=True),
+            ProviderMenuAction(id="open", label="打开"),
+            ProviderMenuAction(id="open_admin", label="以管理员身份打开"),
+            ProviderMenuAction(id="copy_cmd", label="复制 SSH 命令"),
+            ProviderMenuAction(id="edit", label="编辑连接", separator_before=True),
         ]
 
     def execute_context_menu_action(self, action_id: str, result: ProviderResult) -> ProviderMenuActionResult:

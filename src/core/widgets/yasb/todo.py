@@ -158,7 +158,7 @@ class TodoWidget(BaseWidget):
 
         self._title_input = QLineEdit()
         self.widget_context_menu(self._title_input)
-        self._title_input.setPlaceholderText("Task title... (max 100 characters, required)")
+        self._title_input.setPlaceholderText("任务标题…（最多 100 个字符，必填）")
         self._title_input.setProperty("class", "title-field")
         if task:
             self._title_input.setText(task["title"])
@@ -168,7 +168,7 @@ class TodoWidget(BaseWidget):
         self._desc_input = QTextEdit()
         self._desc_input.insertFromMimeData = lambda source: self._desc_input.insertPlainText(source.text())
         self.widget_context_menu(self._desc_input)
-        self._desc_input.setPlaceholderText("Task description... (max 500 characters)")
+        self._desc_input.setPlaceholderText("任务描述…（最多 500 个字符）")
         if task:
             self._desc_input.setText(task.get("description", ""))
         self._desc_input.textChanged.connect(lambda: self._limit_text_length("description", 500))
@@ -199,7 +199,7 @@ class TodoWidget(BaseWidget):
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(0, 0, 0, 0)
 
-        cancel_button = QPushButton("Cancel")
+        cancel_button = QPushButton("取消")
         cancel_button.setProperty("class", "button cancel")
         cancel_button.clicked.connect(dialog.reject)
         button_layout.addWidget(cancel_button)
@@ -276,7 +276,7 @@ class TodoWidget(BaseWidget):
             tooltip_lines = [f"{label}: {count}" for label, count in category_counts.items()]
             tooltip_text = "\n".join(tooltip_lines)
         else:
-            tooltip_text = "No tasks."
+            tooltip_text = "没有任务。"
         set_tooltip(self._widget_container, tooltip_text)
 
     def _toggle_menu(self):
@@ -311,13 +311,13 @@ class TodoWidget(BaseWidget):
         header_layout.addWidget(add_task_button, alignment=Qt.AlignmentFlag.AlignLeft)
         header_layout.addStretch()
 
-        self._in_progress_btn = QPushButton("In Progress")
+        self._in_progress_btn = QPushButton("进行中")
         self._in_progress_btn.setCheckable(True)
         self._in_progress_btn.setChecked(not self._show_completed)
         self._in_progress_btn.setProperty("class", "tab-buttons in-progress")
         self._in_progress_btn.clicked.connect(lambda: self._set_show_completed(False))
 
-        self._completed_btn = QPushButton("Completed")
+        self._completed_btn = QPushButton("已完成")
         self._completed_btn.setCheckable(True)
         self._completed_btn.setChecked(self._show_completed)
         self._completed_btn.setProperty("class", "tab-buttons completed")
@@ -381,9 +381,9 @@ class TodoWidget(BaseWidget):
             QMenu::indicator:checked { background: transparent;color:transparent }
         """)
         apply_qmenu_style(menu)
-        sort_by_date = QAction("Sort by date (Newest)", self)
-        sort_by_date_old = QAction("Sort by date (Oldest)", self)
-        sort_reset = QAction("Reset sorting", self)
+        sort_by_date = QAction("按日期排序（最新优先）", self)
+        sort_by_date_old = QAction("按日期排序（最早优先）", self)
+        sort_reset = QAction("重置排序", self)
 
         menu.addAction(sort_by_date)
         menu.addAction(sort_by_date_old)
@@ -394,13 +394,13 @@ class TodoWidget(BaseWidget):
         sort_reset.triggered.connect(lambda: self._sort_and_filter_tasks(sort_mode="default"))
         menu.addSeparator()
 
-        show_all_action = QAction("Show all categories", self)
+        show_all_action = QAction("显示所有分类", self)
         show_all_action.triggered.connect(self._clear_category_filter)
         show_all_action.setCheckable(True)
         show_all_action.setChecked(self._category_filter is None)
         menu.addAction(show_all_action)
         for cat_key, cat_config in self.config.categories.items():
-            action = QAction(f"Show only {cat_config.label}", self)
+            action = QAction(f"仅显示 {cat_config.label}", self)
             action.setCheckable(True)
             action.setChecked(self._category_filter == cat_key)
             action.triggered.connect(lambda checked, c=cat_key: self._sort_and_filter_tasks(category_key=c))
@@ -463,16 +463,16 @@ class TodoWidget(BaseWidget):
             if self._category_filter:
                 cat_key = self._category_filter
                 cat_conf = self.config.categories.get(cat_key)
-                category_label = f" in <b>{cat_conf.label if cat_conf else cat_key}</b>"
+                category_label = f"（<b>{cat_conf.label if cat_conf else cat_key}</b>）"
 
             if not self._show_completed:
                 msg = (
-                    f"No tasks{category_label} yet.<br>Click <b>New Task</b> to create your first task!"
+                    f"暂无任务{category_label}。<br>点击<b>新建任务</b>创建第一项任务！"
                     if not category_label
-                    else f"No tasks{category_label}.<br>Click <b>New Task</b> to create your first task!"
+                    else f"没有任务{category_label}。<br>点击<b>新建任务</b>创建第一项任务！"
                 )
             else:
-                msg = f"No completed tasks{category_label} yet."
+                msg = f"暂无已完成任务{category_label}。"
 
             no_tasks_icon = QLabel(self.config.icons.no_tasks)
             no_tasks_icon.setProperty("class", "no-tasks-icon")
@@ -507,11 +507,11 @@ class TodoWidget(BaseWidget):
         self._refresh_menu_task_list()
 
     def _show_add_task_dialog(self):
-        self._show_task_dialog(dialog_title="Add New Task", save_button_text="Add Task", on_save=self._add_new_task)
+        self._show_task_dialog(dialog_title="添加新任务", save_button_text="添加任务", on_save=self._add_new_task)
 
     def _show_edit_task_dialog(self, task):
         self._show_task_dialog(
-            dialog_title="Edit Task", save_button_text="Save Changes", on_save=self._edit_task, task=task
+            dialog_title="编辑任务", save_button_text="保存更改", on_save=self._edit_task, task=task
         )
 
     def widget_context_menu(self, widget):
@@ -654,7 +654,7 @@ class TodoWidget(BaseWidget):
                 delta = now - created_at
                 if delta.days == 0:
                     if delta.seconds < 60:
-                        friendly_date = "Just now"
+                        friendly_date = "刚刚"
                     elif delta.seconds < 3600:
                         minutes = delta.seconds // 60
                         friendly_date = f"{minutes} min ago"
@@ -662,7 +662,7 @@ class TodoWidget(BaseWidget):
                         hours = delta.seconds // 3600
                         friendly_date = f"{hours} hour{'s' if hours != 1 else ''} ago"
                 elif delta.days == 1:
-                    friendly_date = "Yesterday"
+                    friendly_date = "昨天"
                 elif 1 < delta.days < 30:
                     friendly_date = f"{delta.days} days ago"
                 else:

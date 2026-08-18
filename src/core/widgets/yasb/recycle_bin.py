@@ -113,7 +113,7 @@ class RecycleBinWidget(BaseWidget):
         # Update label to indicate emptying
         for widget in self._widgets:
             if "label" in widget.property("class"):
-                widget.setText("Emptying...")
+                widget.setText("正在清空...")
         # Get the thread and signal from monitor, and store the thread reference
         signal, self._empty_thread = self.monitor.empty_recycle_bin_async(
             show_confirmation=self.config.show_confirmation

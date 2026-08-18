@@ -15,8 +15,8 @@ class NotificationsCallbacksConfig(CallbacksConfig):
 
 
 class NotificationsConfig(CustomBaseModel):
-    label: str = "{count} new notifications"
-    label_alt: str = "{count} new notifications"
+    label: str = "{count} 条新通知"
+    label_alt: str = "{count} 条新通知"
     class_name: str = ""
     hide_empty: bool = False
     tooltip: bool = True

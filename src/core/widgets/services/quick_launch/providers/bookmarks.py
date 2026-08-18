@@ -29,8 +29,8 @@ class BookmarksProvider(BaseProvider):
     """Search and open browser bookmarks."""
 
     name = "bookmarks"
-    display_name = "Browser Bookmarks"
-    input_placeholder = "Search bookmarks..."
+    display_name = "浏览器书签"
+    input_placeholder = "搜索书签..."
     icon = ICON_BOOKMARK
 
     def __init__(self, config: dict | None = None):
@@ -184,8 +184,8 @@ class BookmarksProvider(BaseProvider):
         if not self._bookmarks:
             return [
                 ProviderResult(
-                    title="No bookmarks found",
-                    description="Check browser setting in Quick Launch config",
+                    title="未找到书签",
+                    description="请检查 Quick Launch 配置中的浏览器设置",
                     icon_char=ICON_BOOKMARK,
                     provider=self.name,
                 )
@@ -206,8 +206,8 @@ class BookmarksProvider(BaseProvider):
         if not matches:
             return [
                 ProviderResult(
-                    title=f"No bookmarks matching {query}",
-                    description="Try a different search",
+                    title=f"没有匹配 {query} 的书签",
+                    description="请尝试其他搜索词",
                     icon_char=ICON_BOOKMARK,
                     provider=self.name,
                 )

@@ -178,7 +178,7 @@ class GithubWidget(BaseWidget):
                     label.setProperty("class", "label")
                 label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 if not self.github_token and self.config.tooltip:
-                    set_tooltip(label, "Error: Token not configured")
+                    set_tooltip(label, "错误：未配置令牌")
                 self._widget_container_layout.addWidget(label)
 
                 widgets.append(label)
@@ -226,7 +226,7 @@ class GithubWidget(BaseWidget):
                 icon = re.sub(r"<span.*?>|</span>", "", part).strip()
                 current_widget.setText(icon)
                 if self.config.tooltip:
-                    set_tooltip(current_widget, f"Notifications {notification_count}")
+                    set_tooltip(current_widget, f"通知：{notification_count}")
                 # Update class based on notification count
                 current_classes = current_widget.property("class").split()
                 notification_class = "new-notification"
@@ -282,11 +282,11 @@ class GithubWidget(BaseWidget):
     def _format_category_title(self, category_type: str) -> str:
         """Return a human-friendly label for a GitHub notification type."""
         custom_titles = {
-            "Issue": "Issues",
-            "PullRequest": "Pull Requests",
-            "Release": "Releases",
-            "Discussion": "Discussions",
-            "CheckSuite": "Check Suites",
+            "Issue": "议题",
+            "PullRequest": "拉取请求",
+            "Release": "发布",
+            "Discussion": "讨论",
+            "CheckSuite": "检查套件",
         }
         if category_type in custom_titles:
             return custom_titles[category_type]
@@ -358,7 +358,7 @@ class GithubWidget(BaseWidget):
         updated_at = notification.get("updated_at", "")
         relative_time = get_relative_time(updated_at)
         if relative_time:
-            repo_description = f"{repo_description} • Updated {relative_time}"
+            repo_description = f"{repo_description} • {relative_time}前更新"
 
         if len(repo_description) > self.config.max_field_size:
             repo_description = repo_description[: self.config.max_field_size - 3] + "..."
@@ -456,7 +456,7 @@ class GithubWidget(BaseWidget):
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        header_label = QLabel("<span style='font-weight:bold'>GitHub</span> Notifications")
+        header_label = QLabel("<span style='font-weight:bold'>GitHub</span> 通知")
         header_label.setProperty("class", "header")
         main_layout.addWidget(header_label)
 
@@ -563,7 +563,7 @@ class GithubWidget(BaseWidget):
             opacity_effect.setOpacity(0.4)
             large_label.setGraphicsEffect(opacity_effect)
 
-            no_data = QLabel("No unread notifications")
+            no_data = QLabel("没有未读通知")
             no_data.setStyleSheet("font-size:18px;font-weight:400;font-family: Segoe UI")
             opacity_effect = QGraphicsOpacityEffect()
             opacity_effect.setOpacity(0.5)
@@ -591,14 +591,14 @@ class GithubWidget(BaseWidget):
             footer_layout.setSpacing(0)
 
             # Left side - unread count
-            footer_label = QLabel(f"Unread notifications ({notifications_unread_count})")
+            footer_label = QLabel(f"未读通知（{notifications_unread_count}）")
             footer_label.setProperty("class", "label")
             footer_layout.addWidget(footer_label)
 
             footer_layout.addStretch()
 
             # Right side - mark all as read button
-            mark_all_label = QLabel("Mark all as read")
+            mark_all_label = QLabel("全部标为已读")
             mark_all_label.setProperty("class", "label")
             mark_all_label.mousePressEvent = lambda ev: self._mark_all_as_read()
             footer_layout.addWidget(mark_all_label)

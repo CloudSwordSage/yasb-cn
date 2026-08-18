@@ -137,7 +137,7 @@ class LanguageWidget(BaseWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         # Header
-        header_label = QLabel("Keyboard Layouts")
+        header_label = QLabel("键盘布局")
         header_label.setProperty("class", "header")
         main_layout.addWidget(header_label)
 
@@ -149,7 +149,7 @@ class LanguageWidget(BaseWidget):
         for lang_info in available_languages:
             self._create_language_item(main_layout, lang_info, lang_info["id"] == current_layout_handle)
 
-        footer_label = QLabel("More keyboard settings")
+        footer_label = QLabel("更多键盘设置")
         footer_label.setProperty("class", "footer")
 
         footer_label.mousePressEvent = self._on_settings_click

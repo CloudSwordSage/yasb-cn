@@ -601,7 +601,7 @@ class ClockWidget(BaseWidget):
                 day_abbr = now.strftime("%a")
                 time_str = now.strftime("%H:%M")
                 self._restore_locale_context(org_locale_time, org_locale_ctype)
-                tz_display = self._active_tz.replace("_", " ") if self._active_tz else "Local time"
+                tz_display = self._active_tz.replace("_", " ") if self._active_tz else "本地时间"
                 tooltip_text = f"{date_str}\n\n{day_abbr} {time_str} ({tz_display})"
 
                 if self._has_enabled_alarms():
@@ -661,7 +661,7 @@ class ClockWidget(BaseWidget):
     def update_week_label(self, qdate: QDate):
         """Set the week number label for the given QDate."""
         week_number = qdate.weekNumber()[0]
-        self.week_label.setText(f"Week {week_number}")
+        self.week_label.setText(f"第 {week_number} 周")
 
     def update_holiday_label(self, qdate: QDate):
         """Show holiday name for the selected date, if available for country."""
@@ -757,7 +757,7 @@ class ClockWidget(BaseWidget):
 
         if self.config.calendar.show_week_numbers:
             week_number = QDate(datetime_now.year, datetime_now.month, datetime_now.day).weekNumber()[0]
-            self.week_label = QLabel(f"Week {week_number}")
+            self.week_label = QLabel(f"第 {week_number} 周")
             self.week_label.setProperty("class", "week-label")
             self.week_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             date_layout.addWidget(self.week_label)
@@ -796,10 +796,10 @@ class ClockWidget(BaseWidget):
             right_frame.setProperty("class", "extended-container")
             right_frame.setLayout(actions_layout)
 
-            alarm_btn = QPushButton("Set Alarm")
+            alarm_btn = QPushButton("设置闹钟")
             alarm_btn.setProperty("class", "button alarm small")
 
-            timer_btn = QPushButton("Set Timer")
+            timer_btn = QPushButton("设置计时器")
             timer_btn.setProperty("class", "button timer small")
 
             def on_alarm_clicked():
@@ -822,7 +822,7 @@ class ClockWidget(BaseWidget):
             actions_layout.addWidget(alarm_btn)
             actions_layout.addWidget(timer_btn)
 
-            holidays_label = QLabel("Upcoming holidays")
+            holidays_label = QLabel("即将到来的节假日")
             holidays_label.setProperty("class", "upcoming-events-header")
             holidays_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
             actions_layout.addWidget(holidays_label)
@@ -886,7 +886,7 @@ class ClockWidget(BaseWidget):
         apply_qmenu_style(menu)
         menu.setProperty("class", "context-menu")
         if len(self._timezones_list) > 1:
-            tz_menu = QMenu("Timezones", menu)
+            tz_menu = QMenu("时区", menu)
             apply_qmenu_style(tz_menu)
             tz_menu.setProperty("class", "context-menu submenu")
 
@@ -899,20 +899,20 @@ class ClockWidget(BaseWidget):
             menu.addSeparator()
 
         if self._shared_state._timer_active:
-            cancel_timer_action = menu.addAction("Cancel Timer")
+            cancel_timer_action = menu.addAction("取消计时器")
             cancel_timer_action.triggered.connect(lambda: self._cancel_timer())
         else:
-            set_timer_action = menu.addAction("Set Timer")
+            set_timer_action = menu.addAction("设置计时器")
             set_timer_action.triggered.connect(lambda: self._show_timer_dialog())
 
         menu.addSeparator()
 
-        set_alarm_action = menu.addAction("Set Alarm")
+        set_alarm_action = menu.addAction("设置闹钟")
         set_alarm_action.triggered.connect(lambda: self._show_alarm_dialog())
 
         if self._shared_state._alarms:
             menu.addSeparator()
-            alarms_label = menu.addAction("Alarms")
+            alarms_label = menu.addAction("闹钟")
             alarms_label.setEnabled(False)
 
             for alarm in self._shared_state._alarms:
@@ -952,12 +952,12 @@ class ClockWidget(BaseWidget):
         days = alarm.get("days", [])
 
         if not days or len(days) == 7:
-            days_str = "Every day"
+            days_str = "每天"
         elif len(days) == 1:
-            day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            day_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
             days_str = day_names[days[0]]
         else:
-            day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            day_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
             days_str = ", ".join([day_names[d] for d in sorted(days)])
 
         enabled_str = (
@@ -981,25 +981,25 @@ class ClockWidget(BaseWidget):
         if self._shared_state._snoozed_alarms and not enabled_alarms:
             if len(self._shared_state._snoozed_alarms) == 1:
                 snooze_time = self._shared_state._snoozed_alarms[0]["snooze_until"].strftime("%H:%M:%S")
-                return f"Snoozed alarm returns at {snooze_time}"
+                return f"稍后提醒将于 {snooze_time} 再次响起"
             else:
-                return f"{len(self._shared_state._snoozed_alarms)} snoozed alarms"
+                return f"{len(self._shared_state._snoozed_alarms)} 个稍后提醒"
 
         if not enabled_alarms:
-            return "No active alarms"
+            return "没有活动闹钟"
 
-        tooltip_lines = ["Active Alarms"]
+        tooltip_lines = ["活动闹钟"]
         for alarm in enabled_alarms:
             time_str = alarm["time"]
             days = alarm.get("days", [])
 
             if not days or len(days) == 7:
-                days_str = "Every day"
+                days_str = "每天"
             elif len(days) == 1:
-                day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+                day_names = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
                 days_str = day_names[days[0]]
             else:
-                day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                day_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
                 days_str = ", ".join([day_names[d] for d in sorted(days)])
 
             tooltip_lines.append(f"{time_str} - {days_str}")
@@ -1007,7 +1007,7 @@ class ClockWidget(BaseWidget):
         if self._shared_state._snoozed_alarms:
             for snoozed in self._shared_state._snoozed_alarms:
                 snooze_time = snoozed["snooze_until"].strftime("%H:%M:%S")
-                tooltip_lines.append(f"Snoozed alarm returns at {snooze_time}")
+                tooltip_lines.append(f"稍后提醒将于 {snooze_time} 再次响起")
 
         return "\n".join(tooltip_lines)
 
@@ -1082,7 +1082,7 @@ class ClockWidget(BaseWidget):
 
         for btn in buttons:
             button_layout.addWidget(btn)
-            if btn.text() == "Delete":
+            if btn.text() == "删除":
                 button_layout.addStretch(1)
 
         return footer_frame
@@ -1108,12 +1108,12 @@ class ClockWidget(BaseWidget):
             now = datetime.now()
             hour, minute = now.hour, now.minute
 
-        grid_wrapper, hour_spin, minute_spin = self._create_time_grid("Hour", "Minute", (0, 23), (0, 59), hour, minute)
+        grid_wrapper, hour_spin, minute_spin = self._create_time_grid("小时", "分钟", (0, 23), (0, 59), hour, minute)
         container_layout.addLayout(grid_wrapper)
 
         days_layout = QHBoxLayout()
         day_buttons = []
-        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        day_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
         for i, day in enumerate(day_names):
             btn = QPushButton(day)
             btn.setCheckable(True)
@@ -1134,9 +1134,9 @@ class ClockWidget(BaseWidget):
 
         quick_layout = QHBoxLayout()
         quick_options = [
-            ("Today", "today"),
-            ("Every day", "everyday"),
-            ("Weekdays", "weekdays"),
+            ("今天", "today"),
+            ("每天", "everyday"),
+            ("工作日", "weekdays"),
         ]
 
         def apply_quick(option_key: str):
@@ -1164,11 +1164,11 @@ class ClockWidget(BaseWidget):
             enabled_button.setCheckable(True)
             is_enabled = alarm.get("enabled", True)
             enabled_button.setChecked(is_enabled)
-            enabled_button.setText("Enabled" if is_enabled else "Disabled")
+            enabled_button.setText("已启用" if is_enabled else "已禁用")
             enabled_button.setProperty("class", f"button {'is-alarm-enabled' if is_enabled else 'is-alarm-disabled'}")
 
             def on_enabled_toggled(checked):
-                enabled_button.setText("Enabled" if checked else "Disabled")
+                enabled_button.setText("已启用" if checked else "已禁用")
                 enabled_button.setProperty("class", f"button {'is-alarm-enabled' if checked else 'is-alarm-disabled'}")
                 refresh_widget_style(enabled_button)
 
@@ -1197,7 +1197,7 @@ class ClockWidget(BaseWidget):
 
         title_edit = QLineEdit()
         title_edit.setProperty("class", "alarm-input-title")
-        title_edit.setPlaceholderText("Alarm title")
+        title_edit.setPlaceholderText("闹钟标题")
         title_edit.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         if is_edit_mode:
             title_edit.setText(alarm.get("title", ""))
@@ -1209,7 +1209,7 @@ class ClockWidget(BaseWidget):
         buttons = []
 
         if is_edit_mode:
-            delete_btn = QPushButton("Delete")
+            delete_btn = QPushButton("删除")
             delete_btn.setProperty("class", "button delete")
 
             def delete_alarm():
@@ -1225,9 +1225,9 @@ class ClockWidget(BaseWidget):
             delete_btn.clicked.connect(delete_alarm)
             buttons.append(delete_btn)
 
-        save_btn = QPushButton("Save")
+        save_btn = QPushButton("保存")
         save_btn.setProperty("class", "button save")
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton("取消")
         cancel_btn.setProperty("class", "button cancel")
 
         buttons.extend([save_btn, cancel_btn])
@@ -1350,7 +1350,7 @@ class ClockWidget(BaseWidget):
         title_icon.setProperty("class", "alarm-title-icon")
         title_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        title_text = alarm.get("title") or "Alarm"
+        title_text = alarm.get("title") or "闹钟"
         title = QLabel(title_text)
         title.setWordWrap(True)
         title.setProperty("class", "alarm-title")
@@ -1372,10 +1372,10 @@ class ClockWidget(BaseWidget):
 
         btn_layout = QHBoxLayout()
         buttons_config = [
-            ("Stop", None),
-            ("Snooze 1 min", 1),
-            ("Snooze 3 min", 3),
-            ("Snooze 5 min", 5),
+            ("停止", None),
+            ("稍后提醒 1 分钟", 1),
+            ("稍后提醒 3 分钟", 3),
+            ("稍后提醒 5 分钟", 5),
         ]
 
         alarm_buttons = []
@@ -1434,11 +1434,11 @@ class ClockWidget(BaseWidget):
         container_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create time grid with default values
-        grid_wrapper, minutes_spin, seconds_spin = self._create_time_grid("Minutes", "Seconds", (0, 99), (0, 59), 5, 0)
+        grid_wrapper, minutes_spin, seconds_spin = self._create_time_grid("分钟", "秒", (0, 99), (0, 59), 5, 0)
         container_layout.addLayout(grid_wrapper)
 
         quick_layout = QHBoxLayout()
-        quick_options = [("1 min", 1), ("5 min", 5), ("10 min", 10), ("30 min", 30), ("60 min", 60)]
+        quick_options = [("1 分钟", 1), ("5 分钟", 5), ("10 分钟", 10), ("30 分钟", 30), ("60 分钟", 60)]
 
         def set_quick(minutes_total: int):
             minutes_spin.blockSignals(True)
@@ -1469,9 +1469,9 @@ class ClockWidget(BaseWidget):
         container_layout.addLayout(quick_layout)
 
         # Create action buttons
-        start_btn = QPushButton("Start")
+        start_btn = QPushButton("开始")
         start_btn.setProperty("class", "button start")
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton("取消")
         cancel_btn.setProperty("class", "button cancel")
 
         def start_timer():

@@ -161,8 +161,8 @@ class SnippetsProvider(BaseProvider):
     """Save and type text snippets into the previously focused window."""
 
     name = "snippets"
-    display_name = "Snippets"
-    input_placeholder = "Search snippets..."
+    display_name = "代码片段"
+    input_placeholder = "搜索代码片段..."
     icon = ICON_SNIPPET
 
     def __init__(self, config: dict | None = None):
@@ -201,12 +201,12 @@ class SnippetsProvider(BaseProvider):
         return {
             "kind": "edit",
             "fields": [
-                {"id": "title", "type": "text", "label": "Title", "placeholder": "Snippet name", "value": title},
+                {"id": "title", "type": "text", "label": "标题", "placeholder": "片段名称", "value": title},
                 {
                     "id": "content",
                     "type": "multiline",
-                    "label": "Content",
-                    "placeholder": "Snippet text that will be typed...",
+                    "label": "内容",
+                    "placeholder": "将要输入的片段文本...",
                     "value": content,
                 },
             ],
@@ -226,8 +226,8 @@ class SnippetsProvider(BaseProvider):
             items = [self._snippet_to_result(s) for s in results]
             items.append(
                 ProviderResult(
-                    title="Create new snippet",
-                    description="Add a new text snippet",
+                    title="新建代码片段",
+                    description="添加新的文本片段",
                     icon_char=ICON_SNIPPET,
                     provider=self.name,
                     action_data={"action": "create"},
@@ -248,7 +248,7 @@ class SnippetsProvider(BaseProvider):
         return sorted(self._snippets, key=lambda s: s.get("last_used", 0), reverse=True)
 
     def _snippet_to_result(self, snippet: dict) -> ProviderResult:
-        title = snippet.get("title", "Untitled")
+        title = snippet.get("title", "未命名")
         content = snippet.get("content", "")
         snippet_id = snippet.get("id", "")
 
@@ -256,7 +256,7 @@ class SnippetsProvider(BaseProvider):
         if self._editing_id == snippet_id:
             return ProviderResult(
                 title=title,
-                description="Editing...",
+                description="正在编辑...",
                 icon_char=ICON_SNIPPET,
                 provider=self.name,
                 action_data={"snippet_id": snippet_id},
@@ -318,9 +318,9 @@ class SnippetsProvider(BaseProvider):
             return []
 
         return [
-            ProviderMenuAction(id="copy", label="Copy to clipboard"),
-            ProviderMenuAction(id="edit", label="Edit snippet"),
-            ProviderMenuAction(id="delete", label="Delete snippet", separator_before=True),
+            ProviderMenuAction(id="copy", label="复制到剪贴板"),
+            ProviderMenuAction(id="edit", label="编辑代码片段"),
+            ProviderMenuAction(id="delete", label="删除代码片段", separator_before=True),
         ]
 
     def execute_context_menu_action(self, action_id: str, result: ProviderResult) -> ProviderMenuActionResult:
@@ -352,7 +352,7 @@ class SnippetsProvider(BaseProvider):
             return ProviderMenuActionResult(refresh_results=True)
 
         if action_id == "save_snippet":
-            title = data.get("title", "").strip() or "Untitled"
+            title = data.get("title", "").strip() or "未命名"
             content = data.get("content", "")
             if not content:
                 return ProviderMenuActionResult(refresh_results=True)

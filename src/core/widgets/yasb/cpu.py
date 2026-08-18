@@ -103,18 +103,18 @@ class CpuWidget(BaseWidget):
 
         stat_rows = [
             (
-                "Usage",
+                "使用率",
                 "usage",
                 f"{data.percent:.0f}%" if data else "\u2014",
-                "Frequency",
+                "频率",
                 "freq",
                 f"{data.freq.current:.0f} MHz" if data else "\u2014",
             ),
             (
-                "Cores (P / L)",
+                "核心数（物理 / 逻辑）",
                 "cores",
                 f"{data.cores_physical} / {data.cores_logical}" if data else "\u2014",
-                "Max frequency",
+                "最高频率",
                 "max_freq",
                 f"{data.freq.max:.0f} MHz" if data else "\u2014",
             ),
@@ -124,7 +124,7 @@ class CpuWidget(BaseWidget):
             parent=self,
             menu_config=menu,
             popup_class_name="cpu-popup",
-            title="<b>CPU</b> Usage",
+            title="<b>CPU</b> 使用率",
             history=self._history,
             stat_rows=stat_rows,
             graph_class="cpu-graph",
@@ -134,7 +134,7 @@ class CpuWidget(BaseWidget):
             main_layout = popup.layout()
             graph_container = popup._graph.parentWidget()
             graph_idx = main_layout.indexOf(graph_container)
-            util_label = QLabel("Utilization")
+            util_label = QLabel("使用率")
             util_label.setProperty("class", "graph-title")
             main_layout.insertWidget(graph_idx, util_label)
 

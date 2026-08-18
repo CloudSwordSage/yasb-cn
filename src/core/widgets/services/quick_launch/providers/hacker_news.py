@@ -83,7 +83,7 @@ class HackerNewsProvider(BaseProvider):
     name = "hacker_news"
     display_name = "Hacker News"
     icon = ICON_HACKER_NEWS
-    input_placeholder = "Search Hacker News..."
+    input_placeholder = "搜索 Hacker News..."
 
     def __init__(self, config: dict | None = None):
         super().__init__(config)
@@ -133,9 +133,9 @@ class HackerNewsProvider(BaseProvider):
         actions: list[ProviderMenuAction] = []
         data = result.action_data
         if data.get("comments_url"):
-            actions.append(ProviderMenuAction(id="open_comments", label="Open HN comments"))
+            actions.append(ProviderMenuAction(id="open_comments", label="打开 HN 评论"))
         if data.get("url"):
-            actions.append(ProviderMenuAction(id="copy_url", label="Copy URL"))
+            actions.append(ProviderMenuAction(id="copy_url", label="复制 URL"))
         return actions
 
     def execute_context_menu_action(self, action_id, result):
@@ -229,8 +229,8 @@ class HackerNewsProvider(BaseProvider):
             return self._items_to_results(items)
         return [
             ProviderResult(
-                title="Failed to load stories",
-                description="Check your internet connection and try again",
+                title="无法加载文章",
+                description="请检查网络连接后重试",
                 icon_char=ICON_HACKER_NEWS,
                 provider=self.name,
             )
@@ -256,7 +256,7 @@ class HackerNewsProvider(BaseProvider):
         for item_el in root.iter("item"):
             if cancel_event and cancel_event.is_set():
                 break
-            title = _el_text(item_el, "title") or "Untitled"
+            title = _el_text(item_el, "title") or "未命名"
             link = _el_text(item_el, "link") or ""
             description = _el_text(item_el, "description") or ""
             pub_date = _el_text(item_el, "pubDate") or ""
@@ -286,11 +286,11 @@ class HackerNewsProvider(BaseProvider):
         for item in items:
             parts: list[str] = []
             if item["points"] is not None:
-                parts.append(f"{item['points']} points")
+                parts.append(f"{item['points']} 分")
             if item["comments"] is not None:
-                parts.append(f"{item['comments']} comments")
+                parts.append(f"{item['comments']} 条评论")
             if item["creator"]:
-                parts.append(f"by {item['creator']}")
+                parts.append(f"作者：{item['creator']}")
             if item["date"]:
                 parts.append(item["date"])
             desc = " \u2502 ".join(parts)
@@ -367,12 +367,12 @@ def _format_date(pub_date: str) -> str:
             hours = delta.seconds // 3600
             if hours == 0:
                 mins = delta.seconds // 60
-                return f"{mins}m ago" if mins > 0 else "just now"
-            return f"{hours}h ago"
+                return f"{mins} 分钟前" if mins > 0 else "刚刚"
+            return f"{hours} 小时前"
         if delta.days == 1:
-            return "1 day ago"
+            return "1 天前"
         if delta.days < 30:
-            return f"{delta.days} days ago"
-        return dt.strftime("%b %d, %Y")
+            return f"{delta.days} 天前"
+        return dt.strftime("%Y 年%m月%d日")
     except Exception:
         return pub_date
