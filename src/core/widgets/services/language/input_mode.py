@@ -14,7 +14,7 @@ _SMTO_ABORTIFHUNG = 0x0002
 
 
 class InputModeMonitor(QObject):
-    """Read the foreground window's IMM32 conversion mode after WinEvents."""
+    """Poll the foreground window's IMM32 conversion mode at a low frequency."""
 
     changed = pyqtSignal(str)
 
@@ -35,6 +35,19 @@ class InputModeMonitor(QObject):
             ctypes.POINTER(ctypes.c_size_t),
         ]
         self._user32.SendMessageTimeoutW.restype = wintypes.LPARAM
+        self._mode: str | None = None
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(200)
+        self._poll_timer.timeout.connect(self._poll)
+
+    def start(self) -> None:
+        """Start monitoring and emit the initial conversion mode."""
+        self._poll()
+        self._poll_timer.start()
+
+    def close(self) -> None:
+        """Stop the conversion-mode polling timer."""
+        self._poll_timer.stop()
 
     def current(self) -> str:
         """Return the foreground window's current conversion-mode label key."""
@@ -63,15 +76,18 @@ class InputModeMonitor(QObject):
         return input_mode_key(value)
 
     def request_update(self, hwnd: int, event) -> None:
-        """Read now and once more after the IME change has settled.
+        """Read immediately after a foreground, focus, or IME event.
 
         Args:
             hwnd: Window handle supplied by WinEvent.
             event: WinEvent type supplied by the system listener.
         """
         logger.debug("input_mode: WinEvent event=%s hwnd=%s", event, hwnd)
-        self._emit_current()
-        QTimer.singleShot(75, self._emit_current)
+        self._poll()
 
-    def _emit_current(self) -> None:
-        self.changed.emit(self.current())
+    def _poll(self) -> None:
+        mode = self.current()
+        if mode != self._mode:
+            self._mode = mode
+            logger.debug("input_mode: mode changed to %s", mode)
+            self.changed.emit(mode)

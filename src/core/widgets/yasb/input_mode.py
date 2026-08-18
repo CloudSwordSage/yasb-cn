@@ -36,9 +36,10 @@ class InputModeWidget(BaseWidget):
         for event in (WinEvent.EventSystemForeground, WinEvent.EventObjectFocus, WinEvent.EventObjectIMEChange):
             self._event_service.register_event(event, self.input_mode_change)
         self.destroyed.connect(self._cleanup_events)
-        self._render(self._monitor.current())
+        self._monitor.start()
 
     def _cleanup_events(self, *_args) -> None:
+        self._monitor.close()
         for event in (WinEvent.EventSystemForeground, WinEvent.EventObjectFocus, WinEvent.EventObjectIMEChange):
             self._event_service.unregister_event(event, self.input_mode_change)
 
