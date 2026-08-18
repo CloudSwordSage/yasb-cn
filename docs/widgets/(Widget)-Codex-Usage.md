@@ -22,7 +22,7 @@ codex_usage:
 ```
 
 Use `primary` or `secondary` with `used_percent`, `window_duration_mins`, or `resets_at`.
-Missing data renders as `None` until Codex is available and signed in.
+Missing data renders as `--`. If YASB cannot find Codex on its own PATH, set `command` to the full path of `codex.cmd`, for example `"D:/nodejs/node_global/codex.cmd"`.
 
 ```css
 .codex-usage {}

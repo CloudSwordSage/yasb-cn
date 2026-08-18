@@ -4,7 +4,7 @@ from ctypes import wintypes
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from core.widgets.services.language.mode import TF_CONVERSIONMODE_NATIVE, input_mode_key
+from core.widgets.services.language.mode import callback_address, input_mode_key
 
 
 _S_OK = 0
@@ -58,7 +58,12 @@ class _CompartmentEventSink:
         self._add_ref = callback(wintypes.ULONG, ctypes.c_void_p)(lambda _this: 1)
         self._release = callback(wintypes.ULONG, ctypes.c_void_p)(lambda _this: 1)
         self._on_change = callback(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_Guid))(self._on_compartment_change)
-        self._vtable = (ctypes.c_void_p * 4)(self._query, self._add_ref, self._release, self._on_change)
+        self._vtable = (ctypes.c_void_p * 4)(
+            callback_address(self._query),
+            callback_address(self._add_ref),
+            callback_address(self._release),
+            callback_address(self._on_change),
+        )
         self._object = _SinkObject(ctypes.cast(self._vtable, ctypes.POINTER(ctypes.c_void_p)))
         self.pointer = ctypes.cast(ctypes.pointer(self._object), ctypes.c_void_p)
 

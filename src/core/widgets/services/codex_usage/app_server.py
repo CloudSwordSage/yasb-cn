@@ -1,12 +1,13 @@
 import json
+import os
 import subprocess
 import threading
 from typing import Any
 
 
 EMPTY_USAGE = {
-    "primary": {"used_percent": None, "window_duration_mins": None, "resets_at": None},
-    "secondary": {"used_percent": None, "window_duration_mins": None, "resets_at": None},
+    "primary": {"used_percent": "--", "window_duration_mins": "--", "resets_at": "--"},
+    "secondary": {"used_percent": "--", "window_duration_mins": "--", "resets_at": "--"},
 }
 
 
@@ -65,6 +66,7 @@ def read_rate_limits(command: str, timeout: int) -> dict[str, dict[str, int | fl
             text=True,
             encoding="utf-8",
             creationflags=subprocess.CREATE_NO_WINDOW,
+            env=os.environ | {"HOME": os.environ.get("HOME") or os.environ.get("USERPROFILE", "")},
         )
         assert process.stdin is not None
         assert process.stdout is not None
