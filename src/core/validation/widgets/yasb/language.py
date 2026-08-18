@@ -24,11 +24,18 @@ class LanguageCallbacksConfig(CallbacksConfig):
     on_left: str = "toggle_label"
 
 
+class InputModeLabelsConfig(CustomBaseModel):
+    native: str = "中"
+    alphanumeric: str = "英"
+    unknown: str = "?"
+
+
 class LanguageConfig(CustomBaseModel):
     label: str = "{lang[language_code]}-{lang[country_code]}"
     label_alt: str = "{lang[full_name]}"
     update_interval: int = Field(default=5, ge=1, le=3600)
     class_name: str = ""
+    input_mode_labels: InputModeLabelsConfig = InputModeLabelsConfig()
     language_menu: LanguageMenuConfig = LanguageMenuConfig()
     keybindings: list[KeybindingConfig] = []
     callbacks: LanguageCallbacksConfig = LanguageCallbacksConfig()

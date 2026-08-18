@@ -27,6 +27,7 @@ from core.utils.win32.constants import (
 )
 from core.validation.widgets.yasb.language import LanguageConfig
 from core.widgets.base import BaseWidget
+from core.widgets.services.language.input_mode import InputModeMonitor
 
 
 class LanguageWidget(BaseWidget):
@@ -62,8 +63,18 @@ class LanguageWidget(BaseWidget):
 
         # Caps Lock state
         self._caps_lock_active = False
+        self._input_mode_monitor = InputModeMonitor(self)
+        self._input_mode_monitor.changed.connect(self._on_input_mode_changed)
+        self.destroyed.connect(lambda *_: self._input_mode_monitor.close())
 
         self.start_timer()
+
+    def closeEvent(self, event):
+        self._input_mode_monitor.close()
+        super().closeEvent(event)
+
+    def _on_input_mode_changed(self, input_mode: str) -> None:
+        self._update_label()
 
     def _toggle_label(self):
         self._show_alt_label = not self._show_alt_label
@@ -452,4 +463,5 @@ class LanguageWidget(BaseWidget):
             "layout_name": layout_locale_name.value,
             "full_layout_name": full_layout_locale_name.value,
             "layout_country_name": layout_country_name.value,
+            "input_mode_label": getattr(self.config.input_mode_labels, self._input_mode_monitor.current()),
         }
