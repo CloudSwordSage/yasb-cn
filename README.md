@@ -117,4 +117,5 @@ python build.py bdist_msi
 | Widget                                                                          | Description                                                           |
 | ------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | [Input Mode](https://github.com/CloudSwordSage/yasb/wiki/(Widget)-Input-Mode)   | 显示当前活动的 Windows 输入法转换模式。                               |
+| [Terminal](https://github.com/CloudSwordSage/yasb/wiki/(Widget)-Terminal)       | 在多个终端之间切换并启动选中的终端。                                  |
 | [Codex Usage](https://github.com/CloudSwordSage/yasb/wiki/(Widget)-Codex-Usage) | 显示 ChatGPT Codex 用量(tips: 未经过详细测试, 可能不稳定, 不建议使用) |
