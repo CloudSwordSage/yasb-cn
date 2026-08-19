@@ -34,7 +34,7 @@
 ```powershell
 git clone https://github.com/amnweb/yasb.git
 cd yasb
-uv venv venv
+uv venv venv --python=python3.14
 .venv\Scripts\activate
 uv pip install .[packaging]
 cd src
