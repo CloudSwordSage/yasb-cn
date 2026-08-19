@@ -8,146 +8,113 @@
   <span>YASB Reborn</span>
 </h1>
 <p align="center">
-  <span align="center">YASB (Yet Another Status Bar) is a highly configurable status bar for Windows, written in Python, with support for many widgets, easy theming, and deep customization.</span>
+  <span align="center">YASB（Yet Another Status Bar，又一个状态栏）是一个高度可配置的 Windows 状态栏，由 Python 编写，支持许多小组件，易于主题设置，并且可以进行深度定制。</span>
+</p>
+<p align="center">
+  <span align="center">此仓库是 <a href="https://github.com/amnweb/yasb">YASB</a> 的中文本地化仓库，用于存储本地化后的代码。</span>
 </p>
 
-<h3 align="center">
-  <a href="https://github.com/amnweb/yasb/wiki/Installation">Installation</a>
-  <span> · </span>
-  <a href="https://github.com/amnweb/yasb/wiki">Documentation</a>
-  <span> · </span>
-  <a href="https://github.com/amnweb/yasb-themes">Themes</a>
-  <span> · </span>
-  <a href="https://github.com/amnweb/yasb/discussions">Discussions</a>
-  <span> · </span>
-  <a href="https://discord.gg/qkeunvBFgX">Discord</a>
-</h3>
-<br/><br/>
+## 📋 安装
 
-## 📋 Installation
-
-For detailed installation instructions and system requirements, visit the [installation docs](https://github.com/amnweb/yasb/wiki/Installation). 
-But to get started quickly, choose one of the installation methods below:
+为了快速开始，您可以选择以下安装方法之一：
 <br/><br/>
 <details open>
-<summary><strong>Download .msi from GitHub</strong></summary>
+<summary><strong>从 GitHub 下载 YASB .msi</strong></summary>
 <br/>
-Go to the <a href="https://github.com/amnweb/yasb/releases/latest">YASB GitHub releases</a>, click Assets to reveal the downloads, and choose the installer that matches your architecture and install scope. For most devices, that's the x64 per-user installer.
+请访问 <a href="https://github.com/amnweb/yasb/releases/latest">上游 YASB GitHub 发布</a>，点击资产以显示下载，选择与您的架构和安装范围匹配的安装程序。对于大多数设备，这是 x64 个人安装程序。
+<br/>
+本地化仓库的安装文件暂未构建, 准备跟上游2.0.7同步构建
 </details>
 
 <details>
-<summary><strong>WinGet</strong></summary>
+<summary><strong>源码安装</strong></summary>
 <br/>
-Download YASB from <a href="https://github.com/microsoft/winget-cli#installing-the-client">WinGet</a>. Updating YASB via winget will respect the current YASB installation scope. To install YASB, run the following command from the command line / PowerShell:
+请从源码安装 YASB。在命令行或 PowerShell 中运行以下命令：
 
-*User scope installer [default]*
 ```powershell
-winget install AmN.yasb
+git clone https://github.com/amnweb/yasb.git
+cd yasb
+uv venv venv
+.venv\Scripts\activate
+uv pip install .[packaging]
+cd src
+python build.py build
+python build.py bdist_msi
 ```
-
-*Machine-wide scope installer*
-```powershell
-winget install --scope machine AmN.yasb
-```
+最终的安装程序可以在 `dist/out/` 目录中找到。
 </details>
 
-<details>
-<summary><strong>Scoop</strong></summary>
-<br/>
-Download YASB from <a href="https://scoop.sh/">Scoop</a>. Updating YASB via Scoop will respect the current YASB installation scope. To install YASB using Scoop, run the following command from the command line / PowerShell:
-
-*Install YASB using Scoop*
-```powershell
-scoop bucket add extras
-scoop install extras/yasb
-```
-</details>
- 
-<details>
-<summary><strong>Chocolatey</strong></summary>
-<br/>
-Download YASB from <a href="https://chocolatey.org/">Chocolatey</a>. Updating YASB via Chocolatey will respect the current YASB installation scope. To install YASB using Chocolatey, run the following command from the command line / PowerShell:
-
-*Install YASB using Chocolatey*
-```powershell
-choco install yasb
-```
-</details>
- 
 ## 💻 Demo
 ![Dark Themea](https://raw.githubusercontent.com/amnweb/yasb/main/docs/assets/readme/demo-dark.jpg)
 ![Light Theme](https://raw.githubusercontent.com/amnweb/yasb/main/docs/assets/readme/demo-light.jpg)
 
 
-## 🛠️ List of currently available widgets in YASB.
+## 🛠️ 上游 YASB 中当前可用的小部件列表。
 
-| Widget | Description |
-| --- | --- |
-| [Active Windows Title](https://github.com/amnweb/yasb/wiki/(Widget)-Active-Windows-Title) | Displays the title of the currently active window. |
-| [Applications](https://github.com/amnweb/yasb/wiki/(Widget)-Applications) | Shows a list of predefined applications. |
-| [Battery](https://github.com/amnweb/yasb/wiki/(Widget)-Battery) | Displays the current battery status. |
-| [Bluetooth](https://github.com/amnweb/yasb/wiki/(Widget)-Bluetooth) | Shows the current Bluetooth status and connected devices. |
-| [Brightness](https://github.com/amnweb/yasb/wiki/(Widget)-Brightness) | Displays and change the current brightness level. |
-| [Cava](https://github.com/amnweb/yasb/wiki/(Widget)-Cava) | Displays audio visualizer using Cava. |
-| [Claude Usage](https://github.com/amnweb/yasb/wiki/(Widget)-Claude-Usage) | Shows your Claude subscription usage. |
-| [Codex Usage](https://github.com/amnweb/yasb/wiki/(Widget)-Codex-Usage) | Shows Codex ChatGPT rate-limit usage. |
-| [Copilot](https://github.com/amnweb/yasb/wiki/(Widget)-Copilot) | GitHub Copilot usage with a detailed menu showing statistics |
-| [CPU](https://github.com/amnweb/yasb/wiki/(Widget)-CPU) | Shows the current CPU usage and information. |
-| [Clock](https://github.com/amnweb/yasb/wiki/(Widget)-Clock) | Displays the current time and date, with customizable formats. |
-| [Control Center](https://github.com/amnweb/yasb/wiki/(Widget)-Control-Center) | A customizable quick-settings control center with quick actions, sliders, and media controls. |
-| [Custom](https://github.com/amnweb/yasb/wiki/(Widget)-Custom) | Create a custom widget. |
-| [Do Not Disturb](https://github.com/amnweb/yasb/wiki/(Widget)-Dnd) | Monitor and toggle Windows Focus Assist (Do Not Disturb). |
-| [Github](https://github.com/amnweb/yasb/wiki/(Widget)-Github) | Shows notifications from GitHub. |
-| [GlazeWM Binding Mode](https://github.com/amnweb/yasb/wiki/(Widget)-GlazeWM-Binding-Mode) | GlazeWM binding mode widget. |
-| [GlazeWM Tiling Direction](https://github.com/amnweb/yasb/wiki/(Widget)-GlazeWM-Tiling-Direction) | GlazeWM tiling direction widget. |
-| [GlazeWM Workspaces](https://github.com/amnweb/yasb/wiki/(Widget)-GlazeWM-Workspaces) | GlazeWM workspaces widget. |
-| [Glucose Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Glucose-Monitor) | Nightscout CGM Widget. |
-| [Grouper](https://github.com/amnweb/yasb/wiki/(Widget)-Grouper) | Groups multiple widgets together in a container. |
-| [GPU](https://github.com/amnweb/yasb/wiki/(Widget)-GPU) | Displays GPU utilization, temperature, and memory usage. |
-| [Home](https://github.com/amnweb/yasb/wiki/(Widget)-Home) | A customizable home widget menu. |
-| [Disk](https://github.com/amnweb/yasb/wiki/(Widget)-Disk) | Displays disk usage information. |
-| [Language](https://github.com/amnweb/yasb/wiki/(Widget)-Language) | Shows the current input language and allows switching between languages. |
-| [Input Mode](https://github.com/amnweb/yasb/wiki/(Widget)-Input-Mode) | Shows the active IME conversion mode. |
-| [Launchpad](https://github.com/amnweb/yasb/wiki/(Widget)-Launchpad) | A customizable launchpad for quick access to applications. |
-| [Libre Hardware Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Libre-HW-Monitor) | Connects to Libre Hardware Monitor to get sensor data. |
-| [Media](https://github.com/amnweb/yasb/wiki/(Widget)-Media) | Displays media controls and information. |
-| [Media Lite](https://github.com/amnweb/yasb/wiki/(Widget)-Media-Lite) | A vertical and minimal album-style media widget. |
-| [Memory](https://github.com/amnweb/yasb/wiki/(Widget)-Memory) | Shows current memory usage and information. |
-| [Microphone](https://github.com/amnweb/yasb/wiki/(Widget)-Microphone) | Displays the current microphone status. |
-| [Notifications](https://github.com/amnweb/yasb/wiki/(Widget)-Notifications) | Shows the number of notifications from Windows. |
-| [Notes](https://github.com/amnweb/yasb/wiki/(Widget)-Notes) | A simple notes widget that allows you to add, delete, and view notes. |
-| [OBS](https://github.com/amnweb/yasb/wiki/(Widget)-Obs) | Integrates with OBS Studio to show various streaming information. |
-| [Open Meteo](https://github.com/amnweb/yasb/wiki/(Widget)-Open-Meteo) | Displays weather information using the Open Meteo API. |
-| [Power Plan](https://github.com/amnweb/yasb/wiki/(Widget)-Power-Plan) | Displays the current power plan and allows switching between plans. |
-| [Server Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Server-Monitor) | Monitors server status. |
-| [Systray](https://github.com/amnweb/yasb/wiki/(Widget)-Systray) | Displays system tray icons. |
-| [Traffic](https://github.com/amnweb/yasb/wiki/(Widget)-Traffic) | Displays network traffic information. |
-| [Todo](https://github.com/amnweb/yasb/wiki/(Widget)-Todo) | Organizes your tasks and to-do lists. |
-| [Taskbar](https://github.com/amnweb/yasb/wiki/(Widget)-Taskbar) | A customizable taskbar for launching applications. |
-| [Pomodoro](https://github.com/amnweb/yasb/wiki/(Widget)-Pomodoro) | A Pomodoro timer widget. |
-| [Power Menu](https://github.com/amnweb/yasb/wiki/(Widget)-Power-Menu) | A menu for power options. |
-| [Quick Launch](https://github.com/amnweb/yasb/wiki/(Widget)-Quick-Launch) | A powerful and customizable quick launcher widget, supporting many different plugins. |
-| [Recycle Bin](https://github.com/amnweb/yasb/wiki/(Widget)-Recycle-Bin) | Shows the status of the recycle bin. |
-| [Update Checker](https://github.com/amnweb/yasb/wiki/(Widget)-Update-Check) | Checks for available updates using Windows Update and Winget. |
-| [Visual Studio Code](https://github.com/amnweb/yasb/wiki/(Widget)-VSCode) | Shows recently opened folders in Visual Studio Code. |
-| [Volume](https://github.com/amnweb/yasb/wiki/(Widget)-Volume) | Shows and controls the system volume. |
-| [Wallpapers](https://github.com/amnweb/yasb/wiki/(Widget)-Wallpapers) | Wallpapers manager widget. |
-| [Weather](https://github.com/amnweb/yasb/wiki/(Widget)-Weather) | Displays current weather information. |
-| [WiFi](https://github.com/amnweb/yasb/wiki/(Widget)-WiFi) | Shows the current WiFi status and available networks. |
-| [WHKD](https://github.com/amnweb/yasb/wiki/(Widget)-Whkd) | Shows the current hotkey binding mode of WHKD. |  
-| [Windows-Desktops](https://github.com/amnweb/yasb/wiki/(Widget)-Windows-Desktops) | Windows virtual desktops widget. |
-| [Window Controls](https://github.com/amnweb/yasb/wiki/(Widget)-Window-Controls) | Window Controls widget provides buttons for minimizing, maximizing/restoring, and closing the focused window. |
-| [Window Switcher](https://github.com/amnweb/yasb/wiki/(Widget)-Window-Switcher) | A fast, lightweight app switcher. |
-| [Komorebi Control](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Control) | Komorebi control widget. |
-| [Komorebi Layout](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Layout) | Shows the current layout of Komorebi. |
-| [Komorebi Stack](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Stack) | Shows windows in the current Komorebi stack. |
-| [Komorebi Workspaces](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Workspaces) | Komorebi workspaces widget. |
+| Widget                                                                                            | Description                                                                                                   |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [Active Windows Title](https://github.com/amnweb/yasb/wiki/(Widget)-Active-Windows-Title)         | Displays the title of the currently active window.                                                            |
+| [Applications](https://github.com/amnweb/yasb/wiki/(Widget)-Applications)                         | Shows a list of predefined applications.                                                                      |
+| [Battery](https://github.com/amnweb/yasb/wiki/(Widget)-Battery)                                   | Displays the current battery status.                                                                          |
+| [Bluetooth](https://github.com/amnweb/yasb/wiki/(Widget)-Bluetooth)                               | Shows the current Bluetooth status and connected devices.                                                     |
+| [Brightness](https://github.com/amnweb/yasb/wiki/(Widget)-Brightness)                             | Displays and change the current brightness level.                                                             |
+| [Cava](https://github.com/amnweb/yasb/wiki/(Widget)-Cava)                                         | Displays audio visualizer using Cava.                                                                         |
+| [Claude Usage](https://github.com/amnweb/yasb/wiki/(Widget)-Claude-Usage)                         | Shows your Claude subscription usage.                                                                         |
+| [Codex Usage](https://github.com/amnweb/yasb/wiki/(Widget)-Codex-Usage)                           | Shows Codex ChatGPT rate-limit usage.                                                                         |
+| [Copilot](https://github.com/amnweb/yasb/wiki/(Widget)-Copilot)                                   | GitHub Copilot usage with a detailed menu showing statistics                                                  |
+| [CPU](https://github.com/amnweb/yasb/wiki/(Widget)-CPU)                                           | Shows the current CPU usage and information.                                                                  |
+| [Clock](https://github.com/amnweb/yasb/wiki/(Widget)-Clock)                                       | Displays the current time and date, with customizable formats.                                                |
+| [Control Center](https://github.com/amnweb/yasb/wiki/(Widget)-Control-Center)                     | A customizable quick-settings control center with quick actions, sliders, and media controls.                 |
+| [Custom](https://github.com/amnweb/yasb/wiki/(Widget)-Custom)                                     | Create a custom widget.                                                                                       |
+| [Do Not Disturb](https://github.com/amnweb/yasb/wiki/(Widget)-Dnd)                                | Monitor and toggle Windows Focus Assist (Do Not Disturb).                                                     |
+| [Github](https://github.com/amnweb/yasb/wiki/(Widget)-Github)                                     | Shows notifications from GitHub.                                                                              |
+| [GlazeWM Binding Mode](https://github.com/amnweb/yasb/wiki/(Widget)-GlazeWM-Binding-Mode)         | GlazeWM binding mode widget.                                                                                  |
+| [GlazeWM Tiling Direction](https://github.com/amnweb/yasb/wiki/(Widget)-GlazeWM-Tiling-Direction) | GlazeWM tiling direction widget.                                                                              |
+| [GlazeWM Workspaces](https://github.com/amnweb/yasb/wiki/(Widget)-GlazeWM-Workspaces)             | GlazeWM workspaces widget.                                                                                    |
+| [Glucose Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Glucose-Monitor)                   | Nightscout CGM Widget.                                                                                        |
+| [Grouper](https://github.com/amnweb/yasb/wiki/(Widget)-Grouper)                                   | Groups multiple widgets together in a container.                                                              |
+| [GPU](https://github.com/amnweb/yasb/wiki/(Widget)-GPU)                                           | Displays GPU utilization, temperature, and memory usage.                                                      |
+| [Home](https://github.com/amnweb/yasb/wiki/(Widget)-Home)                                         | A customizable home widget menu.                                                                              |
+| [Disk](https://github.com/amnweb/yasb/wiki/(Widget)-Disk)                                         | Displays disk usage information.                                                                              |
+| [Language](https://github.com/amnweb/yasb/wiki/(Widget)-Language)                                 | Shows the current input language and allows switching between languages.                                      |
+| [Input Mode](https://github.com/amnweb/yasb/wiki/(Widget)-Input-Mode)                             | Shows the active IME conversion mode.                                                                         |
+| [Launchpad](https://github.com/amnweb/yasb/wiki/(Widget)-Launchpad)                               | A customizable launchpad for quick access to applications.                                                    |
+| [Libre Hardware Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Libre-HW-Monitor)           | Connects to Libre Hardware Monitor to get sensor data.                                                        |
+| [Media](https://github.com/amnweb/yasb/wiki/(Widget)-Media)                                       | Displays media controls and information.                                                                      |
+| [Media Lite](https://github.com/amnweb/yasb/wiki/(Widget)-Media-Lite)                             | A vertical and minimal album-style media widget.                                                              |
+| [Memory](https://github.com/amnweb/yasb/wiki/(Widget)-Memory)                                     | Shows current memory usage and information.                                                                   |
+| [Microphone](https://github.com/amnweb/yasb/wiki/(Widget)-Microphone)                             | Displays the current microphone status.                                                                       |
+| [Notifications](https://github.com/amnweb/yasb/wiki/(Widget)-Notifications)                       | Shows the number of notifications from Windows.                                                               |
+| [Notes](https://github.com/amnweb/yasb/wiki/(Widget)-Notes)                                       | A simple notes widget that allows you to add, delete, and view notes.                                         |
+| [OBS](https://github.com/amnweb/yasb/wiki/(Widget)-Obs)                                           | Integrates with OBS Studio to show various streaming information.                                             |
+| [Open Meteo](https://github.com/amnweb/yasb/wiki/(Widget)-Open-Meteo)                             | Displays weather information using the Open Meteo API.                                                        |
+| [Power Plan](https://github.com/amnweb/yasb/wiki/(Widget)-Power-Plan)                             | Displays the current power plan and allows switching between plans.                                           |
+| [Server Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Server-Monitor)                     | Monitors server status.                                                                                       |
+| [Systray](https://github.com/amnweb/yasb/wiki/(Widget)-Systray)                                   | Displays system tray icons.                                                                                   |
+| [Traffic](https://github.com/amnweb/yasb/wiki/(Widget)-Traffic)                                   | Displays network traffic information.                                                                         |
+| [Todo](https://github.com/amnweb/yasb/wiki/(Widget)-Todo)                                         | Organizes your tasks and to-do lists.                                                                         |
+| [Taskbar](https://github.com/amnweb/yasb/wiki/(Widget)-Taskbar)                                   | A customizable taskbar for launching applications.                                                            |
+| [Pomodoro](https://github.com/amnweb/yasb/wiki/(Widget)-Pomodoro)                                 | A Pomodoro timer widget.                                                                                      |
+| [Power Menu](https://github.com/amnweb/yasb/wiki/(Widget)-Power-Menu)                             | A menu for power options.                                                                                     |
+| [Quick Launch](https://github.com/amnweb/yasb/wiki/(Widget)-Quick-Launch)                         | A powerful and customizable quick launcher widget, supporting many different plugins.                         |
+| [Recycle Bin](https://github.com/amnweb/yasb/wiki/(Widget)-Recycle-Bin)                           | Shows the status of the recycle bin.                                                                          |
+| [Update Checker](https://github.com/amnweb/yasb/wiki/(Widget)-Update-Check)                       | Checks for available updates using Windows Update and Winget.                                                 |
+| [Visual Studio Code](https://github.com/amnweb/yasb/wiki/(Widget)-VSCode)                         | Shows recently opened folders in Visual Studio Code.                                                          |
+| [Volume](https://github.com/amnweb/yasb/wiki/(Widget)-Volume)                                     | Shows and controls the system volume.                                                                         |
+| [Wallpapers](https://github.com/amnweb/yasb/wiki/(Widget)-Wallpapers)                             | Wallpapers manager widget.                                                                                    |
+| [Weather](https://github.com/amnweb/yasb/wiki/(Widget)-Weather)                                   | Displays current weather information.                                                                         |
+| [WiFi](https://github.com/amnweb/yasb/wiki/(Widget)-WiFi)                                         | Shows the current WiFi status and available networks.                                                         |
+| [WHKD](https://github.com/amnweb/yasb/wiki/(Widget)-Whkd)                                         | Shows the current hotkey binding mode of WHKD.                                                                |
+| [Windows-Desktops](https://github.com/amnweb/yasb/wiki/(Widget)-Windows-Desktops)                 | Windows virtual desktops widget.                                                                              |
+| [Window Controls](https://github.com/amnweb/yasb/wiki/(Widget)-Window-Controls)                   | Window Controls widget provides buttons for minimizing, maximizing/restoring, and closing the focused window. |
+| [Window Switcher](https://github.com/amnweb/yasb/wiki/(Widget)-Window-Switcher)                   | A fast, lightweight app switcher.                                                                             |
+| [Komorebi Control](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Control)                 | Komorebi control widget.                                                                                      |
+| [Komorebi Layout](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Layout)                   | Shows the current layout of Komorebi.                                                                         |
+| [Komorebi Stack](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Stack)                     | Shows windows in the current Komorebi stack.                                                                  |
+| [Komorebi Workspaces](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Workspaces)           | Komorebi workspaces widget.                                                                                   |
 
-
-## 🤝 Contributors
-Thanks to our amazing contributors!
-
-[![YASB Contributors](https://contrib.rocks/image?repo=amnweb/yasb)](https://github.com/amnweb/yasb/graphs/contributors)
-
-## 🔑 Code Signing Policy
-Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/)
+## 本地化仓库新增小部件
+| Widget                                                                          | Description                                                           |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [Input Mode](https://github.com/CloudSwordSage/yasb/wiki/(Widget)-Input-Mode)   | 显示当前活动的 Windows 输入法转换模式。                               |
+| [Codex Usage](https://github.com/CloudSwordSage/yasb/wiki/(Widget)-Codex-Usage) | 显示 ChatGPT Codex 用量(tips: 未经过详细测试, 可能不稳定, 不建议使用) |
