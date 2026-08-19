@@ -135,6 +135,12 @@ executables = [
         copyright=f"Copyright (C) {datetime.datetime.now().year} AmN",
         target_name="yasbc",
     ),
+    Executable(
+        "core/widgets/services/language/input_mode_helper.py",
+        base="gui",
+        copyright=f"Copyright (C) {datetime.datetime.now().year} AmN",
+        target_name="yasb-input-mode-helper",
+    ),
 ]
 
 setup(

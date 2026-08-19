@@ -1,93 +1,130 @@
 import ctypes
 import logging
+import sys
+import threading
+import time
 from ctypes import wintypes
+from pathlib import Path
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
-from core.widgets.services.language.mode import format_imm_probe, input_mode_key
-
+from core.widgets.services.language.input_mode_helper import _bind_win32, _user_sid
+from core.widgets.services.language.mode import input_mode_pipe_name, mode_from_input_mode_code
 
 logger = logging.getLogger("input_mode")
-_WM_IME_CONTROL = 0x0283
-_IMC_GETCONVERSIONMODE = 0x0001
-_SMTO_ABORTIFHUNG = 0x0002
+_GENERIC_READ = 0x80000000
+_OPEN_EXISTING = 3
+_ERROR_FILE_NOT_FOUND = 2
+_ERROR_PIPE_BUSY = 231
+_ERROR_ACCESS_DENIED = 5
+_ERROR_CANCELLED = 1223
+_INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+
+class _ShellExecuteInfo(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("fMask", wintypes.ULONG),
+        ("hwnd", wintypes.HWND),
+        ("lpVerb", wintypes.LPCWSTR),
+        ("lpFile", wintypes.LPCWSTR),
+        ("lpParameters", wintypes.LPCWSTR),
+        ("lpDirectory", wintypes.LPCWSTR),
+        ("nShow", ctypes.c_int),
+        ("hInstApp", wintypes.HINSTANCE),
+        ("lpIDList", ctypes.c_void_p),
+        ("lpClass", wintypes.LPCWSTR),
+        ("hkeyClass", wintypes.HKEY),
+        ("dwHotKey", wintypes.DWORD),
+        ("hIconOrMonitor", wintypes.HANDLE),
+        ("hProcess", wintypes.HANDLE),
+    ]
+
+
+def _pipe_name() -> str:
+    kernel32, _user32, _imm32, advapi32 = _bind_win32()
+    session_id = wintypes.DWORD()
+    if not kernel32.ProcessIdToSessionId(kernel32.GetCurrentProcessId(), ctypes.byref(session_id)):
+        raise OSError(ctypes.get_last_error(), "ProcessIdToSessionId")
+    return input_mode_pipe_name(_user_sid(kernel32, advapi32), session_id.value)
 
 
 class InputModeMonitor(QObject):
-    """Poll the foreground window's IMM32 conversion mode at a low frequency."""
+    """Receive conversion-mode updates from the elevated helper process."""
 
     changed = pyqtSignal(str)
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-        self._user32 = ctypes.WinDLL("user32", use_last_error=True)
-        self._imm32 = ctypes.WinDLL("imm32", use_last_error=True)
-        self._user32.GetForegroundWindow.restype = wintypes.HWND
-        self._imm32.ImmGetDefaultIMEWnd.argtypes = [wintypes.HWND]
-        self._imm32.ImmGetDefaultIMEWnd.restype = wintypes.HWND
-        self._user32.SendMessageTimeoutW.argtypes = [
-            wintypes.HWND,
-            wintypes.UINT,
-            ctypes.c_size_t,
-            ctypes.c_ssize_t,
-            wintypes.UINT,
-            wintypes.UINT,
-            ctypes.POINTER(ctypes.c_size_t),
-        ]
-        self._user32.SendMessageTimeoutW.restype = wintypes.LPARAM
-        self._mode: str | None = None
-        self._poll_timer = QTimer(self)
-        self._poll_timer.setInterval(200)
-        self._poll_timer.timeout.connect(self._poll)
+        self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        self._shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+        self._kernel32.CreateFileW.restype = wintypes.HANDLE
+        self._kernel32.ReadFile.restype = wintypes.BOOL
+        self._kernel32.CloseHandle.restype = wintypes.BOOL
+        self._shell32.ShellExecuteExW.restype = wintypes.BOOL
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._last_launch = 0.0
+        self._elevation_denied = False
+        self._last_mode: str | None = None
 
     def start(self) -> None:
-        """Start monitoring and emit the initial conversion mode."""
-        self._poll()
-        self._poll_timer.start()
+        """Connect to, or elevate and start, the input-mode helper."""
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = threading.Thread(target=self._read_loop, name="input-mode-pipe", daemon=True)
+            self._thread.start()
 
     def close(self) -> None:
-        """Stop the conversion-mode polling timer."""
-        self._poll_timer.stop()
+        """Stop the pipe reader; the helper exits after its idle grace period."""
+        self._stop.set()
 
-    def current(self) -> str:
-        """Return the foreground window's current conversion-mode label key."""
-        hwnd = self._user32.GetForegroundWindow()
-        if not hwnd:
-            logger.debug("input_mode: foreground window unavailable")
-            return "unknown"
-        ime_window = self._imm32.ImmGetDefaultIMEWnd(hwnd)
-        if not ime_window:
-            logger.debug("input_mode: ImmGetDefaultIMEWnd hwnd=%s unavailable", hwnd)
-            return "unknown"
-        result = ctypes.c_size_t()
-        success = bool(
-            self._user32.SendMessageTimeoutW(
-                ime_window,
-                _WM_IME_CONTROL,
-                _IMC_GETCONVERSIONMODE,
-                0,
-                _SMTO_ABORTIFHUNG,
-                100,
-                ctypes.byref(result),
-            )
+    def _launch_helper(self) -> None:
+        if self._elevation_denied or time.monotonic() - self._last_launch < 3:
+            return
+        self._last_launch = time.monotonic()
+        helper = Path(sys.executable).with_name("yasb-input-mode-helper.exe")
+        file = str(helper) if getattr(sys, "frozen", False) else sys.executable
+        parameters = None if getattr(sys, "frozen", False) else "-m core.widgets.services.language.input_mode_helper"
+        directory = None if getattr(sys, "frozen", False) else str(Path(__file__).parents[4])
+        info = _ShellExecuteInfo(
+            cbSize=ctypes.sizeof(_ShellExecuteInfo),
+            lpVerb="runas",
+            lpFile=file,
+            lpParameters=parameters,
+            lpDirectory=directory,
+            nShow=0,
         )
-        value = result.value if success else None
-        logger.debug("input_mode: hwnd=%s ime_hwnd=%s %s", hwnd, ime_window, format_imm_probe(success, value))
-        return input_mode_key(value)
+        if not self._shell32.ShellExecuteExW(ctypes.byref(info)):
+            error = ctypes.get_last_error()
+            self._elevation_denied = error == _ERROR_CANCELLED
+            logger.warning("input_mode: helper elevation failed (error=%s)", error)
 
-    def request_update(self, hwnd: int, event) -> None:
-        """Read immediately after a foreground, focus, or IME event.
+    def _open_pipe(self) -> tuple[int | None, int]:
+        handle = self._kernel32.CreateFileW(_pipe_name(), _GENERIC_READ, 0, None, _OPEN_EXISTING, 0, None)
+        return (None, ctypes.get_last_error()) if handle == _INVALID_HANDLE_VALUE else (handle, 0)
 
-        Args:
-            hwnd: Window handle supplied by WinEvent.
-            event: WinEvent type supplied by the system listener.
-        """
-        logger.debug("input_mode: WinEvent event=%s hwnd=%s", event, hwnd)
-        self._poll()
-
-    def _poll(self) -> None:
-        mode = self.current()
-        if mode != self._mode:
-            self._mode = mode
-            logger.debug("input_mode: mode changed to %s", mode)
-            self.changed.emit(mode)
+    def _read_loop(self) -> None:
+        while not self._stop.is_set():
+            handle, error = self._open_pipe()
+            if handle is None:
+                if error == _ERROR_FILE_NOT_FOUND:
+                    self._launch_helper()
+                elif error == _ERROR_ACCESS_DENIED:
+                    logger.error("input_mode: pipe access denied")
+                elif error != _ERROR_PIPE_BUSY:
+                    logger.warning("input_mode: pipe connection failed (error=%s)", error)
+                self._stop.wait(0.2)
+                continue
+            try:
+                payload = ctypes.create_string_buffer(1)
+                count = wintypes.DWORD()
+                while not self._stop.is_set() and self._kernel32.ReadFile(
+                    handle, payload, 1, ctypes.byref(count), None
+                ):
+                    if count.value == 1:
+                        mode = mode_from_input_mode_code(payload.raw)
+                        if mode != self._last_mode:
+                            self._last_mode = mode
+                            self.changed.emit(mode)
+            finally:
+                self._kernel32.CloseHandle(handle)
