@@ -12,7 +12,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from pydantic import ValidationError
-from PyQt6.QtCore import QEvent
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QColor, QImage, QPainter
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
@@ -136,6 +137,29 @@ class CavaProcessManagerTests(unittest.TestCase):
         self.assertEqual(process.wait_timeouts, [2, 2])
 
 
+class CavaConfigurationTests(unittest.TestCase):
+    def test_runtime_sensitive_values_are_validated(self) -> None:
+        invalid_values = {
+            "bar_height": 0,
+            "min_bar_height": -1,
+            "bars_number": 0,
+            "output_bit_format": "32bit",
+            "sleep_timer": -1,
+            "framerate": 0,
+            "edge_fade": [10],
+        }
+
+        for field, value in invalid_values.items():
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                CavaConfig(**{field: value})
+
+        for edge_fade in (-1, [-1, 10], [10, -1]):
+            with self.subTest(edge_fade=edge_fade), self.assertRaises(ValidationError):
+                CavaConfig(edge_fade=edge_fade)
+
+        self.assertEqual(CavaConfig(edge_fade=[10, 20]).edge_fade, (10, 20))
+
+
 class CavaLifecycleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -226,6 +250,30 @@ class CavaLifecycleTests(unittest.TestCase):
         self.widget.stop_cava()
 
         self.assertEqual(process.wait_calls, 2)
+
+    def test_zero_frame_requests_repaint(self) -> None:
+        with patch.object(type(self.widget._bar_frame), "update") as update:
+            self.widget.on_samples_updated([0] * self.widget.config.bars_number)
+
+        update.assert_called_once_with()
+
+    def test_single_gradient_color_draws_in_all_paths(self) -> None:
+        self.widget.colors = [QColor("#89b4fa")]
+        self.widget.samples = [0.5] * self.widget.config.bars_number
+        image = QImage(
+            max(1, self.widget._bar_frame.width()),
+            max(1, self.widget._bar_frame.height()),
+            QImage.Format.Format_ARGB32,
+        )
+        image.fill(Qt.GlobalColor.transparent)
+
+        for method_name in ("draw_bars", "draw_bars_mirrored", "draw_waves"):
+            with self.subTest(method=method_name):
+                painter = QPainter(image)
+                try:
+                    getattr(self.widget._bar_frame, method_name)(painter)
+                finally:
+                    painter.end()
 
     def test_system_resume_requests_one_restart(self) -> None:
         event_filter = getattr(self.widget, "_system_event_filter", None)

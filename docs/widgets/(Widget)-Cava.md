@@ -7,8 +7,8 @@
 | `class_name` | string | "" | Additional CSS class names for the widget container |
 | `source` | string | "auto" | Audio input source device. Use `"auto"` for the default device, or specify a device name to capture from a specific audio device. Requires cava >= 0.10.4 with device selection support |
 | `bar_height` | integer | 20 | The height of bars in pixels |
-| `min_bar_height` | integer | 0 | The minimum height of bars in pixels |
-| `bars_number` | integer | 10 | The number of bars (0-512). 0 sets it to auto |
+| `min_bar_height` | integer | 1 | The minimum height of bars in pixels (0 or greater) |
+| `bars_number` | integer | 10 | The number of bars (1 or greater) |
 | `output_bit_format` | string | "16bit" | Binary bit format, can be '8bit' (0-255) or '16bit' (0-65530) |
 | `orientation` | string | `"bottom"` | Visual orientation of the bar. Can be `"top"` or `"bottom"`. |
 | `bar_spacing` | integer | 1 | Space between bars |
@@ -18,7 +18,7 @@
 | `sensitivity` | integer | 100 | Manual sensitivity in %. 200 means double height |
 | `lower_cutoff_freq` | integer | 50 | Lower cutoff frequencies for lowest bars |
 | `higher_cutoff_freq` | integer | 10000 | Higher cutoff frequencies for highest bars |
-| `framerate` | integer | 60 | Accepts only non-negative values |
+| `framerate` | integer | 60 | Frames per second (1 or greater) |
 | `noise_reduction` | integer | 77 | Noise reduction, 0-100. Higher = smoother but slower, lower = faster but noisier |
 | `channels` | string | "stereo" | Visual channels. Can be 'stereo' or 'mono' |
 | `mono_option` | string | "average" | Set mono to take input from 'left', 'right' or 'average' |
@@ -33,7 +33,7 @@
 | `gradient_color_3` | string | "#cba6f7" | Third gradient color in hex format |
 | `hide_empty` | boolean | false | Hide widget when no audio is playing (requires `sleep_timer` to be enabled) |
 | `bar_type`         | string  | `bars`  | Type of bar display. Can be 'bars', 'bars_mirrored', 'waves', or 'waves_mirrored'. |
-| `edge_fade` | integer or array | 0 | Apply fade effect to edges in pixels. Can be a single integer (applies to both sides) or an array `[left, right]` for separate control. 0 to disable. **Note:** When both sides have fade, each is capped to half the widget width to prevent overlap. When only one side has fade, it can use the full widget width |
+| `edge_fade` | integer or two-item array | 0 | Apply a non-negative fade width to both edges, or use `[left, right]` for separate control. 0 disables it. **Note:** When both sides have fade, each is capped to half the widget width to prevent overlap. When only one side has fade, it can use the full widget width |
 | `callbacks`         | dict    | `{'on_left': 'do_nothing', 'on_middle': 'do_nothing', 'on_right': 'reload_cava'}` | Callbacks for mouse events on the widget. |
 
 ## Example Configuration
@@ -63,7 +63,7 @@
 - **source**: Audio input source device. Set to `"auto"` (default) to use the system default audio device, or specify a device name to capture audio from a specific device. This is useful when you have multiple audio outputs and want to visualize a particular one. Requires cava >= 0.10.4 with device selection support.
 - **bar_height**: The height of bars in pixels.
 - **min_bar_height**: The minimum height of bars in pixels.
-- **bars_number**: The number of bars to display. Can be between 0 and 512. 0 sets it to auto.
+- **bars_number**: The number of bars to display. Must be at least 1.
 - **output_bit_format**: Binary bit format, can be '8bit' (0-255) or '16bit' (0-65530).
 - **orientation**: The visual orientation of the bar. Can be `'top'` (cava bars grow downwards) or `'bottom'` (cava bars grow upwards). Default is `'bottom'`.
 - **bar_spacing**: Space between bars in number of characters.
@@ -73,7 +73,7 @@
 - **sensitivity**: Manual sensitivity in %. 200 means double height.
 - **lower_cutoff_freq**: Lower cutoff frequencies for lowest bars.
 - **higher_cutoff_freq**: Higher cutoff frequencies for highest bars.
-- **framerate**: Accepts only non-negative values.
+- **framerate**: Frames per second. Must be at least 1.
 - **noise_reduction**: Noise reduction, 0-100. Higher = smoother but slower, lower = faster but noisier.
 - **channels**: Visual channels. Can be 'stereo' or 'mono'.
 - **mono_option**: Set mono to take input from 'left', 'right' or 'average'.
@@ -90,7 +90,7 @@
 - **bar_type**: Type of bar display. Can be 'bars', 'bars_mirrored', 'waves', or 'waves_mirrored'.
 - **edge_fade**: Apply fade effect to edges. Creates a smooth fade-out effect on the edges of the visualization. Can be configured in two ways:
   - **Single value** (e.g., `15`): Applies the same fade width to both left and right edges
-  - **Array format** (e.g., `[10, 20]`): Applies different fade widths - first value for left edge, second for right edge
+  - **Two-item array** (e.g., `[10, 20]`): Applies different non-negative fade widths - first value for left edge, second for right edge
   - Set to `0` or `[0, 0]` to disable. **Important:** When both sides have fade, each is automatically capped to half the widget width to prevent overlapping. When only one side has fade (e.g., `[180, 0]`), it can use the full widget width.
 - **callbacks**: A dictionary specifying the callbacks for mouse events. The keys are `on_left`, `on_middle`, and `on_right`, and the values are the names of the callback functions.
 

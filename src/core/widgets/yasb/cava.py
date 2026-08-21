@@ -1,5 +1,4 @@
 import atexit
-import ctypes
 import logging
 import os
 import re
@@ -10,6 +9,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable
+from ctypes import wintypes
 from enum import Enum
 
 from pycaw.callbacks import MMNotificationClient
@@ -61,7 +61,7 @@ class _CavaSystemEventFilter(QAbstractNativeEventFilter):
 
     def nativeEventFilter(self, _event_type, message):
         try:
-            event = ctypes.wintypes.MSG.from_address(int(message))
+            event = wintypes.MSG.from_address(int(message))
             if event.message == _WM_POWERBROADCAST and event.wParam in _POWER_RESUME_EVENTS:
                 self._on_resume("system resume")
         except (TypeError, ValueError):
@@ -510,7 +510,8 @@ class CavaBar(QFrame):
                 if self._cava_widget.config.gradient == 1 and self._cava_widget.colors:
                     gradient = QLinearGradient(0, 1, 0, 0)
                     gradient.setCoordinateMode(QLinearGradient.CoordinateMode.ObjectBoundingMode)
-                    stop_step = 1.0 / (len(self._cava_widget.colors) - 1)
+                    colors_len = len(self._cava_widget.colors)
+                    stop_step = 1.0 / (colors_len - 1) if colors_len > 1 else 1.0
                     for idx, color in enumerate(self._cava_widget.colors):
                         gradient.setColorAt(idx * stop_step, color)
 
@@ -546,7 +547,8 @@ class CavaBar(QFrame):
 
         # Precompute brushes (single gradient instance reused)
         if self._cava_widget.config.gradient == 1 and self._cava_widget.colors:
-            stop_step = 1.0 / (len(self._cava_widget.colors) - 1)
+            colors_len = len(self._cava_widget.colors)
+            stop_step = 1.0 / (colors_len - 1) if colors_len > 1 else 1.0
             gradient_upper = QLinearGradient(0, 1, 0, 0)
             gradient_upper.setCoordinateMode(QLinearGradient.CoordinateMode.ObjectBoundingMode)
             gradient_lower = QLinearGradient(0, 0, 0, 1)
@@ -604,7 +606,8 @@ class CavaBar(QFrame):
         samples = self._cava_widget.samples
 
         if self._cava_widget.config.gradient == 1 and self._cava_widget.colors:
-            stop_step = 1.0 / (len(self._cava_widget.colors) - 1)
+            colors_len = len(self._cava_widget.colors)
+            stop_step = 1.0 / (colors_len - 1) if colors_len > 1 else 1.0
             gradient = QLinearGradient(0, 1, 0, 0)
             gradient.setCoordinateMode(QLinearGradient.CoordinateMode.ObjectBoundingMode)
             for idx, color in enumerate(self._cava_widget.colors):
@@ -780,9 +783,8 @@ class CavaWidget(BaseWidget):
         self._audio_device_callback = None
 
         # Parse edge_fade parameter - support both integer and [left, right] formats
-        if isinstance(self.config.edge_fade, list) and len(self.config.edge_fade) == 2:
-            self._edge_fade_left = self.config.edge_fade[0]
-            self._edge_fade_right = self.config.edge_fade[1]
+        if isinstance(self.config.edge_fade, tuple):
+            self._edge_fade_left, self._edge_fade_right = self.config.edge_fade
         else:
             # Single value applies to both sides
             self._edge_fade_left = self.config.edge_fade
@@ -981,17 +983,17 @@ class CavaWidget(BaseWidget):
             self.samples = new_samples
         except Exception:
             return
-        if any(val != 0 for val in new_samples):
-            try:
+        try:
+            if any(val != 0 for val in new_samples):
                 if self.config.hide_empty and self.config.sleep_timer > 0:
                     if self._hide_cava_widget:
                         self.show()
                         self._hide_cava_widget = False
                     if self._hide_timer:
                         self._hide_timer.start()
-                self._bar_frame.update()
-            except Exception as e:
-                logging.error("Error updating cava widget: %s", e)
+            self._bar_frame.update()
+        except Exception as e:
+            logging.error("Error updating cava widget: %s", e)
 
     def hide_bar_frame(self) -> None:
         self.hide()
