@@ -4,7 +4,10 @@ import os
 import shutil
 import struct
 import subprocess
+import tempfile
 import threading
+from collections.abc import Callable
+from enum import Enum
 
 from PyQt6.QtCore import QPointF, QRectF, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath
@@ -13,6 +16,198 @@ from PyQt6.QtWidgets import QApplication, QFrame, QLabel
 from core.utils.system import app_data_path
 from core.validation.widgets.yasb.cava import CavaConfig
 from core.widgets.base import BaseWidget
+
+
+class CavaState(Enum):
+    """Lifecycle states for one managed Cava process."""
+
+    STOPPED = "stopped"
+    STARTING = "starting"
+    RUNNING = "running"
+    STOPPING = "stopping"
+    FAILED = "failed"
+
+
+class CavaProcessManager:
+    """Own exactly one Cava process and its reader thread."""
+
+    def __init__(
+        self,
+        config_path: str,
+        bars_number: int,
+        bit_format: str,
+        on_samples: Callable[[list[float]], None],
+        command: list[str] | None = None,
+    ) -> None:
+        """Initialize process ownership without starting Cava.
+
+        Args:
+            config_path: Path used for the generated Cava configuration.
+            bars_number: Number of values expected in each raw frame.
+            bit_format: Cava raw output format, either ``8bit`` or ``16bit``.
+            on_samples: Callback invoked for each complete normalized frame.
+            command: Optional executable command used by integration tests.
+        """
+        self._config_path = config_path
+        self._bars_number = bars_number
+        self._on_samples = on_samples
+        self._command = command or ["cava"]
+        self._byte_type, self._byte_size, self._byte_norm = (
+            ("H", 2, 65535) if bit_format == "16bit" else ("B", 1, 255)
+        )
+        self._state_lock = threading.RLock()
+        self._transition_lock = threading.Lock()
+        self._state = CavaState.STOPPED
+        self._generation = 0
+        self._process: subprocess.Popen[bytes] | None = None
+        self._thread: threading.Thread | None = None
+        self._stop_event: threading.Event | None = None
+        self._shutdown = False
+
+    @property
+    def state(self) -> CavaState:
+        """Return the current lifecycle state."""
+        with self._state_lock:
+            return self._state
+
+    @property
+    def generation(self) -> int:
+        """Return the current process generation."""
+        with self._state_lock:
+            return self._generation
+
+    def start(self, config_text: str) -> bool:
+        """Start one reader worker unless one is already active.
+
+        Args:
+            config_text: Complete Cava configuration file contents.
+
+        Returns:
+            bool: ``True`` when a worker was created, otherwise ``False``.
+        """
+        with self._transition_lock, self._state_lock:
+            if self._shutdown or self._state in {CavaState.STARTING, CavaState.RUNNING, CavaState.STOPPING}:
+                return False
+            self._generation += 1
+            generation = self._generation
+            stop_event = threading.Event()
+            self._stop_event = stop_event
+            self._state = CavaState.STARTING
+            thread = threading.Thread(
+                target=self._run,
+                args=(generation, stop_event, config_text),
+                name=f"cava-{generation}",
+                daemon=True,
+            )
+            self._thread = thread
+            thread.start()
+            return True
+
+    def stop(self, *, shutdown: bool = False) -> None:
+        """Stop and reap the owned process and worker.
+
+        Args:
+            shutdown: Permanently reject future starts when ``True``.
+        """
+        with self._transition_lock:
+            with self._state_lock:
+                self._shutdown = self._shutdown or shutdown
+                stop_event = self._stop_event
+                process = self._process
+                thread = self._thread
+                if self._state is not CavaState.STOPPED:
+                    self._state = CavaState.STOPPING
+                if stop_event is not None:
+                    stop_event.set()
+
+            if process is not None:
+                self._terminate_process(process)
+            if thread is not None and thread is not threading.current_thread():
+                thread.join()
+
+            with self._state_lock:
+                if self._thread is thread:
+                    self._thread = None
+                if self._process is process:
+                    self._process = None
+                self._stop_event = None
+                self._state = CavaState.STOPPED
+
+    @staticmethod
+    def _terminate_process(process: subprocess.Popen[bytes]) -> None:
+        if process.poll() is None:
+            try:
+                process.terminate()
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+            except OSError:
+                logging.exception("Failed to stop Cava process")
+        if process.stdout is not None:
+            try:
+                process.stdout.close()
+            except (OSError, ValueError):
+                pass
+
+    def _run(self, generation: int, stop_event: threading.Event, config_text: str) -> None:
+        process: subprocess.Popen[bytes] | None = None
+        stderr_file = tempfile.TemporaryFile()
+        try:
+            with open(self._config_path, "w") as config_file:
+                config_file.write(config_text)
+
+            if stop_event.is_set():
+                return
+            process = subprocess.Popen(
+                [*self._command, "-p", self._config_path],
+                stdout=subprocess.PIPE,
+                stderr=stderr_file,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            with self._state_lock:
+                if generation != self._generation or stop_event.is_set():
+                    stale = True
+                else:
+                    stale = False
+                    self._process = process
+                    self._state = CavaState.RUNNING
+            if stale:
+                self._terminate_process(process)
+                return
+
+            chunk = self._byte_size * self._bars_number
+            frame_format = self._byte_type * self._bars_number
+            while not stop_event.is_set():
+                if process.stdout is None:
+                    break
+                data = process.stdout.read(chunk)
+                if len(data) < chunk:
+                    break
+                with self._state_lock:
+                    if generation != self._generation or stop_event.is_set():
+                        break
+                samples = [value / self._byte_norm for value in struct.unpack(frame_format, data)]
+                self._on_samples(samples)
+        except Exception:
+            logging.exception("Error running Cava process")
+        finally:
+            if process is not None:
+                self._terminate_process(process)
+            stderr_file.close()
+            try:
+                os.unlink(self._config_path)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                logging.exception("Failed to remove Cava config %s", self._config_path)
+            with self._state_lock:
+                if generation == self._generation:
+                    if self._process is process:
+                        self._process = None
+                    if self._thread is threading.current_thread():
+                        self._thread = None
+                    self._state = CavaState.STOPPED if stop_event.is_set() else CavaState.FAILED
 
 
 class CavaBar(QFrame):
@@ -370,15 +565,14 @@ class CavaWidget(BaseWidget):
 
     _edge_fade_left: int
     _edge_fade_right: int
-    _cava_process: subprocess.Popen[bytes] | None
-    thread_cava: threading.Thread | None
+    _manager: CavaProcessManager
     foreground_color: QColor
     colors: list[QColor]
     samples: list[float]
     _instance_id: int
     _hide_cava_widget: bool
-    _stop_cava: bool
     _hide_timer: QTimer | None
+    _restart_timer: QTimer
     _bar_frame: CavaBar
 
     def __init__(self, config: CavaConfig):
@@ -388,11 +582,8 @@ class CavaWidget(BaseWidget):
         CavaWidget._instance_counter += 1
         self._instance_id = CavaWidget._instance_counter
 
-        self._cava_process = None
-        self.thread_cava = None
         self._hide_timer = None
         self._hide_cava_widget = True
-        self._stop_cava = False
 
         # Parse edge_fade parameter - support both integer and [left, right] formats
         if isinstance(self.config.edge_fade, list) and len(self.config.edge_fade) == 2:
@@ -419,6 +610,16 @@ class CavaWidget(BaseWidget):
         # Add the custom bar frame
         self._bar_frame = CavaBar(self)
         self._widget_container_layout.addWidget(self._bar_frame)
+
+        self._manager = CavaProcessManager(
+            app_data_path(f"yasb_cava_config_{self._instance_id}"),
+            self.config.bars_number,
+            self.config.output_bit_format,
+            self.samplesUpdated.emit,
+        )
+        self._restart_timer = QTimer(self)
+        self._restart_timer.setSingleShot(True)
+        self._restart_timer.timeout.connect(self.start_cava)
 
         self.register_callback("reload_cava", self._reload_cava)
 
@@ -448,10 +649,9 @@ class CavaWidget(BaseWidget):
         """Stop current cava process and start a new one"""
         try:
             self.stop_cava()
-
             self.samples = [0] * self.config.bars_number
-
-            QTimer.singleShot(500, self.start_cava)
+            self._restart_timer.stop()
+            self._restart_timer.start(500)
 
             if self.config.hide_empty and self.config.sleep_timer > 0:
                 if self._hide_timer:
@@ -462,19 +662,14 @@ class CavaWidget(BaseWidget):
             logging.error("Error reloading cava: %s", e)
 
     def stop_cava(self) -> None:
-        self._stop_cava = True
+        if hasattr(self, "_restart_timer"):
+            self._restart_timer.stop()
         self.colors.clear()
-        if self._cava_process and self._cava_process.poll() is None:
-            try:
-                self._cava_process.terminate()
-                self._cava_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                self._cava_process.kill()
-        if self.thread_cava and self.thread_cava.is_alive():
-            if threading.current_thread() != self.thread_cava:
-                self.thread_cava.join(timeout=2)
+        if hasattr(self, "_manager"):
+            self._manager.stop()
 
     def initialize_colors(self) -> None:
+        self.colors.clear()
         self.foreground_color = QColor(self.config.foreground)
         if self.config.gradient == 1:
             for color_str in [self.config.gradient_color_1, self.config.gradient_color_2, self.config.gradient_color_3]:
@@ -510,9 +705,6 @@ class CavaWidget(BaseWidget):
         self._hide_cava_widget = True
 
     def start_cava(self) -> None:
-        # Reset stop flag to allow new process to start
-        self._stop_cava = False
-
         # Build configuration file, temp config file will be created in YASB TEMP directory
         lines: list[str] = []
         lines.append("# Cava config auto-generated by YASB")
@@ -557,54 +749,4 @@ class CavaWidget(BaseWidget):
 
         self.initialize_colors()
 
-        # Determine byte type settings for reading audio data
-        if self.config.output_bit_format == "16bit":
-            bytetype, bytesize, bytenorm = ("H", 2, 65535)
-        else:
-            bytetype, bytesize, bytenorm = ("B", 1, 255)
-
-        def process_audio():
-            cava_config_path = None
-            try:
-                cava_config_path = app_data_path(f"yasb_cava_config_{self._instance_id}")
-                with open(cava_config_path, "w") as config_file:
-                    config_file.write(config_template)
-                    config_file.flush()
-
-                self._cava_process = subprocess.Popen(
-                    ["cava", "-p", cava_config_path],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-
-                chunk = bytesize * self.config.bars_number
-                fmt = bytetype * self.config.bars_number
-
-                while not self._stop_cava:
-                    try:
-                        data = self._cava_process.stdout.read(chunk)
-                        if len(data) < chunk:
-                            break
-                        samples = [val / bytenorm for val in struct.unpack(fmt, data)]
-                        self.samplesUpdated.emit(samples)
-                    except Exception as e:
-                        logging.error("Error reading cava data: %s", e)
-                        break
-
-            except Exception as e:
-                logging.error("Error starting cava process: %s", e)
-            finally:
-                # Clean up config file
-                if cava_config_path and os.path.exists(cava_config_path):
-                    try:
-                        os.unlink(cava_config_path)
-                    except:
-                        pass
-
-        # Wait for previous thread to finish if it exists
-        if self.thread_cava and self.thread_cava.is_alive():
-            self.thread_cava.join(timeout=1)
-
-        self.thread_cava = threading.Thread(target=process_audio, daemon=True)
-        self.thread_cava.start()
+        self._manager.start(config_template)
