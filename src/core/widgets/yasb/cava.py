@@ -176,6 +176,7 @@ class CavaProcessManager:
             if (
                 self._shutdown
                 or (self._thread is not None and self._thread.is_alive())
+                or (self._process is not None and self._process.poll() is None)
                 or self._state in {CavaState.STARTING, CavaState.RUNNING, CavaState.STOPPING}
             ):
                 return False
@@ -195,16 +196,20 @@ class CavaProcessManager:
             thread.start()
             return True
 
-    def stop(self, *, shutdown: bool = False, reason: str = "requested stop") -> None:
+    def stop(self, *, shutdown: bool = False, reason: str = "requested stop") -> bool:
         """Stop and reap the owned process and worker.
 
         Args:
             shutdown: Permanently reject future starts when ``True``.
             reason: Lifecycle reason included in diagnostic logs.
+
+        Returns:
+            bool: ``True`` only when both process and worker have exited.
         """
         with self._transition_lock:
             with self._state_lock:
                 self._shutdown = self._shutdown or shutdown
+                generation = self._generation
                 stop_event = self._stop_event
                 process = self._process
                 thread = self._thread
@@ -213,38 +218,64 @@ class CavaProcessManager:
                 if stop_event is not None:
                     stop_event.set()
 
+            process_stopped = True
             if process is not None:
-                logging.debug("Stopping Cava generation=%d PID=%d reason=%s", self._generation, process.pid, reason)
-                self._terminate_process(process, self._generation, reason)
+                logging.debug("Stopping Cava generation=%d PID=%d reason=%s", generation, process.pid, reason)
+                process_stopped = self._terminate_process(process, generation, reason)
             if thread is not None and thread is not threading.current_thread():
-                thread.join()
+                thread.join(timeout=3)
+            worker_stopped = thread is None or not thread.is_alive()
+            if not worker_stopped:
+                logging.error("Cava worker generation=%d failed to exit", generation)
 
             with self._state_lock:
-                if self._thread is thread:
+                if worker_stopped and self._thread is thread:
                     self._thread = None
-                if self._process is process:
+                if process_stopped and self._process is process:
                     self._process = None
-                self._stop_event = None
-                self._state = CavaState.STOPPED
+                stopped = worker_stopped and process_stopped
+                if stopped:
+                    self._stop_event = None
+                    self._state = CavaState.STOPPED
+                else:
+                    self._state = CavaState.STOPPING
+                return stopped
 
     @staticmethod
-    def _terminate_process(process: subprocess.Popen[bytes], generation: int, reason: str) -> None:
+    def _terminate_process(process: subprocess.Popen[bytes], generation: int, reason: str) -> bool:
+        """Terminate and reap a process using bounded waits.
+
+        Args:
+            process: Owned Cava child process.
+            generation: Lifecycle generation used in diagnostics.
+            reason: Lifecycle reason used in diagnostics.
+
+        Returns:
+            bool: ``True`` when the child has exited and was reaped.
+        """
+        stopped = process.poll() is not None
         if process.poll() is None:
             try:
                 logging.debug("Terminating Cava generation=%d PID=%d reason=%s", generation, process.pid, reason)
                 process.terminate()
                 process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                logging.warning("Killing Cava generation=%d PID=%d after terminate timeout", generation, process.pid)
-                process.kill()
-                process.wait()
-            except OSError:
-                logging.exception("Failed to stop Cava process")
+                stopped = True
+            except (OSError, subprocess.TimeoutExpired):
+                logging.warning("Killing Cava generation=%d PID=%d after terminate failure", generation, process.pid)
+                try:
+                    if process.poll() is None:
+                        process.kill()
+                    process.wait(timeout=2)
+                    stopped = True
+                except (OSError, subprocess.TimeoutExpired):
+                    logging.exception("Failed to kill Cava generation=%d PID=%d", generation, process.pid)
+                    stopped = False
         if process.stdout is not None:
             try:
                 process.stdout.close()
             except (OSError, ValueError):
                 pass
+        return stopped
 
     def _run(self, generation: int, stop_event: threading.Event, config_text: str) -> None:
         process: subprocess.Popen[bytes] | None = None
@@ -294,8 +325,9 @@ class CavaProcessManager:
             failure_reason = f"worker error: {error}"
             logging.exception("Error running Cava generation=%d PID=%s", generation, getattr(process, "pid", None))
         finally:
+            process_stopped = True
             if process is not None:
-                self._terminate_process(process, generation, failure_reason)
+                process_stopped = self._terminate_process(process, generation, failure_reason)
             try:
                 stderr_file.flush()
                 stderr_file.seek(max(0, stderr_file.tell() - 4096))
@@ -320,10 +352,15 @@ class CavaProcessManager:
             failure_callback = None
             with self._state_lock:
                 if generation == self._generation:
-                    if self._process is process:
+                    if process_stopped and self._process is process:
                         self._process = None
-                    self._state = CavaState.STOPPED if stop_event.is_set() else CavaState.FAILED
-                    if not stop_event.is_set() and not self._shutdown:
+                    elif not process_stopped and process is not None:
+                        self._process = process
+                    if stop_event.is_set():
+                        self._state = CavaState.STOPPED if process_stopped else CavaState.STOPPING
+                    else:
+                        self._state = CavaState.FAILED
+                    if process_stopped and not stop_event.is_set() and not self._shutdown:
                         failure_callback = self._on_failure
             if failure_callback is not None:
                 logging.warning(
@@ -834,7 +871,9 @@ class CavaWidget(BaseWidget):
     @pyqtSlot()
     def _reload_cava_on_widget_thread(self) -> None:
         try:
-            self.stop_cava()
+            if not self._stop_cava_on_widget_thread():
+                logging.error("Cava reload cancelled because the previous worker did not exit")
+                return
             self._restart_failures = 0
             self.samples = [0] * self.config.bars_number
             self._restart_timer.stop()
@@ -848,19 +887,20 @@ class CavaWidget(BaseWidget):
         except Exception as e:
             logging.error("Error reloading cava: %s", e)
 
-    def stop_cava(self) -> None:
+    def stop_cava(self) -> bool:
         if self._invoke_on_widget_thread("_stop_cava_on_widget_thread"):
-            return
-        self._stop_cava_on_widget_thread()
+            return self._manager.state is CavaState.STOPPED
+        return self._stop_cava_on_widget_thread()
 
     @pyqtSlot()
-    def _stop_cava_on_widget_thread(self) -> None:
+    def _stop_cava_on_widget_thread(self) -> bool:
         self._restart_allowed = False
         if hasattr(self, "_restart_timer"):
             self._restart_timer.stop()
         self.colors.clear()
         if hasattr(self, "_manager"):
-            self._manager.stop(reason="requested stop")
+            return self._manager.stop(reason="requested stop")
+        return True
 
     def shutdown(self, *_args) -> None:
         """Permanently stop Cava during widget or application disposal."""
@@ -908,7 +948,9 @@ class CavaWidget(BaseWidget):
     def _schedule_restart(self, reason: str) -> None:
         if self._shutdown or not self._restart_allowed or self._restart_timer.isActive():
             return
-        self._manager.stop(reason=reason)
+        if not self._manager.stop(reason=reason):
+            logging.error("Cava restart cancelled because the previous worker did not exit")
+            return
         delay = min(500 * (2**self._restart_failures), 10_000)
         self._restart_failures += 1
         logging.warning("Restarting Cava in %d ms: %s", delay, reason)

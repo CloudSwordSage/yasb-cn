@@ -17,7 +17,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
 from core.validation.widgets.yasb.cava import CavaConfig
-from core.widgets.yasb.cava import CavaProcessManager, CavaWidget, _read_cava_version
+from core.widgets.yasb.cava import CavaProcessManager, CavaState, CavaWidget, _read_cava_version
 
 
 class _BlockingStdout:
@@ -47,32 +47,93 @@ class _EofStdout:
 class _FakeProcess:
     _next_pid = 1000
 
-    def __init__(self, *, timeout_on_terminate: bool = False, eof: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_on_terminate: bool = False,
+        terminate_error: bool = False,
+        timeout_after_kill: bool = False,
+        eof: bool = False,
+    ) -> None:
         type(self)._next_pid += 1
         self.pid = type(self)._next_pid
         self._stopped = threading.Event()
         self._timeout_on_terminate = timeout_on_terminate
+        self._terminate_error = terminate_error
+        self._timeout_after_kill = timeout_after_kill
         self._killed = False
         self.stdout = _EofStdout(self._stopped) if eof else _BlockingStdout(self._stopped)
         self.wait_calls = 0
+        self.wait_timeouts: list[float | None] = []
 
     def poll(self) -> int | None:
         return 0 if self._stopped.is_set() else None
 
     def terminate(self) -> None:
+        if self._terminate_error:
+            raise OSError("terminate failed")
         if not self._timeout_on_terminate:
             self._stopped.set()
 
     def kill(self) -> None:
         self._killed = True
-        self._stopped.set()
+        if not self._timeout_after_kill:
+            self._stopped.set()
 
     def wait(self, timeout: float | None = None) -> int:
         self.wait_calls += 1
+        self.wait_timeouts.append(timeout)
         if self._timeout_on_terminate and not self._killed:
+            raise subprocess.TimeoutExpired("cava", timeout)
+        if self._timeout_after_kill and self._killed:
             raise subprocess.TimeoutExpired("cava", timeout)
         self._stopped.wait(timeout)
         return 0
+
+
+class _StuckThread:
+    def __init__(self) -> None:
+        self.join_timeout: float | None = None
+
+    def is_alive(self) -> bool:
+        return True
+
+    def join(self, timeout: float | None = None) -> None:
+        self.join_timeout = timeout
+
+
+class CavaProcessManagerTests(unittest.TestCase):
+    def test_stop_keeps_ownership_when_worker_does_not_exit(self) -> None:
+        manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None)
+        process = _FakeProcess()
+        thread = _StuckThread()
+        manager._state = CavaState.RUNNING
+        manager._generation = 1
+        manager._process = process
+        manager._thread = thread
+        manager._stop_event = threading.Event()
+
+        self.assertFalse(manager.stop())
+
+        self.assertEqual(thread.join_timeout, 3)
+        self.assertEqual(manager.state, CavaState.STOPPING)
+        self.assertFalse(manager.start(""))
+        self.assertEqual(manager.generation, 1)
+
+    def test_terminate_error_falls_back_to_kill(self) -> None:
+        process = _FakeProcess(terminate_error=True)
+
+        self.assertTrue(CavaProcessManager._terminate_process(process, 1, "test"))
+
+        self.assertTrue(process._killed)
+        self.assertEqual(process.wait_timeouts, [2])
+
+    def test_kill_wait_is_bounded_and_reports_failure(self) -> None:
+        process = _FakeProcess(timeout_on_terminate=True, timeout_after_kill=True)
+
+        self.assertFalse(CavaProcessManager._terminate_process(process, 1, "test"))
+
+        self.assertEqual(process.wait_timeouts, [2, 2])
 
 
 class CavaLifecycleTests(unittest.TestCase):
