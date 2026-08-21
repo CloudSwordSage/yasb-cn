@@ -15,7 +15,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QLabel
 
 from core.validation.widgets.yasb.cava import CavaConfig
-from core.widgets.yasb.cava import CavaWidget
+from core.widgets.yasb.cava import CavaProcessManager, CavaState, CavaWidget
 
 
 class _BlockingStdout:
@@ -119,7 +119,7 @@ class CavaLifecycleTests(unittest.TestCase):
         return condition()
 
     def test_reload_storm_starts_only_one_replacement(self) -> None:
-        for _ in range(20):
+        for _ in range(100):
             self.widget._reload_cava()
 
         QTest.qWait(700)
@@ -169,6 +169,14 @@ class CavaLifecycleTests(unittest.TestCase):
         QTest.qWait(700)
 
         self.assertEqual(len(self.processes), 2)
+
+    def test_late_failure_signal_does_not_undo_active_stop(self) -> None:
+        self.widget.stop_cava()
+
+        self.widget.restartRequested.emit("late worker failure")
+        QTest.qWait(700)
+
+        self.assertEqual(len(self.processes), 1)
 
 
 class CavaRecoveryTests(unittest.TestCase):
@@ -299,6 +307,53 @@ class CavaRecoveryTests(unittest.TestCase):
         self.assertIn(f"PID={processes[0].pid}", log)
         self.assertIn("stdout EOF", log)
         self.assertIn("WASAPI backend failed", log)
+
+
+@unittest.skipUnless(sys.platform == "win32", "Windows process integration")
+class CavaWindowsIntegrationTests(unittest.TestCase):
+    def test_real_child_stall_is_detected_and_process_is_reaped(self) -> None:
+        frame_received = threading.Event()
+        script = (
+            "import sys,time;"
+            "sys.stdout.buffer.write(bytes((64,128)));"
+            "sys.stdout.buffer.flush();"
+            "time.sleep(30)"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manager = CavaProcessManager(
+                str(Path(temp_dir) / "cava.conf"),
+                2,
+                "8bit",
+                lambda _samples: frame_received.set(),
+                command=[sys.executable, "-u", "-c", script],
+            )
+            try:
+                self.assertTrue(manager.start(""))
+                self.assertTrue(frame_received.wait(2))
+                pid = manager.process_id
+                self.assertIsNotNone(pid)
+                time.sleep(0.2)
+                self.assertTrue(manager.is_stalled(0.1))
+            finally:
+                manager.stop()
+
+        self.assertEqual(manager.state, CavaState.STOPPED)
+        self.assertFalse(self._pid_is_running(pid))
+
+    @staticmethod
+    def _pid_is_running(pid: int) -> bool:
+        process_query_limited_information = 0x1000
+        still_active = 259
+        handle = ctypes.windll.kernel32.OpenProcess(process_query_limited_information, False, pid)
+        if not handle:
+            return False
+        try:
+            exit_code = ctypes.wintypes.DWORD()
+            if not ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                return False
+            return exit_code.value == still_active
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
 
 
 if __name__ == "__main__":
