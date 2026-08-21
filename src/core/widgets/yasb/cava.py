@@ -225,6 +225,8 @@ class CavaProcessManager:
             if thread is not None and thread is not threading.current_thread():
                 thread.join(timeout=3)
             worker_stopped = thread is None or not thread.is_alive()
+            if not process_stopped and process is not None:
+                process_stopped = process.poll() is not None
             if not worker_stopped:
                 logging.error("Cava worker generation=%d failed to exit", generation)
 

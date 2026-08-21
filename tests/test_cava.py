@@ -103,6 +103,21 @@ class _StuckThread:
         self.join_timeout = timeout
 
 
+class _ExitingThread(_StuckThread):
+    def __init__(self, process: _FakeProcess) -> None:
+        super().__init__()
+        self._process = process
+        self._alive = True
+
+    def is_alive(self) -> bool:
+        return self._alive
+
+    def join(self, timeout: float | None = None) -> None:
+        super().join(timeout)
+        self._process._stopped.set()
+        self._alive = False
+
+
 class CavaProcessManagerTests(unittest.TestCase):
     def test_stop_keeps_ownership_when_worker_does_not_exit(self) -> None:
         manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None)
@@ -128,6 +143,21 @@ class CavaProcessManagerTests(unittest.TestCase):
 
         self.assertTrue(process._killed)
         self.assertEqual(process.wait_timeouts, [2])
+
+    def test_stop_accepts_process_reaped_by_exiting_worker(self) -> None:
+        manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None)
+        process = _FakeProcess()
+        manager._state = CavaState.RUNNING
+        manager._generation = 1
+        manager._process = process
+        manager._thread = _ExitingThread(process)
+        manager._stop_event = threading.Event()
+
+        with patch.object(manager, "_terminate_process", return_value=False):
+            self.assertTrue(manager.stop())
+
+        self.assertEqual(manager.state, CavaState.STOPPED)
+        self.assertIsNone(manager.process_id)
 
     def test_kill_wait_is_bounded_and_reports_failure(self) -> None:
         process = _FakeProcess(timeout_on_terminate=True, timeout_after_kill=True)
