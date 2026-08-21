@@ -7,7 +7,7 @@ import time
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -18,7 +18,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
 from core.validation.widgets.yasb.cava import CavaConfig
-from core.widgets.yasb.cava import CavaProcessManager, CavaState, CavaWidget, _read_cava_version
+from core.widgets.yasb.cava import CavaProcessManager, CavaState, CavaWidget, _make_cava_cleanup, _read_cava_version
 
 
 class _BlockingStdout:
@@ -188,6 +188,26 @@ class CavaConfigurationTests(unittest.TestCase):
                 CavaConfig(edge_fade=edge_fade)
 
         self.assertEqual(CavaConfig(edge_fade=[10, 20]).edge_fade, (10, 20))
+
+
+class CavaCleanupTests(unittest.TestCase):
+    def test_failed_stop_remains_registered_for_retry(self) -> None:
+        manager = Mock()
+        manager.stop.side_effect = [False, True]
+        app = Mock()
+        enumerator = Mock()
+        cleanup = _make_cava_cleanup(manager, app, object(), enumerator, object())
+
+        with patch("core.widgets.yasb.cava.atexit.unregister") as unregister:
+            cleanup()
+            unregister.assert_not_called()
+            cleanup()
+            cleanup()
+
+        self.assertEqual(manager.stop.call_count, 2)
+        unregister.assert_called_once_with(cleanup)
+        app.removeNativeEventFilter.assert_called_once()
+        enumerator.UnregisterEndpointNotificationCallback.assert_called_once()
 
 
 class CavaLifecycleTests(unittest.TestCase):

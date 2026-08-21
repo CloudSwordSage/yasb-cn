@@ -379,21 +379,27 @@ class CavaProcessManager:
 
 def _make_cava_cleanup(manager, app, system_event_filter, audio_device_enumerator, audio_device_callback):
     cleaned = False
+    resources_released = False
 
     def cleanup(*_args) -> None:
-        nonlocal cleaned
+        nonlocal cleaned, resources_released
         if cleaned:
+            return
+        stopped = manager.stop(shutdown=True, reason="widget disposal")
+        if not resources_released:
+            resources_released = True
+            if app is not None and system_event_filter is not None:
+                app.removeNativeEventFilter(system_event_filter)
+            if audio_device_enumerator is not None and audio_device_callback is not None:
+                try:
+                    audio_device_enumerator.UnregisterEndpointNotificationCallback(audio_device_callback)
+                except Exception:
+                    logging.warning("Unable to unregister default audio device monitor", exc_info=True)
+        if not stopped:
+            logging.error("Cava cleanup remains registered because the worker did not exit")
             return
         cleaned = True
         atexit.unregister(cleanup)
-        manager.stop(shutdown=True, reason="widget disposal")
-        if app is not None and system_event_filter is not None:
-            app.removeNativeEventFilter(system_event_filter)
-        if audio_device_enumerator is not None and audio_device_callback is not None:
-            try:
-                audio_device_enumerator.UnregisterEndpointNotificationCallback(audio_device_callback)
-            except Exception:
-                logging.warning("Unable to unregister default audio device monitor", exc_info=True)
 
     return cleanup
 
