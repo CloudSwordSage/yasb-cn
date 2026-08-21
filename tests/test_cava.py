@@ -1,3 +1,4 @@
+import ctypes
 import subprocess
 import sys
 import tempfile
@@ -11,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from pydantic import ValidationError
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QLabel
 
 from core.validation.widgets.yasb.cava import CavaConfig
 from core.widgets.yasb.cava import CavaWidget
@@ -81,23 +82,26 @@ class CavaLifecycleTests(unittest.TestCase):
         self.processes: list[_FakeProcess] = []
         self.temp_dir = tempfile.TemporaryDirectory()
         self.which_patcher = patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe")
+        self.version_patcher = patch("core.widgets.yasb.cava._read_cava_version", return_value=(1, 0, 0))
         self.path_patcher = patch(
             "core.widgets.yasb.cava.app_data_path",
             side_effect=lambda name: str(Path(self.temp_dir.name) / name),
         )
         self.popen_patcher = patch("core.widgets.yasb.cava.subprocess.Popen", side_effect=self._create_process)
         self.which_patcher.start()
+        self.version_patcher.start()
         self.path_patcher.start()
         self.popen_patcher.start()
         self.widget = CavaWidget(CavaConfig())
         self.assertTrue(self._wait_until(lambda: len(self.processes) == 1))
 
     def tearDown(self) -> None:
-        self.widget.stop_cava()
+        self.widget.shutdown()
         self.widget.close()
         self.popen_patcher.stop()
         self.path_patcher.stop()
         self.which_patcher.stop()
+        self.version_patcher.stop()
         self.temp_dir.cleanup()
 
     def _create_process(self, *_args, **_kwargs) -> _FakeProcess:
@@ -141,6 +145,31 @@ class CavaLifecycleTests(unittest.TestCase):
 
         self.assertEqual(process.wait_calls, 2)
 
+    def test_system_resume_requests_one_restart(self) -> None:
+        event_filter = getattr(self.widget, "_system_event_filter", None)
+        self.assertIsNotNone(event_filter)
+        if event_filter is None:
+            return
+        message = ctypes.wintypes.MSG()
+        message.message = 0x0218
+        message.wParam = 0x0012
+
+        event_filter.nativeEventFilter("windows_generic_MSG", ctypes.addressof(message))
+        QTest.qWait(700)
+
+        self.assertEqual(len(self.processes), 2)
+
+    def test_default_audio_device_change_requests_one_restart(self) -> None:
+        callback = getattr(self.widget, "_audio_device_callback", None)
+        self.assertIsNotNone(callback)
+        if callback is None:
+            return
+
+        callback.on_default_device_changed("eRender", 0, "eMultimedia", 1, "device-id")
+        QTest.qWait(700)
+
+        self.assertEqual(len(self.processes), 2)
+
 
 class CavaRecoveryTests(unittest.TestCase):
     @classmethod
@@ -159,6 +188,7 @@ class CavaRecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe"),
+                patch("core.widgets.yasb.cava._read_cava_version", return_value=(1, 0, 0)),
                 patch(
                     "core.widgets.yasb.cava.app_data_path",
                     side_effect=lambda name: str(Path(temp_dir) / name),
@@ -180,6 +210,7 @@ class CavaRecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe"),
+                patch("core.widgets.yasb.cava._read_cava_version", return_value=(1, 0, 0)),
                 patch(
                     "core.widgets.yasb.cava.app_data_path",
                     side_effect=lambda name: str(Path(temp_dir) / name),
@@ -201,6 +232,7 @@ class CavaRecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe"),
+                patch("core.widgets.yasb.cava._read_cava_version", return_value=(1, 0, 0)),
                 patch(
                     "core.widgets.yasb.cava.app_data_path",
                     side_effect=lambda name: str(Path(temp_dir) / name),
@@ -218,6 +250,55 @@ class CavaRecoveryTests(unittest.TestCase):
                 widget.close()
 
         self.assertEqual(len(processes), 1)
+
+    def test_old_cava_version_is_rejected_before_spawn(self) -> None:
+        processes: list[_FakeProcess] = []
+        with (
+            patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe"),
+            patch("core.widgets.yasb.cava._read_cava_version", return_value=(0, 10, 3)),
+            patch(
+                "core.widgets.yasb.cava.subprocess.Popen",
+                side_effect=lambda *_args, **_kwargs: processes.append(_FakeProcess()) or processes[-1],
+            ),
+        ):
+            widget = CavaWidget(CavaConfig())
+            QTest.qWait(50)
+            labels = " ".join(label.text() for label in widget.findChildren(QLabel))
+            widget.shutdown()
+            widget.close()
+
+        self.assertEqual(processes, [])
+        self.assertIn("0.10.4", labels)
+
+    def test_failure_log_contains_pid_reason_and_stderr(self) -> None:
+        processes: list[_FakeProcess] = []
+
+        def create_process(*_args, **kwargs) -> _FakeProcess:
+            kwargs["stderr"].write(b"WASAPI backend failed\n")
+            kwargs["stderr"].flush()
+            processes.append(_FakeProcess(eof=True))
+            return processes[-1]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe"),
+                patch("core.widgets.yasb.cava._read_cava_version", return_value=(1, 0, 0)),
+                patch(
+                    "core.widgets.yasb.cava.app_data_path",
+                    side_effect=lambda name: str(Path(temp_dir) / name),
+                ),
+                patch("core.widgets.yasb.cava.subprocess.Popen", side_effect=create_process),
+                self.assertLogs(level="DEBUG") as captured,
+            ):
+                widget = CavaWidget(CavaConfig())
+                QTest.qWait(100)
+                widget.shutdown()
+                widget.close()
+
+        log = "\n".join(captured.output)
+        self.assertIn(f"PID={processes[0].pid}", log)
+        self.assertIn("stdout EOF", log)
+        self.assertIn("WASAPI backend failed", log)
 
 
 if __name__ == "__main__":

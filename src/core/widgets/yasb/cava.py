@@ -1,6 +1,8 @@
 import atexit
+import ctypes
 import logging
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -10,13 +12,61 @@ import time
 from collections.abc import Callable
 from enum import Enum
 
-from PyQt6.QtCore import QPointF, QRectF, QTimer, pyqtSignal
+from pycaw.callbacks import MMNotificationClient
+from pycaw.pycaw import AudioUtilities
+from PyQt6.QtCore import QAbstractNativeEventFilter, QPointF, QRectF, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath
 from PyQt6.QtWidgets import QApplication, QFrame, QLabel
 
 from core.utils.system import app_data_path
 from core.validation.widgets.yasb.cava import CavaConfig
 from core.widgets.base import BaseWidget
+
+_MIN_CAVA_VERSION = (0, 10, 4)
+_WM_POWERBROADCAST = 0x0218
+_POWER_RESUME_EVENTS = {0x0006, 0x0007, 0x0012}
+
+
+def _read_cava_version(executable: str) -> tuple[int, int, int] | None:
+    try:
+        result = subprocess.run(
+            [executable, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        logging.warning("Unable to determine Cava version", exc_info=True)
+        return None
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", f"{result.stdout}\n{result.stderr}")
+    return tuple(map(int, match.groups())) if match else None
+
+
+class _CavaSystemEventFilter(QAbstractNativeEventFilter):
+    def __init__(self, on_resume: Callable[[str], None]) -> None:
+        super().__init__()
+        self._on_resume = on_resume
+
+    def nativeEventFilter(self, _event_type, message):
+        try:
+            event = ctypes.wintypes.MSG.from_address(int(message))
+            if event.message == _WM_POWERBROADCAST and event.wParam in _POWER_RESUME_EVENTS:
+                self._on_resume("system resume")
+        except (TypeError, ValueError):
+            pass
+        return False, 0
+
+
+class _CavaAudioDeviceCallback(MMNotificationClient):
+    def __init__(self, on_change: Callable[[str], None]) -> None:
+        super().__init__()
+        self._on_change = on_change
+
+    def on_default_device_changed(self, flow, _flow_id, _role, _role_id, _default_device_id):
+        if flow == "eRender":
+            self._on_change("default audio device changed")
 
 
 class CavaState(Enum):
@@ -125,11 +175,12 @@ class CavaProcessManager:
             thread.start()
             return True
 
-    def stop(self, *, shutdown: bool = False) -> None:
+    def stop(self, *, shutdown: bool = False, reason: str = "requested stop") -> None:
         """Stop and reap the owned process and worker.
 
         Args:
             shutdown: Permanently reject future starts when ``True``.
+            reason: Lifecycle reason included in diagnostic logs.
         """
         with self._transition_lock:
             with self._state_lock:
@@ -143,7 +194,8 @@ class CavaProcessManager:
                     stop_event.set()
 
             if process is not None:
-                self._terminate_process(process)
+                logging.debug("Stopping Cava generation=%d PID=%d reason=%s", self._generation, process.pid, reason)
+                self._terminate_process(process, self._generation, reason)
             if thread is not None and thread is not threading.current_thread():
                 thread.join()
 
@@ -156,12 +208,14 @@ class CavaProcessManager:
                 self._state = CavaState.STOPPED
 
     @staticmethod
-    def _terminate_process(process: subprocess.Popen[bytes]) -> None:
+    def _terminate_process(process: subprocess.Popen[bytes], generation: int, reason: str) -> None:
         if process.poll() is None:
             try:
+                logging.debug("Terminating Cava generation=%d PID=%d reason=%s", generation, process.pid, reason)
                 process.terminate()
                 process.wait(timeout=2)
             except subprocess.TimeoutExpired:
+                logging.warning("Killing Cava generation=%d PID=%d after terminate timeout", generation, process.pid)
                 process.kill()
                 process.wait()
             except OSError:
@@ -175,6 +229,7 @@ class CavaProcessManager:
     def _run(self, generation: int, stop_event: threading.Event, config_text: str) -> None:
         process: subprocess.Popen[bytes] | None = None
         stderr_file = tempfile.TemporaryFile()
+        failure_reason = "stdout EOF"
         try:
             with open(self._config_path, "w") as config_file:
                 config_file.write(config_text)
@@ -196,8 +251,9 @@ class CavaProcessManager:
                     self._state = CavaState.RUNNING
                     self._last_frame_time = time.monotonic()
             if stale:
-                self._terminate_process(process)
+                self._terminate_process(process, generation, "stale generation")
                 return
+            logging.debug("Cava generation=%d PID=%d started", generation, process.pid)
 
             chunk = self._byte_size * self._bars_number
             frame_format = self._byte_type * self._bars_number
@@ -206,6 +262,7 @@ class CavaProcessManager:
                     break
                 data = process.stdout.read(chunk)
                 if len(data) < chunk:
+                    failure_reason = f"stdout EOF (exit={process.poll()})"
                     break
                 with self._state_lock:
                     if generation != self._generation or stop_event.is_set():
@@ -213,11 +270,26 @@ class CavaProcessManager:
                     self._last_frame_time = time.monotonic()
                 samples = [value / self._byte_norm for value in struct.unpack(frame_format, data)]
                 self._on_samples(samples)
-        except Exception:
-            logging.exception("Error running Cava process")
+        except Exception as error:
+            failure_reason = f"worker error: {error}"
+            logging.exception("Error running Cava generation=%d PID=%s", generation, getattr(process, "pid", None))
         finally:
             if process is not None:
-                self._terminate_process(process)
+                self._terminate_process(process, generation, failure_reason)
+            try:
+                stderr_file.flush()
+                stderr_file.seek(max(0, stderr_file.tell() - 4096))
+                stderr_tail = stderr_file.read().decode(errors="replace")
+                stderr_tail = " | ".join(stderr_tail.splitlines()[-5:])
+            except (OSError, ValueError):
+                stderr_tail = ""
+            if stderr_tail:
+                logging.error(
+                    "Cava generation=%d PID=%s stderr: %s",
+                    generation,
+                    getattr(process, "pid", None),
+                    stderr_tail,
+                )
             stderr_file.close()
             try:
                 os.unlink(self._config_path)
@@ -236,7 +308,13 @@ class CavaProcessManager:
                     if not stop_event.is_set() and not self._shutdown:
                         failure_callback = self._on_failure
             if failure_callback is not None:
-                failure_callback("process exit or stdout EOF", generation)
+                logging.warning(
+                    "Cava generation=%d PID=%s failed: %s",
+                    generation,
+                    getattr(process, "pid", None),
+                    failure_reason,
+                )
+                failure_callback(failure_reason, generation)
 
 
 class CavaBar(QFrame):
@@ -617,6 +695,9 @@ class CavaWidget(BaseWidget):
         self._hide_cava_widget = True
         self._shutdown = False
         self._restart_failures = 0
+        self._system_event_filter = None
+        self._audio_device_enumerator = None
+        self._audio_device_callback = None
 
         # Parse edge_fade parameter - support both integer and [left, right] formats
         if isinstance(self.config.edge_fade, list) and len(self.config.edge_fade) == 2:
@@ -635,9 +716,17 @@ class CavaWidget(BaseWidget):
         self._init_container()
 
         # Check if cava is available
-        if shutil.which("cava") is None:
+        cava_executable = shutil.which("cava")
+        if cava_executable is None:
             error_label = QLabel("未安装 Cava")
             self._widget_container_layout.addWidget(error_label)
+            return
+        cava_version = _read_cava_version(cava_executable)
+        if cava_version is not None and cava_version < _MIN_CAVA_VERSION:
+            required = ".".join(map(str, _MIN_CAVA_VERSION))
+            error_label = QLabel(f"Cava 版本过低（至少需要 {required}）")
+            self._widget_container_layout.addWidget(error_label)
+            logging.error("Cava %s is unsupported; version %s or newer is required", cava_version, required)
             return
 
         # Add the custom bar frame
@@ -650,6 +739,7 @@ class CavaWidget(BaseWidget):
             self.config.output_bit_format,
             self.samplesUpdated.emit,
             lambda reason, _generation: self.restartRequested.emit(reason),
+            [cava_executable],
         )
         self._restart_timer = QTimer(self)
         self._restart_timer.setSingleShot(True)
@@ -668,6 +758,7 @@ class CavaWidget(BaseWidget):
         # Connect signal and start audio processing
         self.samplesUpdated.connect(self.on_samples_updated)
         self.restartRequested.connect(self._schedule_restart)
+        self._install_system_event_handlers()
         self.destroyed.connect(self.shutdown)
         self.start_cava()
 
@@ -706,24 +797,55 @@ class CavaWidget(BaseWidget):
             self._restart_timer.stop()
         self.colors.clear()
         if hasattr(self, "_manager"):
-            self._manager.stop()
+            self._manager.stop(reason="requested stop")
 
     def shutdown(self, *_args) -> None:
         """Permanently stop Cava during widget or application disposal."""
         if self._shutdown:
             return
         self._shutdown = True
+        atexit.unregister(self.shutdown)
         if hasattr(self, "_restart_timer"):
             self._restart_timer.stop()
         if hasattr(self, "_watchdog_timer"):
             self._watchdog_timer.stop()
         if hasattr(self, "_manager"):
-            self._manager.stop(shutdown=True)
+            self._manager.stop(shutdown=True, reason="application shutdown")
+        self._remove_system_event_handlers()
+
+    def _install_system_event_handlers(self) -> None:
+        app = QApplication.instance()
+        if app is not None:
+            self._system_event_filter = _CavaSystemEventFilter(self.restartRequested.emit)
+            app.installNativeEventFilter(self._system_event_filter)
+        if self.config.source != "auto":
+            return
+        try:
+            self._audio_device_callback = _CavaAudioDeviceCallback(self.restartRequested.emit)
+            self._audio_device_enumerator = AudioUtilities.GetDeviceEnumerator()
+            self._audio_device_enumerator.RegisterEndpointNotificationCallback(self._audio_device_callback)
+        except Exception:
+            self._audio_device_callback = None
+            self._audio_device_enumerator = None
+            logging.warning("Unable to monitor default audio device changes", exc_info=True)
+
+    def _remove_system_event_handlers(self) -> None:
+        app = QApplication.instance()
+        if app is not None and self._system_event_filter is not None:
+            app.removeNativeEventFilter(self._system_event_filter)
+        self._system_event_filter = None
+        if self._audio_device_enumerator is not None and self._audio_device_callback is not None:
+            try:
+                self._audio_device_enumerator.UnregisterEndpointNotificationCallback(self._audio_device_callback)
+            except Exception:
+                logging.warning("Unable to unregister default audio device monitor", exc_info=True)
+        self._audio_device_enumerator = None
+        self._audio_device_callback = None
 
     def _schedule_restart(self, reason: str) -> None:
         if self._shutdown or self._restart_timer.isActive():
             return
-        self._manager.stop()
+        self._manager.stop(reason=reason)
         delay = min(500 * (2**self._restart_failures), 10_000)
         self._restart_failures += 1
         logging.warning("Restarting Cava in %d ms: %s", delay, reason)
