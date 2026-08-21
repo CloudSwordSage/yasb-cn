@@ -14,7 +14,17 @@ from enum import Enum
 
 from pycaw.callbacks import MMNotificationClient
 from pycaw.pycaw import AudioUtilities
-from PyQt6.QtCore import QAbstractNativeEventFilter, QPointF, QRectF, QTimer, pyqtSignal
+from PyQt6.QtCore import (
+    QAbstractNativeEventFilter,
+    QMetaObject,
+    QPointF,
+    QRectF,
+    Qt,
+    QThread,
+    QTimer,
+    pyqtSignal,
+    pyqtSlot,
+)
 from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath
 from PyQt6.QtWidgets import QApplication, QFrame, QLabel
 
@@ -30,7 +40,7 @@ _POWER_RESUME_EVENTS = {0x0006, 0x0007, 0x0012}
 def _read_cava_version(executable: str) -> tuple[int, int, int] | None:
     try:
         result = subprocess.run(
-            [executable, "--version"],
+            [executable, "-v"],
             capture_output=True,
             text=True,
             timeout=2,
@@ -163,7 +173,11 @@ class CavaProcessManager:
             bool: ``True`` when a worker was created, otherwise ``False``.
         """
         with self._transition_lock, self._state_lock:
-            if self._shutdown or self._state in {CavaState.STARTING, CavaState.RUNNING, CavaState.STOPPING}:
+            if (
+                self._shutdown
+                or (self._thread is not None and self._thread.is_alive())
+                or self._state in {CavaState.STARTING, CavaState.RUNNING, CavaState.STOPPING}
+            ):
                 return False
             self._generation += 1
             generation = self._generation
@@ -308,8 +322,6 @@ class CavaProcessManager:
                 if generation == self._generation:
                     if self._process is process:
                         self._process = None
-                    if self._thread is threading.current_thread():
-                        self._thread = None
                     self._state = CavaState.STOPPED if stop_event.is_set() else CavaState.FAILED
                     if not stop_event.is_set() and not self._shutdown:
                         failure_callback = self._on_failure
@@ -321,6 +333,30 @@ class CavaProcessManager:
                     failure_reason,
                 )
                 failure_callback(failure_reason, generation)
+            with self._state_lock:
+                if generation == self._generation and self._thread is threading.current_thread():
+                    self._thread = None
+
+
+def _make_cava_cleanup(manager, app, system_event_filter, audio_device_enumerator, audio_device_callback):
+    cleaned = False
+
+    def cleanup(*_args) -> None:
+        nonlocal cleaned
+        if cleaned:
+            return
+        cleaned = True
+        atexit.unregister(cleanup)
+        manager.stop(shutdown=True, reason="widget disposal")
+        if app is not None and system_event_filter is not None:
+            app.removeNativeEventFilter(system_event_filter)
+        if audio_device_enumerator is not None and audio_device_callback is not None:
+            try:
+                audio_device_enumerator.UnregisterEndpointNotificationCallback(audio_device_callback)
+            except Exception:
+                logging.warning("Unable to unregister default audio device monitor", exc_info=True)
+
+    return cleanup
 
 
 class CavaBar(QFrame):
@@ -766,7 +802,14 @@ class CavaWidget(BaseWidget):
         self.samplesUpdated.connect(self.on_samples_updated)
         self.restartRequested.connect(self._schedule_restart)
         self._install_system_event_handlers()
-        self.destroyed.connect(self.shutdown)
+        self._cleanup_resources = _make_cava_cleanup(
+            self._manager,
+            QApplication.instance(),
+            self._system_event_filter,
+            self._audio_device_enumerator,
+            self._audio_device_callback,
+        )
+        self.destroyed.connect(self._cleanup_resources)
         self.start_cava()
 
         # Set up auto-hide timer for silence
@@ -780,10 +823,16 @@ class CavaWidget(BaseWidget):
 
         if QApplication.instance():
             QApplication.instance().aboutToQuit.connect(self.shutdown)
-        atexit.register(self.shutdown)
+        atexit.register(self._cleanup_resources)
 
     def _reload_cava(self):
         """Stop current cava process and start a new one"""
+        if self._invoke_on_widget_thread("_reload_cava_on_widget_thread"):
+            return
+        self._reload_cava_on_widget_thread()
+
+    @pyqtSlot()
+    def _reload_cava_on_widget_thread(self) -> None:
         try:
             self.stop_cava()
             self._restart_failures = 0
@@ -800,6 +849,12 @@ class CavaWidget(BaseWidget):
             logging.error("Error reloading cava: %s", e)
 
     def stop_cava(self) -> None:
+        if self._invoke_on_widget_thread("_stop_cava_on_widget_thread"):
+            return
+        self._stop_cava_on_widget_thread()
+
+    @pyqtSlot()
+    def _stop_cava_on_widget_thread(self) -> None:
         self._restart_allowed = False
         if hasattr(self, "_restart_timer"):
             self._restart_timer.stop()
@@ -813,14 +868,26 @@ class CavaWidget(BaseWidget):
             return
         self._shutdown = True
         self._restart_allowed = False
-        atexit.unregister(self.shutdown)
         if hasattr(self, "_restart_timer"):
             self._restart_timer.stop()
         if hasattr(self, "_watchdog_timer"):
             self._watchdog_timer.stop()
-        if hasattr(self, "_manager"):
-            self._manager.stop(shutdown=True, reason="application shutdown")
-        self._remove_system_event_handlers()
+        if hasattr(self, "_cleanup_resources"):
+            self._cleanup_resources()
+        self._system_event_filter = None
+        self._audio_device_enumerator = None
+        self._audio_device_callback = None
+
+    def closeEvent(self, event) -> None:
+        """Release process and event resources before the widget closes."""
+        self.shutdown()
+        super().closeEvent(event)
+
+    def _invoke_on_widget_thread(self, method_name: str) -> bool:
+        if QThread.currentThread() == self.thread():
+            return False
+        QMetaObject.invokeMethod(self, method_name, Qt.ConnectionType.BlockingQueuedConnection)
+        return True
 
     def _install_system_event_handlers(self) -> None:
         app = QApplication.instance()
@@ -837,19 +904,6 @@ class CavaWidget(BaseWidget):
             self._audio_device_callback = None
             self._audio_device_enumerator = None
             logging.warning("Unable to monitor default audio device changes", exc_info=True)
-
-    def _remove_system_event_handlers(self) -> None:
-        app = QApplication.instance()
-        if app is not None and self._system_event_filter is not None:
-            app.removeNativeEventFilter(self._system_event_filter)
-        self._system_event_filter = None
-        if self._audio_device_enumerator is not None and self._audio_device_callback is not None:
-            try:
-                self._audio_device_enumerator.UnregisterEndpointNotificationCallback(self._audio_device_callback)
-            except Exception:
-                logging.warning("Unable to unregister default audio device monitor", exc_info=True)
-        self._audio_device_enumerator = None
-        self._audio_device_callback = None
 
     def _schedule_restart(self, reason: str) -> None:
         if self._shutdown or not self._restart_allowed or self._restart_timer.isActive():
@@ -902,6 +956,12 @@ class CavaWidget(BaseWidget):
         self._hide_cava_widget = True
 
     def start_cava(self) -> None:
+        if self._invoke_on_widget_thread("_start_cava_on_widget_thread"):
+            return
+        self._start_cava_on_widget_thread()
+
+    @pyqtSlot()
+    def _start_cava_on_widget_thread(self) -> None:
         if self._shutdown:
             return
         self._restart_allowed = True

@@ -5,17 +5,19 @@ import tempfile
 import threading
 import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from pydantic import ValidationError
+from PyQt6.QtCore import QEvent
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication, QLabel
+from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
 from core.validation.widgets.yasb.cava import CavaConfig
-from core.widgets.yasb.cava import CavaProcessManager, CavaState, CavaWidget
+from core.widgets.yasb.cava import CavaProcessManager, CavaWidget, _read_cava_version
 
 
 class _BlockingStdout:
@@ -96,8 +98,9 @@ class CavaLifecycleTests(unittest.TestCase):
         self.assertTrue(self._wait_until(lambda: len(self.processes) == 1))
 
     def tearDown(self) -> None:
-        self.widget.shutdown()
-        self.widget.close()
+        if self.widget is not None:
+            self.widget.shutdown()
+            self.widget.close()
         self.popen_patcher.stop()
         self.path_patcher.stop()
         self.which_patcher.stop()
@@ -128,14 +131,32 @@ class CavaLifecycleTests(unittest.TestCase):
 
     def test_concurrent_start_creates_only_one_process(self) -> None:
         self.widget.stop_cava()
-        callers = [threading.Thread(target=self.widget.start_cava) for _ in range(20)]
+        manager = CavaProcessManager(
+            str(Path(self.temp_dir.name) / "manager.conf"),
+            2,
+            "8bit",
+            lambda _samples: None,
+        )
+        callers = [threading.Thread(target=manager.start, args=("",)) for _ in range(20)]
         for caller in callers:
             caller.start()
         for caller in callers:
             caller.join()
 
-        self.assertTrue(self._wait_until(lambda: len(self.processes) > 1 or self.processes[-1].poll() is None))
-        self.assertEqual(sum(process.poll() is None for process in self.processes), 1)
+        self.assertTrue(self._wait_until(lambda: manager.process_id is not None))
+        self.assertEqual(manager.generation, 1)
+        manager.stop()
+
+    def test_concurrent_reload_runs_on_widget_thread_and_debounces(self) -> None:
+        callers = [threading.Thread(target=self.widget._reload_cava) for _ in range(20)]
+        for caller in callers:
+            caller.start()
+        self.assertTrue(self._wait_until(lambda: all(not caller.is_alive() for caller in callers)))
+        for caller in callers:
+            caller.join()
+        QTest.qWait(700)
+
+        self.assertEqual(len(self.processes), 2)
 
     def test_stop_waits_after_forced_kill(self) -> None:
         process = self.processes[0]
@@ -177,6 +198,36 @@ class CavaLifecycleTests(unittest.TestCase):
         QTest.qWait(700)
 
         self.assertEqual(len(self.processes), 1)
+
+    def test_close_event_performs_final_cleanup(self) -> None:
+        process = self.processes[0]
+
+        self.widget.close()
+        QTest.qWait(50)
+
+        self.assertIsNotNone(process.poll())
+        self.assertTrue(self.widget._shutdown)
+        self.assertIsNone(self.widget._system_event_filter)
+
+    def test_delete_later_performs_final_cleanup(self) -> None:
+        process = self.processes[0]
+
+        self.widget.deleteLater()
+        QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.widget = None
+
+        self.assertIsNotNone(process.poll())
+
+    def test_parent_disposal_performs_final_cleanup(self) -> None:
+        process = self.processes[0]
+        parent = QWidget()
+        self.widget.setParent(parent)
+
+        parent.deleteLater()
+        QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.widget = None
+
+        self.assertIsNotNone(process.poll())
 
 
 class CavaRecoveryTests(unittest.TestCase):
@@ -278,6 +329,15 @@ class CavaRecoveryTests(unittest.TestCase):
         self.assertEqual(processes, [])
         self.assertIn("0.10.4", labels)
 
+    def test_version_probe_uses_documented_short_flag(self) -> None:
+        with patch(
+            "core.widgets.yasb.cava.subprocess.run",
+            return_value=subprocess.CompletedProcess(["cava", "-v"], 0, "cava 1.0.0", ""),
+        ) as run:
+            self.assertEqual(_read_cava_version("cava.exe"), (1, 0, 0))
+
+        self.assertEqual(run.call_args.args[0], ["cava.exe", "-v"])
+
     def test_failure_log_contains_pid_reason_and_stderr(self) -> None:
         processes: list[_FakeProcess] = []
 
@@ -311,34 +371,115 @@ class CavaRecoveryTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == "win32", "Windows process integration")
 class CavaWindowsIntegrationTests(unittest.TestCase):
-    def test_real_child_stall_is_detected_and_process_is_reaped(self) -> None:
-        frame_received = threading.Event()
-        script = (
-            "import sys,time;"
-            "sys.stdout.buffer.write(bytes((64,128)));"
-            "sys.stdout.buffer.flush();"
-            "time.sleep(30)"
-        )
-        with tempfile.TemporaryDirectory() as temp_dir:
-            manager = CavaProcessManager(
-                str(Path(temp_dir) / "cava.conf"),
-                2,
-                "8bit",
-                lambda _samples: frame_received.set(),
-                command=[sys.executable, "-u", "-c", script],
-            )
-            try:
-                self.assertTrue(manager.start(""))
-                self.assertTrue(frame_received.wait(2))
-                pid = manager.process_id
-                self.assertIsNotNone(pid)
-                time.sleep(0.2)
-                self.assertTrue(manager.is_stalled(0.1))
-            finally:
-                manager.stop()
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
 
-        self.assertEqual(manager.state, CavaState.STOPPED)
-        self.assertFalse(self._pid_is_running(pid))
+    def test_real_stalled_child_is_replaced_and_reaped(self) -> None:
+        script = "import sys,time;sys.stdout.buffer.write(bytes((64,128)));sys.stdout.buffer.flush();time.sleep(30)"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self._real_child_widget(temp_dir, script):
+                widget = CavaWidget(
+                    CavaConfig(
+                        source="integration-test",
+                        bars_number=2,
+                        output_bit_format="8bit",
+                        output_timeout=0.1,
+                    )
+                )
+                self.assertTrue(self._wait_until(lambda: widget._manager.process_id is not None))
+                old_pid = widget._manager.process_id
+                self.assertTrue(
+                    self._wait_until(
+                        lambda: widget._manager.generation >= 2
+                        and widget._manager.process_id is not None
+                        and widget._manager.process_id != old_pid,
+                        timeout=3,
+                    )
+                )
+                replacement_pid = widget._manager.process_id
+                self.assertFalse(self._pid_is_running(old_pid))
+                widget.close()
+
+        self.assertFalse(self._pid_is_running(replacement_pid))
+
+    def test_real_killed_child_is_replaced_and_reaped(self) -> None:
+        script = "import time;time.sleep(30)"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self._real_child_widget(temp_dir, script):
+                widget = CavaWidget(
+                    CavaConfig(source="integration-test", bars_number=2, output_bit_format="8bit", output_timeout=5)
+                )
+                self.assertTrue(self._wait_until(lambda: widget._manager.process_id is not None))
+                old_pid = widget._manager.process_id
+                self.assertTrue(self._terminate_pid(old_pid))
+                self.assertTrue(
+                    self._wait_until(
+                        lambda: widget._manager.generation >= 2
+                        and widget._manager.process_id is not None
+                        and widget._manager.process_id != old_pid,
+                        timeout=3,
+                    )
+                )
+                replacement_pid = widget._manager.process_id
+                self.assertFalse(self._pid_is_running(old_pid))
+                widget.close()
+
+        self.assertFalse(self._pid_is_running(replacement_pid))
+
+    @staticmethod
+    @contextmanager
+    def _real_child_widget(temp_dir: str, script: str):
+        original_init = CavaProcessManager.__init__
+
+        def manager_init(
+            manager,
+            config_path,
+            bars_number,
+            bit_format,
+            on_samples,
+            on_failure=None,
+            _command=None,
+        ) -> None:
+            original_init(
+                manager,
+                config_path,
+                bars_number,
+                bit_format,
+                on_samples,
+                on_failure,
+                [sys.executable, "-u", "-c", script],
+            )
+
+        with (
+            patch("core.widgets.yasb.cava.shutil.which", return_value=sys.executable),
+            patch("core.widgets.yasb.cava._read_cava_version", return_value=(1, 0, 0)),
+            patch(
+                "core.widgets.yasb.cava.app_data_path",
+                side_effect=lambda name: str(Path(temp_dir) / name),
+            ),
+            patch.object(CavaProcessManager, "__init__", new=manager_init),
+        ):
+            yield
+
+    @staticmethod
+    def _wait_until(condition, timeout: float = 2.0) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if condition():
+                return True
+            QTest.qWait(10)
+        return condition()
+
+    @staticmethod
+    def _terminate_pid(pid: int) -> bool:
+        handle = ctypes.windll.kernel32.OpenProcess(0x0001, False, pid)
+        if not handle:
+            return False
+        try:
+            return bool(ctypes.windll.kernel32.TerminateProcess(handle, 9))
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
 
     @staticmethod
     def _pid_is_running(pid: int) -> bool:
