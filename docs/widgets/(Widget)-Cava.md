@@ -14,6 +14,7 @@
 | `bar_spacing` | integer | 1 | Space between bars |
 | `bar_width` | integer | 3 | Bars' width in number of characters |
 | `sleep_timer` | integer | 0 | Seconds with no input before cava goes to sleep mode. 0 to disable |
+| `output_timeout` | float | 3.0 | Seconds without a raw frame before YASB restarts Cava. Active when `sleep_timer` is 0 |
 | `sensitivity` | integer | 100 | Manual sensitivity in %. 200 means double height |
 | `lower_cutoff_freq` | integer | 50 | Lower cutoff frequencies for lowest bars |
 | `higher_cutoff_freq` | integer | 10000 | Higher cutoff frequencies for highest bars |
@@ -68,6 +69,7 @@
 - **bar_spacing**: Space between bars in number of characters.
 - **bar_width**: Bars' width in number of characters.
 - **sleep_timer**: Seconds with no input before cava goes to sleep mode. 0 to disable.
+- **output_timeout**: Restart Cava after this many seconds without a raw frame. This watchdog is active when `sleep_timer` is `0`.
 - **sensitivity**: Manual sensitivity in %. 200 means double height.
 - **lower_cutoff_freq**: Lower cutoff frequencies for lowest bars.
 - **higher_cutoff_freq**: Higher cutoff frequencies for highest bars.

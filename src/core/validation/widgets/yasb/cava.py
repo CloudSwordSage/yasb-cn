@@ -1,5 +1,7 @@
 from typing import Literal
 
+from pydantic import Field
+
 from core.validation.widgets.base_model import (
     CallbacksConfig,
     CustomBaseModel,
@@ -22,6 +24,7 @@ class CavaConfig(CustomBaseModel):
     bar_spacing: int = 1
     bar_width: int = 3
     sleep_timer: int = 0
+    output_timeout: float = Field(default=3.0, gt=0)
     sensitivity: int = 100
     lower_cutoff_freq: int = 50
     higher_cutoff_freq: int = 10000

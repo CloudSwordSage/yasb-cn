@@ -6,6 +6,7 @@ import struct
 import subprocess
 import tempfile
 import threading
+import time
 from collections.abc import Callable
 from enum import Enum
 
@@ -37,6 +38,7 @@ class CavaProcessManager:
         bars_number: int,
         bit_format: str,
         on_samples: Callable[[list[float]], None],
+        on_failure: Callable[[str, int], None] | None = None,
         command: list[str] | None = None,
     ) -> None:
         """Initialize process ownership without starting Cava.
@@ -46,11 +48,13 @@ class CavaProcessManager:
             bars_number: Number of values expected in each raw frame.
             bit_format: Cava raw output format, either ``8bit`` or ``16bit``.
             on_samples: Callback invoked for each complete normalized frame.
+            on_failure: Callback invoked after an unexpected process failure.
             command: Optional executable command used by integration tests.
         """
         self._config_path = config_path
         self._bars_number = bars_number
         self._on_samples = on_samples
+        self._on_failure = on_failure
         self._command = command or ["cava"]
         self._byte_type, self._byte_size, self._byte_norm = (
             ("H", 2, 65535) if bit_format == "16bit" else ("B", 1, 255)
@@ -63,6 +67,7 @@ class CavaProcessManager:
         self._thread: threading.Thread | None = None
         self._stop_event: threading.Event | None = None
         self._shutdown = False
+        self._last_frame_time: float | None = None
 
     @property
     def state(self) -> CavaState:
@@ -75,6 +80,22 @@ class CavaProcessManager:
         """Return the current process generation."""
         with self._state_lock:
             return self._generation
+
+    def is_stalled(self, timeout: float) -> bool:
+        """Return whether the running process has produced no frame in time.
+
+        Args:
+            timeout: Maximum allowed seconds without a complete frame.
+
+        Returns:
+            bool: ``True`` only for a currently running stalled generation.
+        """
+        with self._state_lock:
+            return (
+                self._state is CavaState.RUNNING
+                and self._last_frame_time is not None
+                and time.monotonic() - self._last_frame_time > timeout
+            )
 
     def start(self, config_text: str) -> bool:
         """Start one reader worker unless one is already active.
@@ -92,6 +113,7 @@ class CavaProcessManager:
             generation = self._generation
             stop_event = threading.Event()
             self._stop_event = stop_event
+            self._last_frame_time = None
             self._state = CavaState.STARTING
             thread = threading.Thread(
                 target=self._run,
@@ -172,6 +194,7 @@ class CavaProcessManager:
                     stale = False
                     self._process = process
                     self._state = CavaState.RUNNING
+                    self._last_frame_time = time.monotonic()
             if stale:
                 self._terminate_process(process)
                 return
@@ -187,6 +210,7 @@ class CavaProcessManager:
                 with self._state_lock:
                     if generation != self._generation or stop_event.is_set():
                         break
+                    self._last_frame_time = time.monotonic()
                 samples = [value / self._byte_norm for value in struct.unpack(frame_format, data)]
                 self._on_samples(samples)
         except Exception:
@@ -201,6 +225,7 @@ class CavaProcessManager:
                 pass
             except OSError:
                 logging.exception("Failed to remove Cava config %s", self._config_path)
+            failure_callback = None
             with self._state_lock:
                 if generation == self._generation:
                     if self._process is process:
@@ -208,6 +233,10 @@ class CavaProcessManager:
                     if self._thread is threading.current_thread():
                         self._thread = None
                     self._state = CavaState.STOPPED if stop_event.is_set() else CavaState.FAILED
+                    if not stop_event.is_set() and not self._shutdown:
+                        failure_callback = self._on_failure
+            if failure_callback is not None:
+                failure_callback("process exit or stdout EOF", generation)
 
 
 class CavaBar(QFrame):
@@ -561,6 +590,7 @@ class CavaBar(QFrame):
 class CavaWidget(BaseWidget):
     validation_schema = CavaConfig
     samplesUpdated = pyqtSignal(list)
+    restartRequested = pyqtSignal(str)
     _instance_counter = 0  # Class variable to track instances
 
     _edge_fade_left: int
@@ -573,6 +603,7 @@ class CavaWidget(BaseWidget):
     _hide_cava_widget: bool
     _hide_timer: QTimer | None
     _restart_timer: QTimer
+    _watchdog_timer: QTimer
     _bar_frame: CavaBar
 
     def __init__(self, config: CavaConfig):
@@ -584,6 +615,8 @@ class CavaWidget(BaseWidget):
 
         self._hide_timer = None
         self._hide_cava_widget = True
+        self._shutdown = False
+        self._restart_failures = 0
 
         # Parse edge_fade parameter - support both integer and [left, right] formats
         if isinstance(self.config.edge_fade, list) and len(self.config.edge_fade) == 2:
@@ -616,10 +649,15 @@ class CavaWidget(BaseWidget):
             self.config.bars_number,
             self.config.output_bit_format,
             self.samplesUpdated.emit,
+            lambda reason, _generation: self.restartRequested.emit(reason),
         )
         self._restart_timer = QTimer(self)
         self._restart_timer.setSingleShot(True)
         self._restart_timer.timeout.connect(self.start_cava)
+        self._watchdog_timer = QTimer(self)
+        self._watchdog_timer.setInterval(250)
+        self._watchdog_timer.timeout.connect(self._check_cava_output)
+        self._watchdog_timer.start()
 
         self.register_callback("reload_cava", self._reload_cava)
 
@@ -629,7 +667,8 @@ class CavaWidget(BaseWidget):
 
         # Connect signal and start audio processing
         self.samplesUpdated.connect(self.on_samples_updated)
-        self.destroyed.connect(self.stop_cava)
+        self.restartRequested.connect(self._schedule_restart)
+        self.destroyed.connect(self.shutdown)
         self.start_cava()
 
         # Set up auto-hide timer for silence
@@ -642,13 +681,14 @@ class CavaWidget(BaseWidget):
             self._hide_timer = None
 
         if QApplication.instance():
-            QApplication.instance().aboutToQuit.connect(self.stop_cava)
-        atexit.register(self.stop_cava)
+            QApplication.instance().aboutToQuit.connect(self.shutdown)
+        atexit.register(self.shutdown)
 
     def _reload_cava(self):
         """Stop current cava process and start a new one"""
         try:
             self.stop_cava()
+            self._restart_failures = 0
             self.samples = [0] * self.config.bars_number
             self._restart_timer.stop()
             self._restart_timer.start(500)
@@ -668,6 +708,31 @@ class CavaWidget(BaseWidget):
         if hasattr(self, "_manager"):
             self._manager.stop()
 
+    def shutdown(self, *_args) -> None:
+        """Permanently stop Cava during widget or application disposal."""
+        if self._shutdown:
+            return
+        self._shutdown = True
+        if hasattr(self, "_restart_timer"):
+            self._restart_timer.stop()
+        if hasattr(self, "_watchdog_timer"):
+            self._watchdog_timer.stop()
+        if hasattr(self, "_manager"):
+            self._manager.stop(shutdown=True)
+
+    def _schedule_restart(self, reason: str) -> None:
+        if self._shutdown or self._restart_timer.isActive():
+            return
+        self._manager.stop()
+        delay = min(500 * (2**self._restart_failures), 10_000)
+        self._restart_failures += 1
+        logging.warning("Restarting Cava in %d ms: %s", delay, reason)
+        self._restart_timer.start(delay)
+
+    def _check_cava_output(self) -> None:
+        if self.config.sleep_timer == 0 and self._manager.is_stalled(self.config.output_timeout):
+            self._schedule_restart("stdout stalled")
+
     def initialize_colors(self) -> None:
         self.colors.clear()
         self.foreground_color = QColor(self.config.foreground)
@@ -684,6 +749,7 @@ class CavaWidget(BaseWidget):
                     logging.error("Error setting gradient color '%s': %s", color_str, e)
 
     def on_samples_updated(self, new_samples: list) -> None:
+        self._restart_failures = 0
         try:
             self.samples = new_samples
         except Exception:

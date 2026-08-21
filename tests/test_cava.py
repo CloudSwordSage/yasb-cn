@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from pydantic import ValidationError
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
@@ -28,16 +29,28 @@ class _BlockingStdout:
         self._stopped.set()
 
 
+class _EofStdout:
+    def __init__(self, stopped: threading.Event) -> None:
+        self._stopped = stopped
+
+    def read(self, _size: int) -> bytes:
+        self._stopped.set()
+        return b""
+
+    def close(self) -> None:
+        self._stopped.set()
+
+
 class _FakeProcess:
     _next_pid = 1000
 
-    def __init__(self, *, timeout_on_terminate: bool = False) -> None:
+    def __init__(self, *, timeout_on_terminate: bool = False, eof: bool = False) -> None:
         type(self)._next_pid += 1
         self.pid = type(self)._next_pid
         self._stopped = threading.Event()
         self._timeout_on_terminate = timeout_on_terminate
         self._killed = False
-        self.stdout = _BlockingStdout(self._stopped)
+        self.stdout = _EofStdout(self._stopped) if eof else _BlockingStdout(self._stopped)
         self.wait_calls = 0
 
     def poll(self) -> int | None:
@@ -127,6 +140,84 @@ class CavaLifecycleTests(unittest.TestCase):
         self.widget.stop_cava()
 
         self.assertEqual(process.wait_calls, 2)
+
+
+class CavaRecoveryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_accepts_positive_output_timeout(self) -> None:
+        try:
+            config = CavaConfig(output_timeout=0.1)
+        except ValidationError as error:
+            self.fail(f"output_timeout should be configurable: {error}")
+        self.assertEqual(config.output_timeout, 0.1)
+
+    def test_unexpected_exit_respawns_cava(self) -> None:
+        processes: list[_FakeProcess] = []
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe"),
+                patch(
+                    "core.widgets.yasb.cava.app_data_path",
+                    side_effect=lambda name: str(Path(temp_dir) / name),
+                ),
+                patch(
+                    "core.widgets.yasb.cava.subprocess.Popen",
+                    side_effect=lambda *_args, **_kwargs: processes.append(_FakeProcess(eof=True)) or processes[-1],
+                ),
+            ):
+                widget = CavaWidget(CavaConfig())
+                QTest.qWait(1200)
+                widget.stop_cava()
+                widget.close()
+
+        self.assertGreaterEqual(len(processes), 2)
+
+    def test_stalled_stdout_respawns_cava(self) -> None:
+        processes: list[_FakeProcess] = []
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe"),
+                patch(
+                    "core.widgets.yasb.cava.app_data_path",
+                    side_effect=lambda name: str(Path(temp_dir) / name),
+                ),
+                patch(
+                    "core.widgets.yasb.cava.subprocess.Popen",
+                    side_effect=lambda *_args, **_kwargs: processes.append(_FakeProcess()) or processes[-1],
+                ),
+            ):
+                widget = CavaWidget(CavaConfig(output_timeout=0.1))
+                QTest.qWait(900)
+                widget.shutdown()
+                widget.close()
+
+        self.assertGreaterEqual(len(processes), 2)
+
+    def test_active_stop_does_not_respawn_cava(self) -> None:
+        processes: list[_FakeProcess] = []
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch("core.widgets.yasb.cava.shutil.which", return_value="cava.exe"),
+                patch(
+                    "core.widgets.yasb.cava.app_data_path",
+                    side_effect=lambda name: str(Path(temp_dir) / name),
+                ),
+                patch(
+                    "core.widgets.yasb.cava.subprocess.Popen",
+                    side_effect=lambda *_args, **_kwargs: processes.append(_FakeProcess()) or processes[-1],
+                ),
+            ):
+                widget = CavaWidget(CavaConfig(output_timeout=0.1))
+                QTest.qWait(50)
+                widget.stop_cava()
+                QTest.qWait(400)
+                widget.shutdown()
+                widget.close()
+
+        self.assertEqual(len(processes), 1)
 
 
 if __name__ == "__main__":
