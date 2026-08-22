@@ -359,12 +359,28 @@ class CavaProcessManager:
             process_stopped = True
             if process is not None:
                 logging.debug("Stopping Cava generation=%d PID=%d reason=%s", generation, process.pid, reason)
-                process_stopped = self._terminate_process(process, generation, reason)
+                if process.poll() is None:
+                    try:
+                        logging.debug("Terminating Cava generation=%d PID=%d reason=%s", generation, process.pid, reason)
+                        process.terminate()
+                    except OSError:
+                        logging.warning("Killing Cava generation=%d PID=%d after terminate failure", generation, process.pid)
+                        try:
+                            process.kill()
+                        except OSError:
+                            logging.exception("Failed to kill Cava generation=%d PID=%d", generation, process.pid)
             if thread is not None and thread is not threading.current_thread():
                 thread.join(timeout=3)
+                if thread.is_alive() and process is not None and process.poll() is None:
+                    logging.warning("Killing Cava generation=%d PID=%d after worker timeout", generation, process.pid)
+                    try:
+                        process.kill()
+                    except OSError:
+                        logging.exception("Failed to kill Cava generation=%d PID=%d", generation, process.pid)
+                    thread.join(timeout=2)
             worker_stopped = thread is None or not thread.is_alive()
-            if not process_stopped and process is not None:
-                process_stopped = process.poll() is not None
+            if process is not None:
+                process_stopped = thread is not None and worker_stopped and process.poll() is not None
             if not worker_stopped:
                 logging.error("Cava worker generation=%d failed to exit", generation)
 
@@ -382,34 +398,44 @@ class CavaProcessManager:
                 return stopped
 
     @staticmethod
-    def _terminate_process(process: subprocess.Popen[bytes], generation: int, reason: str) -> bool:
-        """Terminate and reap a process using bounded waits.
+    def _reap_process(
+        process: subprocess.Popen[bytes], generation: int, reason: str, *, request_termination: bool = True
+    ) -> bool:
+        """Reap a process using bounded waits from its worker thread.
 
         Args:
             process: Owned Cava child process.
             generation: Lifecycle generation used in diagnostics.
             reason: Lifecycle reason used in diagnostics.
+            request_termination: Terminate the process before waiting when ``True``.
 
         Returns:
             bool: ``True`` when the child has exited and was reaped.
         """
-        stopped = process.poll() is not None
-        if process.poll() is None:
+        stopped = False
+        if request_termination and process.poll() is None:
             try:
                 logging.debug("Terminating Cava generation=%d PID=%d reason=%s", generation, process.pid, reason)
                 process.terminate()
+            except OSError:
+                logging.warning("Killing Cava generation=%d PID=%d after terminate failure", generation, process.pid)
+                try:
+                    process.kill()
+                except OSError:
+                    logging.exception("Failed to kill Cava generation=%d PID=%d", generation, process.pid)
+        try:
+            process.wait(timeout=2)
+            stopped = True
+        except (OSError, subprocess.TimeoutExpired):
+            logging.warning("Killing Cava generation=%d PID=%d after wait failure", generation, process.pid)
+            try:
+                if process.poll() is None:
+                    process.kill()
                 process.wait(timeout=2)
                 stopped = True
             except (OSError, subprocess.TimeoutExpired):
-                logging.warning("Killing Cava generation=%d PID=%d after terminate failure", generation, process.pid)
-                try:
-                    if process.poll() is None:
-                        process.kill()
-                    process.wait(timeout=2)
-                    stopped = True
-                except (OSError, subprocess.TimeoutExpired):
-                    logging.exception("Failed to kill Cava generation=%d PID=%d", generation, process.pid)
-                    stopped = False
+                logging.exception("Failed to kill Cava generation=%d PID=%d", generation, process.pid)
+                stopped = False
         if process.stdout is not None:
             try:
                 process.stdout.close()
@@ -442,7 +468,7 @@ class CavaProcessManager:
                     self._state = CavaState.RUNNING
                     self._last_frame_time = time.monotonic()
             if stale:
-                self._terminate_process(process, generation, "stale generation")
+                failure_reason = "stale generation"
                 return
             logging.debug("Cava generation=%d PID=%d started", generation, process.pid)
 
@@ -468,7 +494,12 @@ class CavaProcessManager:
         finally:
             process_stopped = True
             if process is not None:
-                process_stopped = self._terminate_process(process, generation, failure_reason)
+                process_stopped = self._reap_process(
+                    process,
+                    generation,
+                    failure_reason,
+                    request_termination=not stop_event.is_set(),
+                )
             try:
                 stderr_file.flush()
                 stderr_file.seek(max(0, stderr_file.tell() - 4096))

@@ -74,6 +74,7 @@ class _FakeProcess:
         self.stdout = _EofStdout(self._stopped) if eof else _BlockingStdout(self._stopped)
         self.wait_calls = 0
         self.wait_timeouts: list[float | None] = []
+        self.wait_threads: list[str] = []
 
     def poll(self) -> int | None:
         return 0 if self._stopped.is_set() else None
@@ -92,6 +93,7 @@ class _FakeProcess:
     def wait(self, timeout: float | None = None) -> int:
         self.wait_calls += 1
         self.wait_timeouts.append(timeout)
+        self.wait_threads.append(threading.current_thread().name)
         if self._timeout_on_terminate and not self._killed:
             raise subprocess.TimeoutExpired("cava", timeout)
         if self._timeout_after_kill and self._killed:
@@ -127,6 +129,19 @@ class _ExitingThread(_StuckThread):
 
 
 class CavaProcessManagerTests(unittest.TestCase):
+    def test_worker_is_the_only_process_reaper(self) -> None:
+        process = _FakeProcess()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manager = CavaProcessManager(str(Path(temp_dir) / "cava.conf"), 2, "8bit", lambda _samples: None)
+            with patch("core.widgets.yasb.cava.subprocess.Popen", return_value=process):
+                self.assertTrue(manager.start(""))
+                deadline = time.monotonic() + 1
+                while manager.process_id is None and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(manager.stop())
+
+        self.assertEqual(process.wait_threads, ["cava-1"])
+
     def test_signal_health_requires_sustained_system_audio_mismatch(self) -> None:
         manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None, cava_peak_threshold=0.1)
         manager._state = CavaState.RUNNING
@@ -171,7 +186,7 @@ class CavaProcessManagerTests(unittest.TestCase):
     def test_terminate_error_falls_back_to_kill(self) -> None:
         process = _FakeProcess(terminate_error=True)
 
-        self.assertTrue(CavaProcessManager._terminate_process(process, 1, "test"))
+        self.assertTrue(CavaProcessManager._reap_process(process, 1, "test"))
 
         self.assertTrue(process._killed)
         self.assertEqual(process.wait_timeouts, [2])
@@ -185,7 +200,7 @@ class CavaProcessManagerTests(unittest.TestCase):
         manager._thread = _ExitingThread(process)
         manager._stop_event = threading.Event()
 
-        with patch.object(manager, "_terminate_process", return_value=False):
+        with patch.object(manager, "_reap_process", return_value=False):
             self.assertTrue(manager.stop())
 
         self.assertEqual(manager.state, CavaState.STOPPED)
@@ -194,7 +209,7 @@ class CavaProcessManagerTests(unittest.TestCase):
     def test_kill_wait_is_bounded_and_reports_failure(self) -> None:
         process = _FakeProcess(timeout_on_terminate=True, timeout_after_kill=True)
 
-        self.assertFalse(CavaProcessManager._terminate_process(process, 1, "test"))
+        self.assertFalse(CavaProcessManager._reap_process(process, 1, "test"))
 
         self.assertEqual(process.wait_timeouts, [2, 2])
 
@@ -362,7 +377,7 @@ class CavaLifecycleTests(unittest.TestCase):
 
         self.widget.stop_cava()
 
-        self.assertEqual(process.wait_calls, 2)
+        self.assertEqual(process.wait_threads, ["cava-1"])
 
     def test_zero_frame_requests_repaint(self) -> None:
         with patch.object(type(self.widget._bar_frame), "update") as update:
