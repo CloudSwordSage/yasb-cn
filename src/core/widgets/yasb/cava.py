@@ -12,8 +12,9 @@ from collections.abc import Callable
 from ctypes import wintypes
 from enum import Enum
 
+from comtypes import CLSCTX_ALL
 from pycaw.callbacks import MMNotificationClient
-from pycaw.pycaw import AudioUtilities
+from pycaw.pycaw import AudioUtilities, IAudioMeterInformation
 from PyQt6.QtCore import (
     QAbstractNativeEventFilter,
     QMetaObject,
@@ -77,6 +78,46 @@ class _CavaAudioDeviceCallback(MMNotificationClient):
     def on_default_device_changed(self, flow, _flow_id, _role, _role_id, _default_device_id):
         if flow == "eRender":
             self._on_change("default audio device changed")
+
+
+class _EndpointPeakMeter:
+    """Read the current Windows default render endpoint peak."""
+
+    def __init__(self) -> None:
+        self._meter = None
+
+    def refresh(self) -> bool:
+        """Bind to the current default render endpoint.
+
+        Returns:
+            bool: ``True`` when a meter interface is available.
+        """
+        self._meter = None
+        try:
+            speakers = AudioUtilities.GetSpeakers()
+            if speakers is None:
+                return False
+            interface = speakers._dev.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None)
+            self._meter = interface.QueryInterface(IAudioMeterInformation)
+            return True
+        except Exception:
+            logging.warning("Unable to bind default audio endpoint meter", exc_info=True)
+            return False
+
+    def peak(self) -> float | None:
+        """Return the endpoint peak, or ``None`` when the meter is unavailable.
+
+        Returns:
+            float | None: Current normalized peak value.
+        """
+        if self._meter is None and not self.refresh():
+            return None
+        try:
+            return float(self._meter.GetPeakValue())
+        except Exception:
+            self._meter = None
+            logging.warning("Unable to read default audio endpoint peak", exc_info=True)
+            return None
 
 
 class CavaState(Enum):
@@ -845,6 +886,7 @@ class CavaWidget(BaseWidget):
     validation_schema = CavaConfig
     samplesUpdated = pyqtSignal(list)
     restartRequested = pyqtSignal(str)
+    endpointChanged = pyqtSignal(str)
     _instance_counter = 0  # Class variable to track instances
 
     _edge_fade_left: int
@@ -875,6 +917,8 @@ class CavaWidget(BaseWidget):
         self._system_event_filter = None
         self._audio_device_enumerator = None
         self._audio_device_callback = None
+        self._peak_meter = _EndpointPeakMeter()
+        self._last_signal_log_time = 0.0
 
         # Parse edge_fade parameter - support both integer and [left, right] formats
         if isinstance(self.config.edge_fade, tuple):
@@ -916,6 +960,7 @@ class CavaWidget(BaseWidget):
             self.samplesUpdated.emit,
             lambda reason, _generation: self.restartRequested.emit(reason),
             [cava_executable],
+            self.config.cava_peak_threshold,
         )
         self._restart_timer = QTimer(self)
         self._restart_timer.setSingleShot(True)
@@ -934,6 +979,7 @@ class CavaWidget(BaseWidget):
         # Connect signal and start audio processing
         self.samplesUpdated.connect(self.on_samples_updated)
         self.restartRequested.connect(self._schedule_restart)
+        self.endpointChanged.connect(self._schedule_restart)
         self._install_system_event_handlers()
         self._cleanup_resources = _make_cava_cleanup(
             self._manager,
@@ -970,7 +1016,6 @@ class CavaWidget(BaseWidget):
             if not self._stop_cava_on_widget_thread():
                 logging.error("Cava reload cancelled because the previous worker did not exit")
                 return
-            self._restart_failures = 0
             self.samples = [0] * self.config.bars_number
             self._restart_timer.stop()
             self._restart_timer.start(500)
@@ -1028,12 +1073,12 @@ class CavaWidget(BaseWidget):
     def _install_system_event_handlers(self) -> None:
         app = QApplication.instance()
         if app is not None:
-            self._system_event_filter = _CavaSystemEventFilter(self.restartRequested.emit)
+            self._system_event_filter = _CavaSystemEventFilter(self.endpointChanged.emit)
             app.installNativeEventFilter(self._system_event_filter)
         if self.config.source != "auto":
             return
         try:
-            self._audio_device_callback = _CavaAudioDeviceCallback(self.restartRequested.emit)
+            self._audio_device_callback = _CavaAudioDeviceCallback(self.endpointChanged.emit)
             self._audio_device_enumerator = AudioUtilities.GetDeviceEnumerator()
             self._audio_device_enumerator.RegisterEndpointNotificationCallback(self._audio_device_callback)
         except Exception:
@@ -1053,8 +1098,29 @@ class CavaWidget(BaseWidget):
         self._restart_timer.start(delay)
 
     def _check_cava_output(self) -> None:
-        if self.config.sleep_timer == 0 and self._manager.is_stalled(self.config.output_timeout):
+        system_peak = self._peak_meter.peak() if self.config.source == "auto" else None
+        health = self._manager.health(
+            system_peak,
+            self.config.output_timeout,
+            self.config.signal_timeout,
+            self.config.system_peak_threshold,
+        )
+        now = time.monotonic()
+        if now - self._last_signal_log_time >= 1:
+            self._last_signal_log_time = now
+            cava_peak, signal_age = self._manager.signal_metrics(now=now)
+            logging.debug(
+                "Cava signal PID=%s generation=%d peak=%.6f system_peak=%s last_signal_age=%s",
+                self._manager.process_id,
+                self._manager.generation,
+                cava_peak,
+                "unavailable" if system_peak is None else f"{system_peak:.6f}",
+                "never" if signal_age is None else f"{signal_age:.1f}s",
+            )
+        if self.config.sleep_timer == 0 and health is CavaHealth.FRAME_STALLED:
             self._schedule_restart("stdout stalled")
+        elif health is CavaHealth.SIGNAL_STALLED:
+            self._schedule_restart("signal stalled")
 
     def initialize_colors(self) -> None:
         self.colors.clear()
@@ -1072,13 +1138,13 @@ class CavaWidget(BaseWidget):
                     logging.error("Error setting gradient color '%s': %s", color_str, e)
 
     def on_samples_updated(self, new_samples: list) -> None:
-        self._restart_failures = 0
         try:
             self.samples = new_samples
         except Exception:
             return
         try:
-            if any(val != 0 for val in new_samples):
+            if max(new_samples, default=0) > self.config.cava_peak_threshold:
+                self._restart_failures = 0
                 if self.config.hide_empty and self.config.sleep_timer > 0:
                     if self._hide_cava_widget:
                         self.show()
@@ -1103,6 +1169,8 @@ class CavaWidget(BaseWidget):
         if self._shutdown:
             return
         self._restart_allowed = True
+        if self.config.source == "auto":
+            self._peak_meter.refresh()
         # Build configuration file, temp config file will be created in YASB TEMP directory
         lines: list[str] = []
         lines.append("# Cava config auto-generated by YASB")

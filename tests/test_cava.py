@@ -265,10 +265,13 @@ class CavaLifecycleTests(unittest.TestCase):
             side_effect=lambda name: str(Path(self.temp_dir.name) / name),
         )
         self.popen_patcher = patch("core.widgets.yasb.cava.subprocess.Popen", side_effect=self._create_process)
+        self.peak_meter_patcher = patch("core.widgets.yasb.cava._EndpointPeakMeter")
         self.which_patcher.start()
         self.version_patcher.start()
         self.path_patcher.start()
         self.popen_patcher.start()
+        self.peak_meter = self.peak_meter_patcher.start().return_value
+        self.peak_meter.peak.return_value = None
         self.widget = CavaWidget(CavaConfig())
         self.assertTrue(self._wait_until(lambda: len(self.processes) == 1))
 
@@ -277,6 +280,7 @@ class CavaLifecycleTests(unittest.TestCase):
             self.widget.shutdown()
             self.widget.close()
         self.popen_patcher.stop()
+        self.peak_meter_patcher.stop()
         self.path_patcher.stop()
         self.which_patcher.stop()
         self.version_patcher.stop()
@@ -347,6 +351,29 @@ class CavaLifecycleTests(unittest.TestCase):
 
         update.assert_called_once_with()
 
+    def test_only_effective_signal_clears_restart_backoff(self) -> None:
+        self.widget._restart_failures = 3
+
+        self.widget.on_samples_updated([0] * self.widget.config.bars_number)
+        self.assertEqual(self.widget._restart_failures, 3)
+
+        self.widget.on_samples_updated([self.widget.config.cava_peak_threshold * 2])
+        self.assertEqual(self.widget._restart_failures, 0)
+
+    def test_signal_stall_requests_restart(self) -> None:
+        self.peak_meter.peak.return_value = 0.5
+
+        with patch.object(
+            self.widget._manager,
+            "health",
+            side_effect=[CavaHealth.HEALTHY, CavaHealth.SIGNAL_STALLED],
+        ):
+            self.widget._check_cava_output()
+            self.widget._check_cava_output()
+        QTest.qWait(700)
+
+        self.assertEqual(len(self.processes), 2)
+
     def test_single_gradient_color_draws_in_all_paths(self) -> None:
         self.widget.colors = [QColor("#89b4fa")]
         self.widget.samples = [0.5] * self.widget.config.bars_number
@@ -385,10 +412,12 @@ class CavaLifecycleTests(unittest.TestCase):
         if callback is None:
             return
 
+        self.peak_meter.reset_mock()
         callback.on_default_device_changed("eRender", 0, "eMultimedia", 1, "device-id")
         QTest.qWait(700)
 
         self.assertEqual(len(self.processes), 2)
+        self.peak_meter.refresh.assert_called_once_with()
 
     def test_late_failure_signal_does_not_undo_active_stop(self) -> None:
         self.widget.stop_cava()
@@ -639,6 +668,7 @@ class CavaWindowsIntegrationTests(unittest.TestCase):
             on_samples,
             on_failure=None,
             _command=None,
+            cava_peak_threshold=1e-4,
         ) -> None:
             original_init(
                 manager,
@@ -648,6 +678,7 @@ class CavaWindowsIntegrationTests(unittest.TestCase):
                 on_samples,
                 on_failure,
                 [sys.executable, "-u", "-c", script],
+                cava_peak_threshold,
             )
 
         with (
