@@ -18,7 +18,14 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
 from core.validation.widgets.yasb.cava import CavaConfig
-from core.widgets.yasb.cava import CavaProcessManager, CavaState, CavaWidget, _make_cava_cleanup, _read_cava_version
+from core.widgets.yasb.cava import (
+    CavaHealth,
+    CavaProcessManager,
+    CavaState,
+    CavaWidget,
+    _make_cava_cleanup,
+    _read_cava_version,
+)
 
 
 class _BlockingStdout:
@@ -119,6 +126,30 @@ class _ExitingThread(_StuckThread):
 
 
 class CavaProcessManagerTests(unittest.TestCase):
+    def test_signal_health_requires_sustained_system_audio_mismatch(self) -> None:
+        manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None, cava_peak_threshold=0.1)
+        manager._state = CavaState.RUNNING
+        manager._last_frame_time = 10.0
+        manager._record_signal([0.0, 0.0], now=10.0)
+
+        with patch("core.widgets.yasb.cava.time.monotonic", side_effect=[11.0, 13.9, 14.1]):
+            self.assertIs(manager.health(0.5, 10.0, 3.0, 0.01), CavaHealth.HEALTHY)
+            self.assertIs(manager.health(0.5, 10.0, 3.0, 0.01), CavaHealth.HEALTHY)
+            self.assertIs(manager.health(0.5, 10.0, 3.0, 0.01), CavaHealth.SIGNAL_STALLED)
+
+    def test_effective_signal_updates_metrics_and_resets_mismatch(self) -> None:
+        manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None, cava_peak_threshold=0.1)
+        manager._state = CavaState.RUNNING
+        manager._last_frame_time = 10.0
+        manager._record_signal([0.0, 0.0], now=10.0)
+
+        with patch("core.widgets.yasb.cava.time.monotonic", return_value=11.0):
+            manager.health(0.5, 10.0, 3.0, 0.01)
+        manager._record_signal([0.05, 0.2], now=12.0)
+
+        self.assertEqual(manager.signal_metrics(now=13.0), (0.2, 1.0))
+        self.assertIsNone(manager._signal_mismatch_since)
+
     def test_stop_keeps_ownership_when_worker_does_not_exit(self) -> None:
         manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None)
         process = _FakeProcess()
@@ -177,6 +208,9 @@ class CavaConfigurationTests(unittest.TestCase):
             "sleep_timer": -1,
             "framerate": 0,
             "edge_fade": [10],
+            "cava_peak_threshold": -0.1,
+            "system_peak_threshold": -0.1,
+            "signal_timeout": 0,
         }
 
         for field, value in invalid_values.items():
@@ -188,6 +222,12 @@ class CavaConfigurationTests(unittest.TestCase):
                 CavaConfig(edge_fade=edge_fade)
 
         self.assertEqual(CavaConfig(edge_fade=[10, 20]).edge_fade, (10, 20))
+
+        config = CavaConfig(cava_peak_threshold=0.01, system_peak_threshold=0.02, signal_timeout=4)
+        self.assertEqual(
+            (config.cava_peak_threshold, config.system_peak_threshold, config.signal_timeout),
+            (0.01, 0.02, 4),
+        )
 
 
 class CavaCleanupTests(unittest.TestCase):

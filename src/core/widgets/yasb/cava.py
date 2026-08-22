@@ -89,6 +89,15 @@ class CavaState(Enum):
     FAILED = "failed"
 
 
+class CavaHealth(Enum):
+    """Health states derived from process, frame, and audio signal liveness."""
+
+    PROCESS_DEAD = "process dead"
+    FRAME_STALLED = "frame stalled"
+    SIGNAL_STALLED = "signal stalled"
+    HEALTHY = "healthy"
+
+
 class CavaProcessManager:
     """Own exactly one Cava process and its reader thread."""
 
@@ -100,6 +109,7 @@ class CavaProcessManager:
         on_samples: Callable[[list[float]], None],
         on_failure: Callable[[str, int], None] | None = None,
         command: list[str] | None = None,
+        cava_peak_threshold: float = 1e-4,
     ) -> None:
         """Initialize process ownership without starting Cava.
 
@@ -110,12 +120,14 @@ class CavaProcessManager:
             on_samples: Callback invoked for each complete normalized frame.
             on_failure: Callback invoked after an unexpected process failure.
             command: Optional executable command used by integration tests.
+            cava_peak_threshold: Minimum normalized Cava peak treated as signal.
         """
         self._config_path = config_path
         self._bars_number = bars_number
         self._on_samples = on_samples
         self._on_failure = on_failure
         self._command = command or ["cava"]
+        self._cava_peak_threshold = cava_peak_threshold
         self._byte_type, self._byte_size, self._byte_norm = (
             ("H", 2, 65535) if bit_format == "16bit" else ("B", 1, 255)
         )
@@ -128,6 +140,9 @@ class CavaProcessManager:
         self._stop_event: threading.Event | None = None
         self._shutdown = False
         self._last_frame_time: float | None = None
+        self._last_signal_time: float | None = None
+        self._last_peak = 0.0
+        self._signal_mismatch_since: float | None = None
 
     @property
     def state(self) -> CavaState:
@@ -163,6 +178,73 @@ class CavaProcessManager:
                 and time.monotonic() - self._last_frame_time > timeout
             )
 
+    def health(
+        self,
+        system_peak: float | None,
+        output_timeout: float,
+        signal_timeout: float,
+        system_peak_threshold: float,
+    ) -> CavaHealth:
+        """Return current health and accumulate sustained signal mismatch time.
+
+        Args:
+            system_peak: Current Windows output endpoint peak, or ``None`` if unavailable.
+            output_timeout: Maximum seconds without a complete Cava frame.
+            signal_timeout: Maximum sustained system/Cava signal mismatch in seconds.
+            system_peak_threshold: Minimum endpoint peak treated as system audio.
+
+        Returns:
+            CavaHealth: Current combined process, frame, and signal health.
+        """
+        with self._state_lock:
+            now = time.monotonic()
+            if self._state is not CavaState.RUNNING:
+                self._signal_mismatch_since = None
+                return CavaHealth.PROCESS_DEAD
+            if self._last_frame_time is not None and now - self._last_frame_time > output_timeout:
+                self._signal_mismatch_since = None
+                return CavaHealth.FRAME_STALLED
+            mismatch = (
+                system_peak is not None
+                and system_peak > system_peak_threshold
+                and self._last_peak <= self._cava_peak_threshold
+            )
+            if not mismatch:
+                self._signal_mismatch_since = None
+                return CavaHealth.HEALTHY
+            if self._signal_mismatch_since is None:
+                self._signal_mismatch_since = now
+            elif now - self._signal_mismatch_since > signal_timeout:
+                return CavaHealth.SIGNAL_STALLED
+            return CavaHealth.HEALTHY
+
+    def signal_metrics(self, *, now: float | None = None) -> tuple[float, float | None]:
+        """Return the latest Cava peak and seconds since effective signal.
+
+        Args:
+            now: Optional monotonic timestamp used by deterministic tests.
+
+        Returns:
+            tuple[float, float | None]: Latest peak and signal age, or ``None`` when no signal arrived.
+        """
+        with self._state_lock:
+            current = time.monotonic() if now is None else now
+            age = None if self._last_signal_time is None else max(0.0, current - self._last_signal_time)
+            return self._last_peak, age
+
+    def _record_signal(self, samples: list[float], *, now: float | None = None) -> None:
+        """Record the latest frame peak and effective signal timestamp.
+
+        Args:
+            samples: Normalized values from one complete Cava frame.
+            now: Optional monotonic timestamp used by deterministic tests.
+        """
+        with self._state_lock:
+            self._last_peak = max(samples, default=0.0)
+            if self._last_peak > self._cava_peak_threshold:
+                self._last_signal_time = time.monotonic() if now is None else now
+                self._signal_mismatch_since = None
+
     def start(self, config_text: str) -> bool:
         """Start one reader worker unless one is already active.
 
@@ -185,6 +267,9 @@ class CavaProcessManager:
             stop_event = threading.Event()
             self._stop_event = stop_event
             self._last_frame_time = None
+            self._last_signal_time = None
+            self._last_peak = 0.0
+            self._signal_mismatch_since = None
             self._state = CavaState.STARTING
             thread = threading.Thread(
                 target=self._run,
@@ -322,6 +407,7 @@ class CavaProcessManager:
                         break
                     self._last_frame_time = time.monotonic()
                 samples = [value / self._byte_norm for value in struct.unpack(frame_format, data)]
+                self._record_signal(samples)
                 self._on_samples(samples)
         except Exception as error:
             failure_reason = f"worker error: {error}"
