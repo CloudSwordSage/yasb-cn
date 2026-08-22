@@ -85,6 +85,17 @@ class _EndpointPeakMeter:
 
     def __init__(self) -> None:
         self._meter = None
+        self._warned = False
+
+    def _warn_once(self, message: str) -> None:
+        """Log the first consecutive meter failure.
+
+        Args:
+            message: Diagnostic message for the failed meter operation.
+        """
+        if not self._warned:
+            self._warned = True
+            logging.warning(message, exc_info=True)
 
     def refresh(self) -> bool:
         """Bind to the current default render endpoint.
@@ -99,9 +110,10 @@ class _EndpointPeakMeter:
                 return False
             interface = speakers._dev.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None)
             self._meter = interface.QueryInterface(IAudioMeterInformation)
+            self._warned = False
             return True
         except Exception:
-            logging.warning("Unable to bind default audio endpoint meter", exc_info=True)
+            self._warn_once("Unable to bind default audio endpoint meter")
             return False
 
     def peak(self) -> float | None:
@@ -116,7 +128,7 @@ class _EndpointPeakMeter:
             return float(self._meter.GetPeakValue())
         except Exception:
             self._meter = None
-            logging.warning("Unable to read default audio endpoint peak", exc_info=True)
+            self._warn_once("Unable to read default audio endpoint peak")
             return None
 
 
@@ -147,7 +159,7 @@ class CavaProcessManager:
         config_path: str,
         bars_number: int,
         bit_format: str,
-        on_samples: Callable[[list[float]], None],
+        on_samples: Callable[[list[float], int], None],
         on_failure: Callable[[str, int], None] | None = None,
         command: list[str] | None = None,
         cava_peak_threshold: float = 1e-4,
@@ -158,7 +170,7 @@ class CavaProcessManager:
             config_path: Path used for the generated Cava configuration.
             bars_number: Number of values expected in each raw frame.
             bit_format: Cava raw output format, either ``8bit`` or ``16bit``.
-            on_samples: Callback invoked for each complete normalized frame.
+            on_samples: Callback invoked with each normalized frame and its generation.
             on_failure: Callback invoked after an unexpected process failure.
             command: Optional executable command used by integration tests.
             cava_peak_threshold: Minimum normalized Cava peak treated as signal.
@@ -449,7 +461,7 @@ class CavaProcessManager:
                     self._last_frame_time = time.monotonic()
                 samples = [value / self._byte_norm for value in struct.unpack(frame_format, data)]
                 self._record_signal(samples)
-                self._on_samples(samples)
+                self._on_samples(samples, generation)
         except Exception as error:
             failure_reason = f"worker error: {error}"
             logging.exception("Error running Cava generation=%d PID=%s", generation, getattr(process, "pid", None))
@@ -884,7 +896,7 @@ class CavaBar(QFrame):
 
 class CavaWidget(BaseWidget):
     validation_schema = CavaConfig
-    samplesUpdated = pyqtSignal(list)
+    samplesUpdated = pyqtSignal(list, int)
     restartRequested = pyqtSignal(str)
     endpointChanged = pyqtSignal(str)
     _instance_counter = 0  # Class variable to track instances
@@ -919,6 +931,7 @@ class CavaWidget(BaseWidget):
         self._audio_device_callback = None
         self._peak_meter = _EndpointPeakMeter()
         self._last_signal_log_time = 0.0
+        self._sample_generation: int | None = None
 
         # Parse edge_fade parameter - support both integer and [left, right] formats
         if isinstance(self.config.edge_fade, tuple):
@@ -1036,6 +1049,7 @@ class CavaWidget(BaseWidget):
     @pyqtSlot()
     def _stop_cava_on_widget_thread(self) -> bool:
         self._restart_allowed = False
+        self._sample_generation = None
         if hasattr(self, "_restart_timer"):
             self._restart_timer.stop()
         self.colors.clear()
@@ -1089,6 +1103,7 @@ class CavaWidget(BaseWidget):
     def _schedule_restart(self, reason: str) -> None:
         if self._shutdown or not self._restart_allowed or self._restart_timer.isActive():
             return
+        self._sample_generation = None
         if not self._manager.stop(reason=reason):
             logging.error("Cava restart cancelled because the previous worker did not exit")
             return
@@ -1137,7 +1152,9 @@ class CavaWidget(BaseWidget):
                 except Exception as e:
                     logging.error("Error setting gradient color '%s': %s", color_str, e)
 
-    def on_samples_updated(self, new_samples: list) -> None:
+    def on_samples_updated(self, new_samples: list, generation: int | None = None) -> None:
+        if generation is not None and generation != self._sample_generation:
+            return
         try:
             self.samples = new_samples
         except Exception:
@@ -1215,4 +1232,5 @@ class CavaWidget(BaseWidget):
 
         self.initialize_colors()
 
-        self._manager.start(config_template)
+        if self._manager.start(config_template):
+            self._sample_generation = self._manager.generation

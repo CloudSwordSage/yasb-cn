@@ -23,6 +23,7 @@ from core.widgets.yasb.cava import (
     CavaProcessManager,
     CavaState,
     CavaWidget,
+    _EndpointPeakMeter,
     _make_cava_cleanup,
     _read_cava_version,
 )
@@ -198,6 +199,20 @@ class CavaProcessManagerTests(unittest.TestCase):
         self.assertEqual(process.wait_timeouts, [2, 2])
 
 
+class EndpointPeakMeterTests(unittest.TestCase):
+    def test_repeated_endpoint_failure_logs_once(self) -> None:
+        meter = _EndpointPeakMeter()
+
+        with (
+            patch("core.widgets.yasb.cava.AudioUtilities.GetSpeakers", side_effect=OSError("missing endpoint")),
+            self.assertLogs(level="WARNING") as captured,
+        ):
+            self.assertIsNone(meter.peak())
+            self.assertIsNone(meter.peak())
+
+        self.assertEqual(sum("Unable to bind default audio endpoint meter" in line for line in captured.output), 1)
+
+
 class CavaConfigurationTests(unittest.TestCase):
     def test_runtime_sensitive_values_are_validated(self) -> None:
         invalid_values = {
@@ -222,6 +237,10 @@ class CavaConfigurationTests(unittest.TestCase):
                 CavaConfig(edge_fade=edge_fade)
 
         self.assertEqual(CavaConfig(edge_fade=[10, 20]).edge_fade, (10, 20))
+
+        for field in ("cava_peak_threshold", "system_peak_threshold"):
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                CavaConfig(**{field: 1.1})
 
         config = CavaConfig(cava_peak_threshold=0.01, system_peak_threshold=0.02, signal_timeout=4)
         self.assertEqual(
@@ -362,17 +381,42 @@ class CavaLifecycleTests(unittest.TestCase):
 
     def test_signal_stall_requests_restart(self) -> None:
         self.peak_meter.peak.return_value = 0.5
+        self.widget.config.signal_timeout = 3
+        self.widget.config.output_timeout = 10
+        self.widget._manager._last_frame_time = 10
+        self.widget._manager._record_signal([0] * self.widget.config.bars_number, now=10)
 
-        with patch.object(
-            self.widget._manager,
-            "health",
-            side_effect=[CavaHealth.HEALTHY, CavaHealth.SIGNAL_STALLED],
-        ):
+        with patch("core.widgets.yasb.cava.time.monotonic", side_effect=[10, 10, 13.1, 13.1]):
             self.widget._check_cava_output()
             self.widget._check_cava_output()
         QTest.qWait(700)
 
         self.assertEqual(len(self.processes), 2)
+
+    def test_late_signal_from_replaced_generation_does_not_clear_backoff(self) -> None:
+        old_generation = self.widget._manager.generation
+        self.widget._restart_failures = 3
+
+        self.widget._schedule_restart("signal stalled")
+        self.widget.on_samples_updated([1.0], old_generation)
+
+        self.assertEqual(self.widget._restart_failures, 4)
+
+    def test_signal_health_log_contains_runtime_metrics(self) -> None:
+        self.peak_meter.peak.return_value = 0.5
+        self.widget._last_signal_log_time = 0
+
+        with (
+            patch.object(self.widget._manager, "health", return_value=CavaHealth.HEALTHY),
+            self.assertLogs(level="DEBUG") as captured,
+        ):
+            self.widget._check_cava_output()
+
+        log = "\n".join(captured.output)
+        self.assertIn(f"PID={self.widget._manager.process_id}", log)
+        self.assertIn(f"generation={self.widget._manager.generation}", log)
+        self.assertIn("peak=", log)
+        self.assertIn("last_signal_age=", log)
 
     def test_single_gradient_color_draws_in_all_paths(self) -> None:
         self.widget.colors = [QColor("#89b4fa")]
@@ -602,6 +646,18 @@ class CavaWindowsIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
+
+    def test_default_endpoint_peak_meter_returns_normalized_value(self) -> None:
+        meter = _EndpointPeakMeter()
+        if not meter.refresh():
+            self.skipTest("No default Windows render endpoint is available")
+
+        peak = meter.peak()
+
+        self.assertIsNotNone(peak)
+        if peak is not None:
+            self.assertGreaterEqual(peak, 0)
+            self.assertLessEqual(peak, 1)
 
     def test_real_stalled_child_is_replaced_and_reaped(self) -> None:
         script = "import sys,time;sys.stdout.buffer.write(bytes((64,128)));sys.stdout.buffer.flush();time.sleep(30)"
