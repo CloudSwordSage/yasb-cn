@@ -18,6 +18,9 @@
 | `signal_timeout` | float | 3.0 | Seconds of system audio with no Cava signal before YASB restarts Cava |
 | `cava_peak_threshold` | float | 0.0001 | Minimum normalized Cava peak treated as an effective signal |
 | `system_peak_threshold` | float | 0.0001 | Minimum Windows endpoint peak treated as active system audio |
+| `cava_stuck_high_threshold` | float | 0.7 | Cava peak above which output is considered stuck high while the system is silent |
+| `system_silence_threshold` | float | 0.001 | Maximum Windows endpoint peak treated as system silence for stuck-high detection |
+| `stuck_high_timeout` | float | 5.0 | Seconds of sustained stuck-high output during system silence before YASB restarts Cava |
 | `sensitivity` | integer | 100 | Manual sensitivity in %. 200 means double height |
 | `lower_cutoff_freq` | integer | 50 | Lower cutoff frequencies for lowest bars |
 | `higher_cutoff_freq` | integer | 10000 | Higher cutoff frequencies for highest bars |
@@ -76,6 +79,9 @@
 - **signal_timeout**: Restart Cava after system audio stays above `system_peak_threshold` while Cava stays at or below `cava_peak_threshold` for this many seconds. This check applies when `source` is `"auto"`.
 - **cava_peak_threshold**: Minimum normalized Cava peak treated as an effective signal. Raise it only if device noise prevents silence detection.
 - **system_peak_threshold**: Minimum Windows default endpoint peak treated as active system audio. Raise it only if endpoint noise causes false recovery attempts.
+- **cava_stuck_high_threshold**: Cava peak above which output is treated as stuck high while the system endpoint remains silent.
+- **system_silence_threshold**: Windows default endpoint peak below which the system is treated as silent for stuck-high detection.
+- **stuck_high_timeout**: Restart Cava after its peak stays above `cava_stuck_high_threshold` while the system peak stays below `system_silence_threshold` for this many seconds.
 - **sensitivity**: Manual sensitivity in %. 200 means double height.
 - **lower_cutoff_freq**: Lower cutoff frequencies for lowest bars.
 - **higher_cutoff_freq**: Higher cutoff frequencies for highest bars.

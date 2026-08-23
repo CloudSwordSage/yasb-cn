@@ -28,6 +28,9 @@ class CavaConfig(CustomBaseModel):
     signal_timeout: float = Field(default=3.0, gt=0)
     cava_peak_threshold: float = Field(default=1e-4, ge=0, le=1)
     system_peak_threshold: float = Field(default=1e-4, ge=0, le=1)
+    cava_stuck_high_threshold: float = Field(default=0.7, ge=0, le=1)
+    system_silence_threshold: float = Field(default=0.001, ge=0, le=1)
+    stuck_high_timeout: float = Field(default=5.0, gt=0)
     sensitivity: int = 100
     lower_cutoff_freq: int = 50
     higher_cutoff_freq: int = 10000

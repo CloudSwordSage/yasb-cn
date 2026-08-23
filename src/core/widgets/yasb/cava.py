@@ -148,6 +148,7 @@ class CavaHealth(Enum):
     PROCESS_DEAD = "process dead"
     FRAME_STALLED = "frame stalled"
     SIGNAL_STALLED = "signal stalled"
+    STUCK_HIGH = "stuck high"
     HEALTHY = "healthy"
 
 
@@ -163,6 +164,7 @@ class CavaProcessManager:
         on_failure: Callable[[str, int], None] | None = None,
         command: list[str] | None = None,
         cava_peak_threshold: float = 1e-4,
+        cava_stuck_high_threshold: float = 0.7,
     ) -> None:
         """Initialize process ownership without starting Cava.
 
@@ -174,6 +176,7 @@ class CavaProcessManager:
             on_failure: Callback invoked after an unexpected process failure.
             command: Optional executable command used by integration tests.
             cava_peak_threshold: Minimum normalized Cava peak treated as signal.
+            cava_stuck_high_threshold: Cava peak above which output is considered stuck high.
         """
         self._config_path = config_path
         self._bars_number = bars_number
@@ -181,6 +184,7 @@ class CavaProcessManager:
         self._on_failure = on_failure
         self._command = command or ["cava"]
         self._cava_peak_threshold = cava_peak_threshold
+        self._cava_stuck_high_threshold = cava_stuck_high_threshold
         self._byte_type, self._byte_size, self._byte_norm = (
             ("H", 2, 65535) if bit_format == "16bit" else ("B", 1, 255)
         )
@@ -196,6 +200,7 @@ class CavaProcessManager:
         self._last_signal_time: float | None = None
         self._last_peak = 0.0
         self._signal_mismatch_since: float | None = None
+        self._stuck_high_since: float | None = None
 
     @property
     def state(self) -> CavaState:
@@ -237,6 +242,9 @@ class CavaProcessManager:
         output_timeout: float,
         signal_timeout: float,
         system_peak_threshold: float,
+        cava_stuck_high_threshold: float = 0.7,
+        system_silence_threshold: float = 0.001,
+        stuck_high_timeout: float = 5.0,
     ) -> CavaHealth:
         """Return current health and accumulate sustained signal mismatch time.
 
@@ -245,18 +253,37 @@ class CavaProcessManager:
             output_timeout: Maximum seconds without a complete Cava frame.
             signal_timeout: Maximum sustained system/Cava signal mismatch in seconds.
             system_peak_threshold: Minimum endpoint peak treated as system audio.
+            cava_stuck_high_threshold: Cava peak above which output is considered stuck high.
+            system_silence_threshold: Endpoint peak below which system audio is considered silent.
+            stuck_high_timeout: Maximum sustained stuck-high output in seconds.
 
         Returns:
             CavaHealth: Current combined process, frame, and signal health.
         """
         with self._state_lock:
             now = time.monotonic()
+            self._cava_stuck_high_threshold = cava_stuck_high_threshold
             if self._state is not CavaState.RUNNING:
                 self._signal_mismatch_since = None
+                self._stuck_high_since = None
                 return CavaHealth.PROCESS_DEAD
             if self._last_frame_time is not None and now - self._last_frame_time > output_timeout:
                 self._signal_mismatch_since = None
+                self._stuck_high_since = None
                 return CavaHealth.FRAME_STALLED
+            stuck_high = (
+                system_peak is not None
+                and system_peak < system_silence_threshold
+                and self._last_peak > self._cava_stuck_high_threshold
+            )
+            if stuck_high:
+                self._signal_mismatch_since = None
+                if self._stuck_high_since is None:
+                    self._stuck_high_since = now
+                elif now - self._stuck_high_since >= stuck_high_timeout:
+                    return CavaHealth.STUCK_HIGH
+                return CavaHealth.HEALTHY
+            self._stuck_high_since = None
             mismatch = (
                 system_peak is not None
                 and system_peak > system_peak_threshold
@@ -294,6 +321,8 @@ class CavaProcessManager:
         """
         with self._state_lock:
             self._last_peak = max(samples, default=0.0)
+            if self._last_peak <= self._cava_stuck_high_threshold:
+                self._stuck_high_since = None
             if self._last_peak > self._cava_peak_threshold:
                 self._last_signal_time = time.monotonic() if now is None else now
                 self._signal_mismatch_since = None
@@ -323,6 +352,7 @@ class CavaProcessManager:
             self._last_signal_time = None
             self._last_peak = 0.0
             self._signal_mismatch_since = None
+            self._stuck_high_since = None
             self._state = CavaState.STARTING
             thread = threading.Thread(
                 target=self._run,
@@ -1005,6 +1035,7 @@ class CavaWidget(BaseWidget):
             lambda reason, _generation: self.restartRequested.emit(reason),
             [cava_executable],
             self.config.cava_peak_threshold,
+            self.config.cava_stuck_high_threshold,
         )
         self._restart_timer = QTimer(self)
         self._restart_timer.setSingleShot(True)
@@ -1150,6 +1181,9 @@ class CavaWidget(BaseWidget):
             self.config.output_timeout,
             self.config.signal_timeout,
             self.config.system_peak_threshold,
+            self.config.cava_stuck_high_threshold,
+            self.config.system_silence_threshold,
+            self.config.stuck_high_timeout,
         )
         now = time.monotonic()
         if now - self._last_signal_log_time >= 1:
@@ -1167,6 +1201,8 @@ class CavaWidget(BaseWidget):
             self._schedule_restart("stdout stalled")
         elif health is CavaHealth.SIGNAL_STALLED:
             self._schedule_restart("signal stalled")
+        elif health is CavaHealth.STUCK_HIGH:
+            self._schedule_restart("stuck high")
 
     def initialize_colors(self) -> None:
         self.colors.clear()

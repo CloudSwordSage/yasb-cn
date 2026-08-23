@@ -153,6 +153,34 @@ class CavaProcessManagerTests(unittest.TestCase):
             self.assertIs(manager.health(0.5, 10.0, 3.0, 0.01), CavaHealth.HEALTHY)
             self.assertIs(manager.health(0.5, 10.0, 3.0, 0.01), CavaHealth.SIGNAL_STALLED)
 
+    def test_stuck_high_requires_sustained_system_silence(self) -> None:
+        manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None)
+        manager._state = CavaState.RUNNING
+        manager._last_frame_time = 10.0
+        manager._record_signal([0.8, 0.7], now=10.0)
+        health_args = (100.0, 3.0, 0.01, 0.7, 0.001, 5.0)
+
+        with patch("core.widgets.yasb.cava.time.monotonic", side_effect=[11.0, 15.9, 16.0, 17.0, 21.9, 22.1]):
+            self.assertIs(manager.health(0.0, *health_args), CavaHealth.HEALTHY)
+            self.assertIs(manager.health(0.0, *health_args), CavaHealth.HEALTHY)
+            self.assertIs(manager.health(0.01, *health_args), CavaHealth.HEALTHY)
+            self.assertIs(manager.health(0.0, *health_args), CavaHealth.HEALTHY)
+            self.assertIs(manager.health(0.0, *health_args), CavaHealth.HEALTHY)
+            self.assertIs(manager.health(0.0, *health_args), CavaHealth.STUCK_HIGH)
+
+    def test_low_frame_interrupts_stuck_high_between_health_checks(self) -> None:
+        manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None)
+        manager._state = CavaState.RUNNING
+        manager._last_frame_time = 10.0
+        manager._record_signal([0.8, 0.8], now=10.0)
+        health_args = (100.0, 3.0, 0.01, 0.7, 0.001, 5.0)
+
+        with patch("core.widgets.yasb.cava.time.monotonic", side_effect=[11.0, 16.1]):
+            self.assertIs(manager.health(0.0, *health_args), CavaHealth.HEALTHY)
+            manager._record_signal([0.6, 0.6], now=12.0)
+            manager._record_signal([0.8, 0.8], now=13.0)
+            self.assertIs(manager.health(0.0, *health_args), CavaHealth.HEALTHY)
+
     def test_effective_signal_updates_metrics_and_resets_mismatch(self) -> None:
         manager = CavaProcessManager("cava.conf", 2, "8bit", lambda _samples: None, cava_peak_threshold=0.1)
         manager._state = CavaState.RUNNING
@@ -241,6 +269,9 @@ class CavaConfigurationTests(unittest.TestCase):
             "cava_peak_threshold": -0.1,
             "system_peak_threshold": -0.1,
             "signal_timeout": 0,
+            "cava_stuck_high_threshold": -0.1,
+            "system_silence_threshold": -0.1,
+            "stuck_high_timeout": 0,
         }
 
         for field, value in invalid_values.items():
@@ -253,7 +284,12 @@ class CavaConfigurationTests(unittest.TestCase):
 
         self.assertEqual(CavaConfig(edge_fade=[10, 20]).edge_fade, (10, 20))
 
-        for field in ("cava_peak_threshold", "system_peak_threshold"):
+        for field in (
+            "cava_peak_threshold",
+            "system_peak_threshold",
+            "cava_stuck_high_threshold",
+            "system_silence_threshold",
+        ):
             with self.subTest(field=field), self.assertRaises(ValidationError):
                 CavaConfig(**{field: 1.1})
 
@@ -261,6 +297,14 @@ class CavaConfigurationTests(unittest.TestCase):
         self.assertEqual(
             (config.cava_peak_threshold, config.system_peak_threshold, config.signal_timeout),
             (0.01, 0.02, 4),
+        )
+        self.assertEqual(
+            (
+                CavaConfig().cava_stuck_high_threshold,
+                CavaConfig().system_silence_threshold,
+                CavaConfig().stuck_high_timeout,
+            ),
+            (0.7, 0.001, 5.0),
         )
 
 
@@ -407,6 +451,21 @@ class CavaLifecycleTests(unittest.TestCase):
         QTest.qWait(700)
 
         self.assertEqual(len(self.processes), 2)
+
+    def test_stuck_high_during_system_silence_requests_restart(self) -> None:
+        self.peak_meter.peak.return_value = 0.0
+        self.widget.config.output_timeout = 10
+        self.widget._manager._last_frame_time = 10
+        self.widget._manager._record_signal([0.8] * self.widget.config.bars_number, now=10)
+
+        with (
+            patch("core.widgets.yasb.cava.time.monotonic", side_effect=[10, 10, 15.1, 15.1]),
+            patch.object(self.widget, "_schedule_restart") as schedule_restart,
+        ):
+            self.widget._check_cava_output()
+            self.widget._check_cava_output()
+
+        schedule_restart.assert_called_once_with("stuck high")
 
     def test_late_signal_from_replaced_generation_does_not_clear_backoff(self) -> None:
         old_generation = self.widget._manager.generation
@@ -740,6 +799,7 @@ class CavaWindowsIntegrationTests(unittest.TestCase):
             on_failure=None,
             _command=None,
             cava_peak_threshold=1e-4,
+            cava_stuck_high_threshold=0.7,
         ) -> None:
             original_init(
                 manager,
@@ -750,6 +810,7 @@ class CavaWindowsIntegrationTests(unittest.TestCase):
                 on_failure,
                 [sys.executable, "-u", "-c", script],
                 cava_peak_threshold,
+                cava_stuck_high_threshold,
             )
 
         with (
