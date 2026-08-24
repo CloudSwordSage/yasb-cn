@@ -1,4 +1,3 @@
-import ctypes
 import logging
 import os
 from collections.abc import Callable
@@ -26,17 +25,11 @@ from core.utils.qobject import is_valid_qobject
 from core.utils.tooltip import set_tooltip
 from core.utils.utilities import ElidedLabel, PopupWidget, ScrollingLabel, refresh_widget_style
 from core.utils.win32.app_icons import get_icon_for_aumid, get_process_icon
-from core.utils.win32.aumid import (
-    ERROR_INSUFFICIENT_BUFFER,
-    PROCESS_QUERY_LIMITED_INFORMATION,
-    CloseHandle,
-    GetApplicationUserModelId,
-    OpenProcess,
-    activate_app_by_aumid,
-)
+from core.utils.win32.aumid import activate_app_by_aumid
 from core.validation.widgets.yasb.media_lite import MediaLiteWidgetConfig
 from core.widgets.base import BaseWidget
 from core.widgets.services.media.aumid_process import (
+    get_app_audio_sessions,
     get_pid_for_window_aumid,
     get_process_name_for_aumid,
 )
@@ -74,7 +67,6 @@ class MediaWidget(BaseWidget):
         self._empty_thumb_cache: dict[tuple[int, float], QPixmap] = {}
         self._source_icon_cache: dict[tuple[str, float], QPixmap] = {}
         self._default_source_icon: dict[float, QPixmap] = {}
-        self._app_volume_session = None
         self._app_is_muted = False
 
         # Bar layout: thumb + title/artist
@@ -412,7 +404,6 @@ class MediaWidget(BaseWidget):
         session = self.current_session
         if session is None or not is_valid_qobject(self.dialog):
             return
-        self._bind_app_volume_session()
         self._apply_source_icon(session)
         self._apply_timeline(session)
         self._update_app_volume_slider()
@@ -635,8 +626,9 @@ class MediaWidget(BaseWidget):
             img = get_icon_for_aumid(aumid, size=phys)
             if img is None:
                 pid = get_pid_for_window_aumid(aumid)
-                if not pid and self._app_volume_session is not None:
-                    proc = getattr(self._app_volume_session, "Process", None)
+                if not pid:
+                    sessions = get_app_audio_sessions(aumid)
+                    proc = getattr(sessions[0], "Process", None) if sessions else None
                     if proc is not None:
                         pid = getattr(proc, "pid", None)
                 if not pid:
@@ -833,65 +825,16 @@ class MediaWidget(BaseWidget):
         if is_valid_qobject(self._popup_current_time_label):
             self._popup_current_time_label.setText(self._format_time((value / 1000.0) * self.current_session.duration))
 
-    def _get_process_aumid(self, pid: int) -> str | None:
-        if GetApplicationUserModelId is None:
-            return None
-        try:
-            h_process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
-            if not h_process:
-                return None
-            try:
-                length = ctypes.c_uint32(0)
-                if GetApplicationUserModelId(h_process, ctypes.byref(length), None) == ERROR_INSUFFICIENT_BUFFER:
-                    buf = ctypes.create_unicode_buffer(length.value)
-                    if GetApplicationUserModelId(h_process, ctypes.byref(length), buf) == 0:
-                        return buf.value
-            finally:
-                CloseHandle(h_process)
-        except Exception:
-            pass
-        return None
-
-    def _bind_app_volume_session(self):
-        self._app_volume_session = None
-        aumid = self.current_session.app_id if self.current_session else None
-        if not aumid:
-            return
-        try:
-            sessions = list(AudioUtilities.GetAllSessions())
-            target = aumid.lower()
-            for session in sessions:
-                try:
-                    proc = getattr(session, "Process", None)
-                    if proc and proc.pid:
-                        process_aumid = self._get_process_aumid(int(proc.pid))
-                        if process_aumid and process_aumid.lower() == target:
-                            self._app_volume_session = session
-                            return
-                except Exception:
-                    continue
-            if aumid.lower().endswith(".exe"):
-                exe = aumid.lower()
-            else:
-                proc_name = get_process_name_for_aumid(aumid)
-                exe = proc_name.lower() if proc_name else ""
-            if not exe.endswith(".exe"):
-                return
-            for session in sessions:
-                try:
-                    proc = getattr(session, "Process", None)
-                    if proc and proc.name().lower() == exe:
-                        self._app_volume_session = session
-                        return
-                except Exception:
-                    continue
-        except Exception as e:
-            logger.error("Failed to bind app volume session: %s", e)
-
     def _get_volume_interface(self):
-        if not self._app_volume_session:
+        app_id = self.current_session.app_id if self.current_session else None
+        if not app_id:
             return None
-        return getattr(self._app_volume_session, "SimpleAudioVolume", None)
+        try:
+            sessions = get_app_audio_sessions(app_id)
+            return getattr(sessions[0], "SimpleAudioVolume", None) if sessions else None
+        except Exception as e:
+            logger.error("Failed to resolve app volume session: %s", e)
+            return None
 
     def _volume_available(self) -> bool:
         return self._get_volume_interface() is not None

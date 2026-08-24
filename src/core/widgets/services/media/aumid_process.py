@@ -9,6 +9,8 @@ from ctypes import POINTER, byref, c_void_p
 
 import win32gui
 import win32process
+from pycaw.constants import AudioSessionState
+from pycaw.pycaw import AudioUtilities
 from win32com.client import Dispatch
 
 from core.utils.win32.aumid import get_aumid_for_window
@@ -53,6 +55,63 @@ for dll_name in ("kernel32", "shell32"):
 
 # AUMID -> (app_display_name, process_exe); negative results cached too.
 _shell_app_cache: dict[str, tuple[str | None, str | None]] = {}
+
+
+def get_process_aumid(pid: int) -> str | None:
+    """Return the AppUserModelID assigned to a process.
+
+    Args:
+        pid(int): Process identifier.
+    Returns:
+        str | None: Process AppUserModelID, or ``None`` when unavailable.
+    """
+    if GetApplicationUserModelId is None:
+        return None
+
+    h_process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+    if not h_process:
+        return None
+    try:
+        length = ctypes.c_uint32(0)
+        if GetApplicationUserModelId(h_process, byref(length), None) != ERROR_INSUFFICIENT_BUFFER:
+            return None
+        buffer = ctypes.create_unicode_buffer(length.value)
+        return buffer.value if GetApplicationUserModelId(h_process, byref(length), buffer) == 0 else None
+    except OSError:
+        return None
+    finally:
+        CloseHandle(h_process)
+
+
+def get_app_audio_sessions(app_id: str):
+    """Enumerate live audio sessions matching a media application.
+
+    Args:
+        app_id(str): Media session AUMID or executable name.
+    Returns:
+        list: Matching non-expired sessions, with active sessions first.
+    """
+    if not app_id:
+        return []
+
+    target = app_id.casefold()
+    executable = get_process_name_for_aumid(app_id)
+    executable = executable.casefold() if executable else ""
+    matches = []
+    for session in AudioUtilities.GetAllSessions():
+        try:
+            process = getattr(session, "Process", None)
+            if process is None:
+                continue
+            process_aumid = get_process_aumid(int(process.pid))
+            if (process_aumid and process_aumid.casefold() == target) or (
+                executable and process.name().casefold() == executable
+            ):
+                if session.State != AudioSessionState.Expired:
+                    matches.append(session)
+        except Exception:
+            continue
+    return sorted(matches, key=lambda session: session.State != AudioSessionState.Active)
 
 
 def _enum_processes():

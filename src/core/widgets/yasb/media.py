@@ -1,4 +1,3 @@
-import ctypes
 import io
 import logging
 import os
@@ -9,7 +8,6 @@ from typing import Any, Literal, cast
 from PIL import Image, ImageChops
 from PIL.ImageDraw import ImageDraw
 from PIL.ImageQt import ImageQt
-from pycaw.pycaw import AudioUtilities
 from PyQt6 import QtCore
 from PyQt6.QtCore import QEvent, QObject, QRectF, Qt, QTimer, pyqtSlot
 from PyQt6.QtGui import QMouseEvent, QPainter, QPainterPath, QPaintEvent, QPixmap, QWheelEvent
@@ -30,18 +28,11 @@ from core.utils.utilities import (
     ScrollingLabel,
     refresh_widget_style,
 )
-from core.utils.win32.aumid import (
-    ERROR_INSUFFICIENT_BUFFER,
-    PROCESS_QUERY_LIMITED_INFORMATION,
-    CloseHandle,
-    GetApplicationUserModelId,
-    OpenProcess,
-    activate_app_by_aumid,
-)
+from core.utils.win32.aumid import activate_app_by_aumid
 from core.validation.widgets.yasb.media import MediaWidgetConfig
 from core.widgets.base import BaseWidget
-from core.widgets.services.media.aumid_process import get_process_name_for_aumid
-from core.widgets.services.media.media import MediaSession, SessionState, WindowsMedia
+from core.widgets.services.media.aumid_process import get_app_audio_sessions, get_process_name_for_aumid
+from core.widgets.services.media.media import SessionState, WindowsMedia
 from core.widgets.services.media.source_apps import (
     get_source_app_class_name,
     resolve_source_app_name,
@@ -195,7 +186,6 @@ class MediaWidget(BaseWidget):
         # Initialize tracking variables
         self.app_volume_slider = None
         self._app_mute_button = None
-        self._app_volume_session = None
         self._is_playing = False
         self._app_is_muted = False
 
@@ -365,7 +355,6 @@ class MediaWidget(BaseWidget):
                         )
 
                         # Bind slider to the current media app session and set initial value
-                        self._bind_app_volume_session()
                         self._updateapp_volume_slider()
                         self._update_app_mute_button()
                     except Exception as e:
@@ -1059,84 +1048,17 @@ class MediaWidget(BaseWidget):
         if self.current_session:
             return self.current_session.app_id
 
-    def _get_process_aumid(self, pid: int) -> str | None:
-        """Get AUMID for a process using GetApplicationUserModelId."""
-        if GetApplicationUserModelId is None:
-            return None
-
-        try:
-            hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
-            if not hProcess:
-                return None
-
-            try:
-                length = ctypes.c_uint32(0)
-                # First call to get buffer size
-                if GetApplicationUserModelId(hProcess, ctypes.byref(length), None) == ERROR_INSUFFICIENT_BUFFER:
-                    buf = ctypes.create_unicode_buffer(length.value)
-                    if GetApplicationUserModelId(hProcess, ctypes.byref(length), buf) == 0:
-                        return buf.value
-            finally:
-                CloseHandle(hProcess)
-        except Exception:
-            pass
-
-        return None
-
-    def _match_session_by_aumid(self, sessions: list[MediaSession], aumid: str):
-        """Match session by process AUMID."""
-        target_aumid = aumid.lower()
-        for session in sessions:
-            try:
-                proc = getattr(session, "Process", None)
-                if proc and proc.pid:
-                    process_aumid = self._get_process_aumid(int(proc.pid))
-                    if process_aumid and process_aumid.lower() == target_aumid:
-                        return session
-            except Exception:
-                continue
-        return None
-
-    def _match_session_by_executable(self, sessions: list[MediaSession], identifier: str):
-        """Match session by executable name."""
-        if not identifier.endswith(".exe"):
-            return None
-
-        exe_name = identifier.lower()
-        for session in sessions:
-            try:
-                proc = getattr(session, "Process", None)
-                if proc and proc.name().lower() == exe_name:
-                    return session
-            except Exception:
-                continue
-        return None
-
-    def _bind_app_volume_session(self):
-        """Locate and bind the audio session corresponding to current media app."""
-        self._app_volume_session = None
-        aumid = self._get_current_app_identifier()
-        if not aumid:
-            return
-
-        try:
-            # pycaw handles COM initialization internally
-            sessions = cast(list[MediaSession], AudioUtilities.GetAllSessions())
-            candidate = self._match_session_by_aumid(sessions, aumid)
-            if not candidate:
-                proc_name = get_process_name_for_aumid(aumid)
-                if proc_name:
-                    candidate = self._match_session_by_executable(sessions, proc_name)
-            self._app_volume_session = candidate
-        except Exception as e:
-            logger.error("Failed to bind app volume session: %s", e)
-            self._app_volume_session = None
-
     def _get_volume_interface(self):
-        """Get the SimpleAudioVolume interface for the current session."""
-        if not self._app_volume_session:
+        """Resolve the current app's live SimpleAudioVolume interface."""
+        app_id = self._get_current_app_identifier()
+        if not app_id:
             return None
-        return getattr(self._app_volume_session, "SimpleAudioVolume", None)
+        try:
+            sessions = get_app_audio_sessions(app_id)
+            return getattr(sessions[0], "SimpleAudioVolume", None) if sessions else None
+        except Exception as e:
+            logger.error("Failed to resolve app volume session: %s", e)
+            return None
 
     def _updateapp_volume_slider(self):
         """Update slider value from bound app session volume."""
