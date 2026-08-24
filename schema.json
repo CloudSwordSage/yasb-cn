@@ -1214,7 +1214,7 @@
           "type": "string"
         },
         "label_no_device": {
-          "default": "No devices connected",
+          "default": "\u6ca1\u6709\u5df2\u8fde\u63a5\u7684\u8bbe\u5907",
           "title": "Label No Device",
           "type": "string"
         },
@@ -1289,20 +1289,20 @@
             "offset_top": 6,
             "offset_left": 0,
             "labels": {
-              "connect": "Connect",
-              "connected": "Connected",
-              "connecting": "Connecting",
-              "disconnect": "Disconnect",
-              "disconnecting": "Disconnecting",
-              "manage": "Manage",
-              "more_settings": "More Bluetooth settings",
-              "new_devices": "New devices",
-              "not_connected": "Not connected",
-              "pair": "Pair",
-              "power_off": "Off",
-              "power_on": "On",
-              "title": "Bluetooth",
-              "your_devices": "Your devices"
+              "connect": "\u8fde\u63a5",
+              "connected": "\u5df2\u8fde\u63a5",
+              "connecting": "\u6b63\u5728\u8fde\u63a5",
+              "disconnect": "\u65ad\u5f00\u8fde\u63a5",
+              "disconnecting": "\u6b63\u5728\u65ad\u5f00\u8fde\u63a5",
+              "manage": "\u7ba1\u7406",
+              "more_settings": "\u66f4\u591a\u84dd\u7259\u8bbe\u7f6e",
+              "new_devices": "\u65b0\u8bbe\u5907",
+              "not_connected": "\u672a\u8fde\u63a5",
+              "pair": "\u914d\u5bf9",
+              "power_off": "\u5173\u95ed",
+              "power_on": "\u5f00\u542f",
+              "title": "\u84dd\u7259",
+              "your_devices": "\u4f60\u7684\u8bbe\u5907"
             },
             "device_icons": {
               "battery": {
@@ -1483,72 +1483,72 @@
       "additionalProperties": false,
       "properties": {
         "title": {
-          "default": "Bluetooth",
+          "default": "\u84dd\u7259",
           "title": "Title",
           "type": "string"
         },
         "your_devices": {
-          "default": "Your devices",
+          "default": "\u4f60\u7684\u8bbe\u5907",
           "title": "Your Devices",
           "type": "string"
         },
         "new_devices": {
-          "default": "New devices",
+          "default": "\u65b0\u8bbe\u5907",
           "title": "New Devices",
           "type": "string"
         },
         "not_connected": {
-          "default": "Not connected",
+          "default": "\u672a\u8fde\u63a5",
           "title": "Not Connected",
           "type": "string"
         },
         "connected": {
-          "default": "Connected",
+          "default": "\u5df2\u8fde\u63a5",
           "title": "Connected",
           "type": "string"
         },
         "more_settings": {
-          "default": "More Bluetooth settings",
+          "default": "\u66f4\u591a\u84dd\u7259\u8bbe\u7f6e",
           "title": "More Settings",
           "type": "string"
         },
         "connect": {
-          "default": "Connect",
+          "default": "\u8fde\u63a5",
           "title": "Connect",
           "type": "string"
         },
         "disconnect": {
-          "default": "Disconnect",
+          "default": "\u65ad\u5f00\u8fde\u63a5",
           "title": "Disconnect",
           "type": "string"
         },
         "connecting": {
-          "default": "Connecting",
+          "default": "\u6b63\u5728\u8fde\u63a5",
           "title": "Connecting",
           "type": "string"
         },
         "disconnecting": {
-          "default": "Disconnecting",
+          "default": "\u6b63\u5728\u65ad\u5f00\u8fde\u63a5",
           "title": "Disconnecting",
           "type": "string"
         },
         "pair": {
-          "default": "Pair",
+          "default": "\u914d\u5bf9",
           "title": "Pair",
           "type": "string"
         },
         "manage": {
-          "default": "Manage",
+          "default": "\u7ba1\u7406",
           "title": "Manage",
           "type": "string"
         },
         "power_on": {
-          "default": "On",
+          "default": "\u5f00\u542f",
           "title": "Power On",
           "type": "string"
         },
         "power_off": {
-          "default": "Off",
+          "default": "\u5173\u95ed",
           "title": "Power Off",
           "type": "string"
         }
@@ -1602,20 +1602,20 @@
         "labels": {
           "$ref": "#/$defs/BluetoothLabelsConfig",
           "default": {
-            "title": "Bluetooth",
-            "your_devices": "Your devices",
-            "new_devices": "New devices",
-            "not_connected": "Not connected",
-            "connected": "Connected",
-            "more_settings": "More Bluetooth settings",
-            "connect": "Connect",
-            "disconnect": "Disconnect",
-            "connecting": "Connecting",
-            "disconnecting": "Disconnecting",
-            "pair": "Pair",
-            "manage": "Manage",
-            "power_on": "On",
-            "power_off": "Off"
+            "title": "\u84dd\u7259",
+            "your_devices": "\u4f60\u7684\u8bbe\u5907",
+            "new_devices": "\u65b0\u8bbe\u5907",
+            "not_connected": "\u672a\u8fde\u63a5",
+            "connected": "\u5df2\u8fde\u63a5",
+            "more_settings": "\u66f4\u591a\u84dd\u7259\u8bbe\u7f6e",
+            "connect": "\u8fde\u63a5",
+            "disconnect": "\u65ad\u5f00\u8fde\u63a5",
+            "connecting": "\u6b63\u5728\u8fde\u63a5",
+            "disconnecting": "\u6b63\u5728\u65ad\u5f00\u8fde\u63a5",
+            "pair": "\u914d\u5bf9",
+            "manage": "\u7ba1\u7406",
+            "power_on": "\u5f00\u542f",
+            "power_off": "\u5173\u95ed"
           }
         },
         "device_icons": {
@@ -2300,21 +2300,28 @@
         },
         "bar_height": {
           "default": 20,
+          "minimum": 1,
           "title": "Bar Height",
           "type": "integer"
         },
         "min_bar_height": {
           "default": 1,
+          "minimum": 0,
           "title": "Min Bar Height",
           "type": "integer"
         },
         "bars_number": {
           "default": 10,
+          "minimum": 1,
           "title": "Bars Number",
           "type": "integer"
         },
         "output_bit_format": {
           "default": "16bit",
+          "enum": [
+            "8bit",
+            "16bit"
+          ],
           "title": "Output Bit Format",
           "type": "string"
         },
@@ -2339,8 +2346,55 @@
         },
         "sleep_timer": {
           "default": 0,
+          "minimum": 0,
           "title": "Sleep Timer",
           "type": "integer"
+        },
+        "output_timeout": {
+          "default": 3.0,
+          "exclusiveMinimum": 0,
+          "title": "Output Timeout",
+          "type": "number"
+        },
+        "signal_timeout": {
+          "default": 3.0,
+          "exclusiveMinimum": 0,
+          "title": "Signal Timeout",
+          "type": "number"
+        },
+        "cava_peak_threshold": {
+          "default": 0.0001,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Cava Peak Threshold",
+          "type": "number"
+        },
+        "system_peak_threshold": {
+          "default": 0.0001,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "System Peak Threshold",
+          "type": "number"
+        },
+        "cava_stuck_high_threshold": {
+          "default": 0.7,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Cava Stuck High Threshold",
+          "type": "number"
+        },
+        "system_silence_threshold": {
+          "default": 0.001,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "System Silence Threshold",
+          "type": "number"
+        },
+        "stuck_high_timeout": {
+          "default": 5.0,
+          "exclusiveMinimum": 0,
+          "title": "Stuck High Timeout",
+          "type": "number"
         },
         "sensitivity": {
           "default": 100,
@@ -2359,6 +2413,7 @@
         },
         "framerate": {
           "default": 60,
+          "minimum": 1,
           "title": "Framerate",
           "type": "integer"
         },
@@ -2462,12 +2517,22 @@
         "edge_fade": {
           "anyOf": [
             {
+              "minimum": 0,
               "type": "integer"
             },
             {
-              "items": {
-                "type": "integer"
-              },
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              ],
               "type": "array"
             }
           ],
@@ -3123,6 +3188,96 @@
       "title": "ClockEntry",
       "type": "object"
     },
+    "CodexUsageCallbacksConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "on_left": {
+          "default": "update_label",
+          "title": "On Left",
+          "type": "string"
+        },
+        "on_middle": {
+          "default": "do_nothing",
+          "title": "On Middle",
+          "type": "string"
+        },
+        "on_right": {
+          "default": "do_nothing",
+          "title": "On Right",
+          "type": "string"
+        }
+      },
+      "title": "CodexUsageCallbacksConfig",
+      "type": "object"
+    },
+    "CodexUsageConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "default": "Codex {usage[primary][used_percent]}%",
+          "title": "Label",
+          "type": "string"
+        },
+        "label_alt": {
+          "default": "Codex {usage[secondary][used_percent]}%",
+          "title": "Label Alt",
+          "type": "string"
+        },
+        "update_interval": {
+          "default": 60,
+          "maximum": 3600,
+          "minimum": 10,
+          "title": "Update Interval",
+          "type": "integer"
+        },
+        "command": {
+          "default": "codex",
+          "title": "Command",
+          "type": "string"
+        },
+        "class_name": {
+          "default": "",
+          "title": "Class Name",
+          "type": "string"
+        },
+        "keybindings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/KeybindingConfig"
+          },
+          "title": "Keybindings",
+          "type": "array"
+        },
+        "callbacks": {
+          "$ref": "#/$defs/CodexUsageCallbacksConfig",
+          "default": {
+            "on_left": "update_label",
+            "on_middle": "do_nothing",
+            "on_right": "do_nothing"
+          }
+        }
+      },
+      "title": "CodexUsageConfig",
+      "type": "object"
+    },
+    "CodexUsageEntry": {
+      "properties": {
+        "type": {
+          "const": "yasb.codex_usage.CodexUsageWidget",
+          "title": "Type",
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/$defs/CodexUsageConfig"
+        }
+      },
+      "required": [
+        "type",
+        "options"
+      ],
+      "title": "CodexUsageEntry",
+      "type": "object"
+    },
     "ColorProviderConfig": {
       "additionalProperties": false,
       "properties": {
@@ -3255,37 +3410,37 @@
                   "command": null,
                   "icon": "\uf285",
                   "id": "toggle_dnd",
-                  "label": "Do Not Disturb"
+                  "label": "\u514d\u6253\u6270"
                 },
                 {
                   "command": null,
                   "icon": "\ue708",
                   "id": "toggle_theme",
-                  "label": "Dark Mode"
+                  "label": "\u6df1\u8272\u6a21\u5f0f"
                 },
                 {
                   "command": null,
                   "icon": "\ue765",
                   "id": "touch_keyboard",
-                  "label": "Keyboard"
+                  "label": "\u952e\u76d8"
                 },
                 {
                   "command": null,
                   "icon": "\ue74f",
                   "id": "toggle_mute",
-                  "label": "Mute"
+                  "label": "\u9759\u97f3"
                 },
                 {
                   "command": null,
                   "icon": "\uf12e",
                   "id": "toggle_mic_mute",
-                  "label": "Mic Mute"
+                  "label": "\u9ea6\u514b\u98ce\u9759\u97f3"
                 },
                 {
                   "command": null,
                   "icon": "\ue91b",
                   "id": "screenshot",
-                  "label": "Screenshot"
+                  "label": "\u622a\u53d6\u5c4f\u5e55\u622a\u56fe"
                 }
               ],
               "columns": 3,
@@ -3315,8 +3470,8 @@
             },
             "power": {
               "button_menu_icon": "\ue76c",
-              "power_mode_title": "Power Mode",
-              "power_plan_title": "Power Plan",
+              "power_mode_title": "\u7535\u6e90\u6a21\u5f0f",
+              "power_plan_title": "\u7535\u6e90\u8ba1\u5212",
               "show": true
             },
             "media": {
@@ -3462,37 +3617,37 @@
                 "command": null,
                 "icon": "\uf285",
                 "id": "toggle_dnd",
-                "label": "Do Not Disturb"
+                "label": "\u514d\u6253\u6270"
               },
               {
                 "command": null,
                 "icon": "\ue708",
                 "id": "toggle_theme",
-                "label": "Dark Mode"
+                "label": "\u6df1\u8272\u6a21\u5f0f"
               },
               {
                 "command": null,
                 "icon": "\ue765",
                 "id": "touch_keyboard",
-                "label": "Keyboard"
+                "label": "\u952e\u76d8"
               },
               {
                 "command": null,
                 "icon": "\ue74f",
                 "id": "toggle_mute",
-                "label": "Mute"
+                "label": "\u9759\u97f3"
               },
               {
                 "command": null,
                 "icon": "\uf12e",
                 "id": "toggle_mic_mute",
-                "label": "Mic Mute"
+                "label": "\u9ea6\u514b\u98ce\u9759\u97f3"
               },
               {
                 "command": null,
                 "icon": "\ue91b",
                 "id": "screenshot",
-                "label": "Screenshot"
+                "label": "\u622a\u53d6\u5c4f\u5e55\u622a\u56fe"
               }
             ]
           }
@@ -3525,8 +3680,8 @@
           "$ref": "#/$defs/PowerSectionConfig",
           "default": {
             "show": true,
-            "power_plan_title": "Power Plan",
-            "power_mode_title": "Power Mode",
+            "power_plan_title": "\u7535\u6e90\u8ba1\u5212",
+            "power_mode_title": "\u7535\u6e90\u6a21\u5f0f",
             "button_menu_icon": "\ue76c"
           }
         },
@@ -4108,7 +4263,7 @@
           "type": "string"
         },
         "label_placeholder": {
-          "default": "Loading...",
+          "default": "\u6b63\u5728\u52a0\u8f7d...",
           "title": "Label Placeholder",
           "type": "string"
         },
@@ -6193,6 +6348,87 @@
       "title": "IgnoreWindowConfig",
       "type": "object"
     },
+    "InputModeConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "default": "{input_mode_label}",
+          "title": "Label",
+          "type": "string"
+        },
+        "class_name": {
+          "default": "",
+          "title": "Class Name",
+          "type": "string"
+        },
+        "input_mode_labels": {
+          "$ref": "#/$defs/InputModeLabelsConfig",
+          "default": {
+            "native": "\u4e2d",
+            "alphanumeric": "\u82f1",
+            "unknown": "?"
+          }
+        },
+        "keybindings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/KeybindingConfig"
+          },
+          "title": "Keybindings",
+          "type": "array"
+        },
+        "callbacks": {
+          "$ref": "#/$defs/CallbacksConfig",
+          "default": {
+            "on_left": "do_nothing",
+            "on_middle": "do_nothing",
+            "on_right": "do_nothing"
+          }
+        }
+      },
+      "title": "InputModeConfig",
+      "type": "object"
+    },
+    "InputModeEntry": {
+      "properties": {
+        "type": {
+          "const": "yasb.input_mode.InputModeWidget",
+          "title": "Type",
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/$defs/InputModeConfig"
+        }
+      },
+      "required": [
+        "type",
+        "options"
+      ],
+      "title": "InputModeEntry",
+      "type": "object"
+    },
+    "InputModeLabelsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "native": {
+          "default": "\u4e2d",
+          "title": "Native",
+          "type": "string"
+        },
+        "alphanumeric": {
+          "default": "\u82f1",
+          "title": "Alphanumeric",
+          "type": "string"
+        },
+        "unknown": {
+          "default": "?",
+          "title": "Unknown",
+          "type": "string"
+        }
+      },
+      "title": "InputModeLabelsConfig",
+      "type": "object"
+    },
     "IpInfoProviderConfig": {
       "additionalProperties": false,
       "properties": {
@@ -6769,7 +7005,7 @@
           "type": "string"
         },
         "search_placeholder": {
-          "default": "Search applications...",
+          "default": "\u641c\u7d22\u5e94\u7528...",
           "title": "Search Placeholder",
           "type": "string"
         },
@@ -8310,12 +8546,12 @@
       "additionalProperties": false,
       "properties": {
         "label": {
-          "default": "{count} new notifications",
+          "default": "{count} \u6761\u65b0\u901a\u77e5",
           "title": "Label",
           "type": "string"
         },
         "label_alt": {
-          "default": "{count} new notifications",
+          "default": "{count} \u6761\u65b0\u901a\u77e5",
           "title": "Label Alt",
           "type": "string"
         },
@@ -9716,12 +9952,12 @@
           "type": "boolean"
         },
         "power_plan_title": {
-          "default": "Power Plan",
+          "default": "\u7535\u6e90\u8ba1\u5212",
           "title": "Power Plan Title",
           "type": "string"
         },
         "power_mode_title": {
-          "default": "Power Mode",
+          "default": "\u7535\u6e90\u6a21\u5f0f",
           "title": "Power Mode Title",
           "type": "string"
         },
@@ -9793,37 +10029,37 @@
           "default": [
             {
               "id": "toggle_dnd",
-              "label": "Do Not Disturb",
+              "label": "\u514d\u6253\u6270",
               "icon": "\uf285",
               "command": null
             },
             {
               "id": "toggle_theme",
-              "label": "Dark Mode",
+              "label": "\u6df1\u8272\u6a21\u5f0f",
               "icon": "\ue708",
               "command": null
             },
             {
               "id": "touch_keyboard",
-              "label": "Keyboard",
+              "label": "\u952e\u76d8",
               "icon": "\ue765",
               "command": null
             },
             {
               "id": "toggle_mute",
-              "label": "Mute",
+              "label": "\u9759\u97f3",
               "icon": "\ue74f",
               "command": null
             },
             {
               "id": "toggle_mic_mute",
-              "label": "Mic Mute",
+              "label": "\u9ea6\u514b\u98ce\u9759\u97f3",
               "icon": "\uf12e",
               "command": null
             },
             {
               "id": "screenshot",
-              "label": "Screenshot",
+              "label": "\u622a\u53d6\u5c4f\u5e55\u622a\u56fe",
               "icon": "\ue91b",
               "command": null
             }
@@ -11559,6 +11795,170 @@
       "title": "TaskbarEntry",
       "type": "object"
     },
+    "TerminalCallbacksConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "on_left": {
+          "default": "launch",
+          "title": "On Left",
+          "type": "string"
+        },
+        "on_middle": {
+          "default": "toggle_label",
+          "title": "On Middle",
+          "type": "string"
+        },
+        "on_right": {
+          "default": "launch_alternate",
+          "title": "On Right",
+          "type": "string"
+        }
+      },
+      "title": "TerminalCallbacksConfig",
+      "type": "object"
+    },
+    "TerminalConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "default": "<span>{icon}</span> {name}",
+          "title": "Label",
+          "type": "string"
+        },
+        "label_alt": {
+          "default": "{command}",
+          "title": "Label Alt",
+          "type": "string"
+        },
+        "class_name": {
+          "default": "",
+          "title": "Class Name",
+          "type": "string"
+        },
+        "launcher": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Launcher"
+        },
+        "terminals": {
+          "items": {
+            "$ref": "#/$defs/TerminalEntryConfig"
+          },
+          "minItems": 1,
+          "title": "Terminals",
+          "type": "array"
+        },
+        "keybindings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/KeybindingConfig"
+          },
+          "title": "Keybindings",
+          "type": "array"
+        },
+        "callbacks": {
+          "$ref": "#/$defs/TerminalCallbacksConfig",
+          "default": {
+            "on_left": "launch",
+            "on_middle": "toggle_label",
+            "on_right": "launch_alternate"
+          }
+        }
+      },
+      "required": [
+        "terminals"
+      ],
+      "title": "TerminalConfig",
+      "type": "object"
+    },
+    "TerminalEntry": {
+      "properties": {
+        "type": {
+          "const": "yasb.terminal.TerminalWidget",
+          "title": "Type",
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/$defs/TerminalConfig"
+        }
+      },
+      "required": [
+        "type",
+        "options"
+      ],
+      "title": "TerminalEntry",
+      "type": "object"
+    },
+    "TerminalEntryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "short": {
+          "default": "",
+          "title": "Short",
+          "type": "string"
+        },
+        "icon": {
+          "default": "",
+          "title": "Icon",
+          "type": "string"
+        },
+        "launcher": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Launcher"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "alternate_command": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alternate Command"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "TerminalEntryConfig",
+      "type": "object"
+    },
     "TitleLabelConfig": {
       "additionalProperties": false,
       "properties": {
@@ -11599,7 +11999,7 @@
           "type": "string"
         },
         "label_alt": {
-          "default": "\uf4a0 Tasks: {count}",
+          "default": "\uf4a0 \u4efb\u52a1\uff1a{count}",
           "title": "Label Alt",
           "type": "string"
         },
@@ -11624,9 +12024,9 @@
         "icons": {
           "$ref": "#/$defs/core__validation__widgets__yasb__todo__IconsConfig",
           "default": {
-            "add": "New Task",
-            "edit": "Edit",
-            "delete": "Delete",
+            "add": "\u65b0\u5efa\u4efb\u52a1",
+            "edit": "\u7f16\u8f91",
+            "delete": "\u5220\u9664",
             "date": "\ue641",
             "category": "\uf412",
             "checked": "\udb80\udd34",
@@ -11641,19 +12041,19 @@
           },
           "default": {
             "default": {
-              "label": "General"
+              "label": "\u5e38\u89c4"
             },
             "urgent": {
-              "label": "Urgent"
+              "label": "\u7d27\u6025"
             },
             "important": {
-              "label": "Important"
+              "label": "\u91cd\u8981"
             },
             "soon": {
-              "label": "Complete soon"
+              "label": "\u5373\u5c06\u5b8c\u6210"
             },
             "today": {
-              "label": "End of day"
+              "label": "\u5f53\u5929\u7ed3\u675f\u524d"
             }
           },
           "title": "Categories",
@@ -15233,17 +15633,17 @@
       "additionalProperties": false,
       "properties": {
         "add": {
-          "default": "New Task",
+          "default": "\u65b0\u5efa\u4efb\u52a1",
           "title": "Add",
           "type": "string"
         },
         "edit": {
-          "default": "Edit",
+          "default": "\u7f16\u8f91",
           "title": "Edit",
           "type": "string"
         },
         "delete": {
-          "default": "Delete",
+          "default": "\u5220\u9664",
           "title": "Delete",
           "type": "string"
         },
@@ -15659,6 +16059,9 @@
             "$ref": "#/$defs/ClockEntry"
           },
           {
+            "$ref": "#/$defs/CodexUsageEntry"
+          },
+          {
             "$ref": "#/$defs/ControlCenterEntry"
           },
           {
@@ -15690,6 +16093,9 @@
           },
           {
             "$ref": "#/$defs/HomeEntry"
+          },
+          {
+            "$ref": "#/$defs/InputModeEntry"
           },
           {
             "$ref": "#/$defs/LanguageEntry"
@@ -15747,6 +16153,9 @@
           },
           {
             "$ref": "#/$defs/TaskbarEntry"
+          },
+          {
+            "$ref": "#/$defs/TerminalEntry"
           },
           {
             "$ref": "#/$defs/TodoEntry"
