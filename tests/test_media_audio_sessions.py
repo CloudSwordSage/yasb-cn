@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from core.widgets.services.media.aumid_process import (
     get_app_audio_sessions,
+    get_app_audio_state,
     set_app_audio_muted,
     set_app_audio_volume,
 )
@@ -29,6 +30,11 @@ class _Volume:
 
     def SetMute(self, muted: bool, _event_context) -> None:
         self.mutes.append(muted)
+
+
+class _BrokenVolume:
+    def GetMasterVolume(self) -> float:
+        raise OSError("session disconnected")
 
 
 class AppAudioSessionTests(unittest.TestCase):
@@ -71,6 +77,42 @@ class AppAudioSessionTests(unittest.TestCase):
 
         self.assertEqual([volume.levels for volume in volumes], [[0.42], [0.42]])
         self.assertEqual([volume.mutes for volume in volumes], [[True], [True]])
+
+    def test_reads_recreated_session_after_stale_interface(self) -> None:
+        replacement = SimpleNamespace(GetMasterVolume=lambda: 0.65, GetMute=lambda: True)
+        sessions = [
+            SimpleNamespace(State=1, SimpleAudioVolume=_BrokenVolume()),
+            SimpleNamespace(State=1, SimpleAudioVolume=replacement),
+        ]
+
+        with patch(
+            "core.widgets.services.media.aumid_process.get_app_audio_sessions",
+            return_value=sessions,
+        ):
+            self.assertEqual(get_app_audio_state("Player.App"), (0.65, True))
+
+    def test_matches_same_application_across_processes(self) -> None:
+        direct_aumid = _Session(11, "host.exe", 1)
+        executable_match = _Session(12, "player.exe", 1)
+
+        with (
+            patch(
+                "core.widgets.services.media.aumid_process.AudioUtilities.GetAllSessions",
+                return_value=[direct_aumid, executable_match],
+            ),
+            patch(
+                "core.widgets.services.media.aumid_process.get_process_name_for_aumid",
+                return_value="player.exe",
+            ),
+            patch(
+                "core.widgets.services.media.aumid_process.get_process_aumid",
+                side_effect=lambda pid: "Player.App" if pid == 11 else None,
+            ),
+        ):
+            self.assertEqual(
+                get_app_audio_sessions("Player.App"),
+                [direct_aumid, executable_match],
+            )
 
 
 if __name__ == "__main__":

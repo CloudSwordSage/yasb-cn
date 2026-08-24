@@ -30,6 +30,7 @@ from core.validation.widgets.yasb.media_lite import MediaLiteWidgetConfig
 from core.widgets.base import BaseWidget
 from core.widgets.services.media.aumid_process import (
     get_app_audio_sessions,
+    get_app_audio_state,
     get_pid_for_window_aumid,
     get_process_name_for_aumid,
     set_app_audio_muted,
@@ -827,31 +828,22 @@ class MediaWidget(BaseWidget):
         if is_valid_qobject(self._popup_current_time_label):
             self._popup_current_time_label.setText(self._format_time((value / 1000.0) * self.current_session.duration))
 
-    def _get_volume_interface(self):
-        app_id = self.current_session.app_id if self.current_session else None
-        if not app_id:
-            return None
-        try:
-            sessions = get_app_audio_sessions(app_id)
-            return getattr(sessions[0], "SimpleAudioVolume", None) if sessions else None
-        except Exception as e:
-            logger.error("Failed to resolve app volume session: %s", e)
-            return None
-
     def _volume_available(self) -> bool:
-        return self._get_volume_interface() is not None
+        app_id = self.current_session.app_id if self.current_session else None
+        return bool(app_id and get_app_audio_state(app_id) is not None)
 
     def _update_app_volume_slider(self):
         if not is_valid_qobject(self.dialog):
             return
-        volume_interface = self._get_volume_interface()
-        if volume_interface is None:
+        app_id = self.current_session.app_id if self.current_session else None
+        state = get_app_audio_state(app_id) if app_id else None
+        if state is None:
             self._volume_hover.hide_slider()
             self.app_volume_slider.setEnabled(False)
             self._update_volume_icon()
             return
         try:
-            level = int(round(float(volume_interface.GetMasterVolume()) * 100))
+            level = int(round(state[0] * 100))
             self.app_volume_slider.blockSignals(True)
             self.app_volume_slider.setValue(level)
             self.app_volume_slider.blockSignals(False)
@@ -861,9 +853,6 @@ class MediaWidget(BaseWidget):
             self.app_volume_slider.setEnabled(False)
 
     def _on_app_volume_slider_changed(self, value: int):
-        volume_interface = self._get_volume_interface()
-        if not volume_interface:
-            return
         try:
             app_id = self.current_session.app_id if self.current_session else None
             if not app_id or not set_app_audio_volume(app_id, float(value) / 100.0):
@@ -875,21 +864,18 @@ class MediaWidget(BaseWidget):
             logger.error("Failed to set app volume: %s", e)
 
     def _adjust_volume_by_delta(self, delta: int):
-        if not is_valid_qobject(self.dialog) or not self._get_volume_interface():
+        if not is_valid_qobject(self.dialog) or not self._volume_available():
             return
         self.app_volume_slider.setValue(max(0, min(100, self.app_volume_slider.value() + delta)))
 
     def _toggle_app_mute(self):
-        volume_interface = self._get_volume_interface()
-        if not volume_interface:
+        app_id = self.current_session.app_id if self.current_session else None
+        state = get_app_audio_state(app_id) if app_id else None
+        if state is None:
             return
         try:
-            try:
-                current_mute = bool(volume_interface.GetMute())
-            except Exception:
-                current_mute = False
-            app_id = self.current_session.app_id if self.current_session else None
-            if not app_id or not set_app_audio_muted(app_id, not current_mute):
+            _, current_mute = state
+            if not set_app_audio_muted(app_id, not current_mute):
                 return
             self._app_is_muted = not current_mute
             self._update_volume_icon()
@@ -900,8 +886,9 @@ class MediaWidget(BaseWidget):
         if not is_valid_qobject(self._volume_icon):
             return
         icons = self.config.media_menu.icons
-        volume_interface = self._get_volume_interface()
-        if not volume_interface:
+        app_id = self.current_session.app_id if self.current_session else None
+        state = get_app_audio_state(app_id) if app_id else None
+        if state is None:
             self._volume_icon.setText(icons.volume)
             self._volume_icon.setProperty("class", "volume-button unavailable")
             refresh_widget_style(self._volume_icon)
@@ -910,7 +897,7 @@ class MediaWidget(BaseWidget):
                 self._volume_hover.setCursor(Qt.CursorShape.ArrowCursor)
             return
         try:
-            is_muted = bool(volume_interface.GetMute())
+            _, is_muted = state
             self._app_is_muted = is_muted
             self._volume_icon.setText(icons.mute if is_muted else icons.volume)
             self._volume_icon.setProperty("class", "volume-button muted" if is_muted else "volume-button")

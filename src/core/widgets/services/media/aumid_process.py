@@ -117,13 +117,29 @@ def get_app_audio_sessions(app_id: str):
 def _get_app_audio_interfaces(app_id: str):
     """Return every active volume interface, or inactive fallbacks when none are active."""
     sessions = get_app_audio_sessions(app_id)
-    active = [session for session in sessions if getattr(session, "State", AudioSessionState.Active) == AudioSessionState.Active]
-    targets = active or sessions
-    return [
-        interface
-        for session in targets
-        if (interface := getattr(session, "SimpleAudioVolume", None)) is not None
+    active = [
+        session
+        for session in sessions
+        if getattr(session, "State", AudioSessionState.Active) == AudioSessionState.Active
     ]
+    targets = active or sessions
+    return [interface for session in targets if (interface := getattr(session, "SimpleAudioVolume", None)) is not None]
+
+
+def get_app_audio_state(app_id: str) -> tuple[float, bool] | None:
+    """Read volume and mute state from the first responsive active session.
+
+    Args:
+        app_id(str): Media session AUMID or executable name.
+    Returns:
+        tuple[float, bool] | None: Volume and mute state, or ``None`` when unavailable.
+    """
+    for interface in _get_app_audio_interfaces(app_id):
+        try:
+            return float(interface.GetMasterVolume()), bool(interface.GetMute())
+        except Exception:
+            continue
+    return None
 
 
 def set_app_audio_volume(app_id: str, level: float) -> bool:

@@ -32,7 +32,7 @@ from core.utils.win32.aumid import activate_app_by_aumid
 from core.validation.widgets.yasb.media import MediaWidgetConfig
 from core.widgets.base import BaseWidget
 from core.widgets.services.media.aumid_process import (
-    get_app_audio_sessions,
+    get_app_audio_state,
     get_process_name_for_aumid,
     set_app_audio_muted,
     set_app_audio_volume,
@@ -1053,31 +1053,20 @@ class MediaWidget(BaseWidget):
         if self.current_session:
             return self.current_session.app_id
 
-    def _get_volume_interface(self):
-        """Resolve the current app's live SimpleAudioVolume interface."""
-        app_id = self._get_current_app_identifier()
-        if not app_id:
-            return None
-        try:
-            sessions = get_app_audio_sessions(app_id)
-            return getattr(sessions[0], "SimpleAudioVolume", None) if sessions else None
-        except Exception as e:
-            logger.error("Failed to resolve app volume session: %s", e)
-            return None
-
     def _updateapp_volume_slider(self):
         """Update slider value from bound app session volume."""
         if not self.app_volume_slider:
             return
 
-        volume_interface = self._get_volume_interface()
-        if not volume_interface:
+        app_id = self._get_current_app_identifier()
+        state = get_app_audio_state(app_id) if app_id else None
+        if state is None:
             self._vol_container.hide()
             self.app_volume_slider.setEnabled(False)
             return
 
         try:
-            raw_level = volume_interface.GetMasterVolume()
+            raw_level, _ = state
             level = int(round(float(raw_level) * 100))
 
             self.app_volume_slider.blockSignals(True)
@@ -1091,10 +1080,6 @@ class MediaWidget(BaseWidget):
 
     def _on_app_volume_slider_changed(self, value: int):
         """Set app session volume from slider."""
-        volume_interface = self._get_volume_interface()
-        if not volume_interface:
-            return
-
         try:
             app_id = self._get_current_app_identifier()
             if not app_id or not set_app_audio_volume(app_id, float(value) / 100.0):
@@ -1110,22 +1095,17 @@ class MediaWidget(BaseWidget):
 
     def _toggle_app_mute(self):
         """Toggle mute state for the current app."""
-        volume_interface = self._get_volume_interface()
-        if not volume_interface:
+        app_id = self._get_current_app_identifier()
+        state = get_app_audio_state(app_id) if app_id else None
+        if state is None:
             return
 
         try:
-            # Get current mute state (default to False if failed)
-            current_mute = False
-            try:
-                current_mute = bool(volume_interface.GetMute())
-            except Exception:
-                pass
+            _, current_mute = state
 
             # Toggle mute state
             new_mute = not current_mute
-            app_id = self._get_current_app_identifier()
-            if not app_id or not set_app_audio_muted(app_id, new_mute):
+            if not set_app_audio_muted(app_id, new_mute):
                 return
             self._app_is_muted = new_mute
 
@@ -1139,13 +1119,14 @@ class MediaWidget(BaseWidget):
         if not self._app_mute_button:
             return
 
-        volume_interface = self._get_volume_interface()
-        if not volume_interface:
+        app_id = self._get_current_app_identifier()
+        state = get_app_audio_state(app_id) if app_id else None
+        if state is None:
             self._app_mute_button.setEnabled(False)
             return
 
         try:
-            is_muted = volume_interface.GetMute()
+            _, is_muted = state
             self._app_is_muted = is_muted
 
             icon_key = "unmute" if is_muted else "mute"
