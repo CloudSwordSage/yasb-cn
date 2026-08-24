@@ -48,6 +48,24 @@ python build.py bdist_msi
 ![Dark Themea](https://raw.githubusercontent.com/amnweb/yasb/main/docs/assets/readme/demo-dark.jpg)
 ![Light Theme](https://raw.githubusercontent.com/amnweb/yasb/main/docs/assets/readme/demo-light.jpg)
 
+## 本地化仓库新增小部件
+| Widget                                                | Description                                                           |
+| ----------------------------------------------------- | --------------------------------------------------------------------- |
+| [Input Mode](./docs/widgets/(Widget)-Input-Mode.md)   | 显示当前活动的 Windows 输入法转换模式。                               |
+| [Terminal](./docs/widgets/(Widget)-Terminal.md)       | 在多个终端之间切换并启动选中的终端。                                  |
+| [Codex Usage](./docs/widgets/(Widget)-Codex-Usage.md) | 显示 ChatGPT Codex 用量(tips: 未经过详细测试, 可能不稳定, 不建议使用) |
+
+## 本地bug修复过的小部件
+| Widget                                      | Description                  |
+| ------------------------------------------- | ---------------------------- |
+| [Volume](./docs/widgets/(Widget)-Volume.md) | 显示并控制系统音量。         |
+| [Cava](./docs/widgets/(Widget)-Cava.md)     | 使用 Cava 显示音频可视化器。 |
+| [Media](./docs/widgets/(Widget)-Media.md)   | 显示媒体控件和信息。         |
+
+## 因 bug 修复更改了文档的小部件
+| Widget                                  | Description                  |
+| --------------------------------------- | ---------------------------- |
+| [Cava](./docs/widgets/(Widget)-Cava.md) | 使用 Cava 显示音频可视化器。 |
 
 ## 🛠️ 上游 YASB 中当前可用的小部件列表。
 
@@ -60,7 +78,6 @@ python build.py bdist_msi
 | [Brightness](https://github.com/amnweb/yasb/wiki/(Widget)-Brightness)                             | Displays and change the current brightness level.                                                             |
 | [Cava](https://github.com/amnweb/yasb/wiki/(Widget)-Cava)                                         | Displays audio visualizer using Cava.                                                                         |
 | [Claude Usage](https://github.com/amnweb/yasb/wiki/(Widget)-Claude-Usage)                         | Shows your Claude subscription usage.                                                                         |
-| [Codex Usage](https://github.com/amnweb/yasb/wiki/(Widget)-Codex-Usage)                           | Shows Codex ChatGPT rate-limit usage.                                                                         |
 | [Copilot](https://github.com/amnweb/yasb/wiki/(Widget)-Copilot)                                   | GitHub Copilot usage with a detailed menu showing statistics                                                  |
 | [CPU](https://github.com/amnweb/yasb/wiki/(Widget)-CPU)                                           | Shows the current CPU usage and information.                                                                  |
 | [Clock](https://github.com/amnweb/yasb/wiki/(Widget)-Clock)                                       | Displays the current time and date, with customizable formats.                                                |
@@ -77,7 +94,6 @@ python build.py bdist_msi
 | [Home](https://github.com/amnweb/yasb/wiki/(Widget)-Home)                                         | A customizable home widget menu.                                                                              |
 | [Disk](https://github.com/amnweb/yasb/wiki/(Widget)-Disk)                                         | Displays disk usage information.                                                                              |
 | [Language](https://github.com/amnweb/yasb/wiki/(Widget)-Language)                                 | Shows the current input language and allows switching between languages.                                      |
-| [Input Mode](https://github.com/amnweb/yasb/wiki/(Widget)-Input-Mode)                             | Shows the active IME conversion mode.                                                                         |
 | [Launchpad](https://github.com/amnweb/yasb/wiki/(Widget)-Launchpad)                               | A customizable launchpad for quick access to applications.                                                    |
 | [Libre Hardware Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Libre-HW-Monitor)           | Connects to Libre Hardware Monitor to get sensor data.                                                        |
 | [Media](https://github.com/amnweb/yasb/wiki/(Widget)-Media)                                       | Displays media controls and information.                                                                      |
@@ -112,10 +128,3 @@ python build.py bdist_msi
 | [Komorebi Layout](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Layout)                   | Shows the current layout of Komorebi.                                                                         |
 | [Komorebi Stack](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Stack)                     | Shows windows in the current Komorebi stack.                                                                  |
 | [Komorebi Workspaces](https://github.com/amnweb/yasb/wiki/(Widget)-Komorebi-Workspaces)           | Komorebi workspaces widget.                                                                                   |
-
-## 本地化仓库新增小部件
-| Widget                                                                          | Description                                                           |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [Input Mode](https://github.com/CloudSwordSage/yasb/wiki/(Widget)-Input-Mode)   | 显示当前活动的 Windows 输入法转换模式。                               |
-| [Terminal](https://github.com/CloudSwordSage/yasb/wiki/(Widget)-Terminal)       | 在多个终端之间切换并启动选中的终端。                                  |
-| [Codex Usage](https://github.com/CloudSwordSage/yasb/wiki/(Widget)-Codex-Usage) | 显示 ChatGPT Codex 用量(tips: 未经过详细测试, 可能不稳定, 不建议使用) |
