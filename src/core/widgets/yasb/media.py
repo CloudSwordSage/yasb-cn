@@ -31,7 +31,12 @@ from core.utils.utilities import (
 from core.utils.win32.aumid import activate_app_by_aumid
 from core.validation.widgets.yasb.media import MediaWidgetConfig
 from core.widgets.base import BaseWidget
-from core.widgets.services.media.aumid_process import get_app_audio_sessions, get_process_name_for_aumid
+from core.widgets.services.media.aumid_process import (
+    get_app_audio_sessions,
+    get_process_name_for_aumid,
+    set_app_audio_muted,
+    set_app_audio_volume,
+)
 from core.widgets.services.media.media import SessionState, WindowsMedia
 from core.widgets.services.media.source_apps import (
     get_source_app_class_name,
@@ -1091,7 +1096,9 @@ class MediaWidget(BaseWidget):
             return
 
         try:
-            volume_interface.SetMasterVolume(float(value) / 100.0, None)
+            app_id = self._get_current_app_identifier()
+            if not app_id or not set_app_audio_volume(app_id, float(value) / 100.0):
+                return
 
             # Unmute if volume is raised above 0
             if value > 0 and self._app_is_muted:
@@ -1117,7 +1124,9 @@ class MediaWidget(BaseWidget):
 
             # Toggle mute state
             new_mute = not current_mute
-            volume_interface.SetMute(new_mute, None)
+            app_id = self._get_current_app_identifier()
+            if not app_id or not set_app_audio_muted(app_id, new_mute):
+                return
             self._app_is_muted = new_mute
 
             self._update_app_mute_button()

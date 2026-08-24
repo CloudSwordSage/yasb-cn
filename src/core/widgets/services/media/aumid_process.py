@@ -114,6 +114,57 @@ def get_app_audio_sessions(app_id: str):
     return sorted(matches, key=lambda session: session.State != AudioSessionState.Active)
 
 
+def _get_app_audio_interfaces(app_id: str):
+    """Return every active volume interface, or inactive fallbacks when none are active."""
+    sessions = get_app_audio_sessions(app_id)
+    active = [session for session in sessions if getattr(session, "State", AudioSessionState.Active) == AudioSessionState.Active]
+    targets = active or sessions
+    return [
+        interface
+        for session in targets
+        if (interface := getattr(session, "SimpleAudioVolume", None)) is not None
+    ]
+
+
+def set_app_audio_volume(app_id: str, level: float) -> bool:
+    """Set every active audio session for an application to one level.
+
+    Args:
+        app_id(str): Media session AUMID or executable name.
+        level(float): Scalar volume level from 0.0 through 1.0.
+    Returns:
+        bool: Whether at least one live session was updated.
+    """
+    level = max(0.0, min(1.0, float(level)))
+    updated = False
+    for interface in _get_app_audio_interfaces(app_id):
+        try:
+            interface.SetMasterVolume(level, None)
+            updated = True
+        except Exception:
+            continue
+    return updated
+
+
+def set_app_audio_muted(app_id: str, muted: bool) -> bool:
+    """Set the mute state of every active audio session for an application.
+
+    Args:
+        app_id(str): Media session AUMID or executable name.
+        muted(bool): Desired mute state.
+    Returns:
+        bool: Whether at least one live session was updated.
+    """
+    updated = False
+    for interface in _get_app_audio_interfaces(app_id):
+        try:
+            interface.SetMute(bool(muted), None)
+            updated = True
+        except Exception:
+            continue
+    return updated
+
+
 def _enum_processes():
     """Yield (pid, exe_name) for running processes."""
     hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)

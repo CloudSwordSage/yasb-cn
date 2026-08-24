@@ -32,6 +32,8 @@ from core.widgets.services.media.aumid_process import (
     get_app_audio_sessions,
     get_pid_for_window_aumid,
     get_process_name_for_aumid,
+    set_app_audio_muted,
+    set_app_audio_volume,
 )
 from core.widgets.services.media.media import SessionState, WindowsMedia
 from core.widgets.services.media.source_apps import resolve_source_app_name
@@ -863,7 +865,9 @@ class MediaWidget(BaseWidget):
         if not volume_interface:
             return
         try:
-            volume_interface.SetMasterVolume(float(value) / 100.0, None)
+            app_id = self.current_session.app_id if self.current_session else None
+            if not app_id or not set_app_audio_volume(app_id, float(value) / 100.0):
+                return
             if value > 0 and self._app_is_muted:
                 self._app_is_muted = False
                 self._update_volume_icon()
@@ -884,7 +888,9 @@ class MediaWidget(BaseWidget):
                 current_mute = bool(volume_interface.GetMute())
             except Exception:
                 current_mute = False
-            volume_interface.SetMute(not current_mute, None)
+            app_id = self.current_session.app_id if self.current_session else None
+            if not app_id or not set_app_audio_muted(app_id, not current_mute):
+                return
             self._app_is_muted = not current_mute
             self._update_volume_icon()
         except Exception as e:

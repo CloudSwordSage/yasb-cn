@@ -6,13 +6,29 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from core.widgets.services.media.aumid_process import get_app_audio_sessions
+from core.widgets.services.media.aumid_process import (
+    get_app_audio_sessions,
+    set_app_audio_muted,
+    set_app_audio_volume,
+)
 
 
 class _Session:
     def __init__(self, pid: int, executable: str, state: int) -> None:
         self.Process = SimpleNamespace(pid=pid, name=lambda: executable)
         self.State = state
+
+
+class _Volume:
+    def __init__(self) -> None:
+        self.levels = []
+        self.mutes = []
+
+    def SetMasterVolume(self, level: float, _event_context) -> None:
+        self.levels.append(level)
+
+    def SetMute(self, muted: bool, _event_context) -> None:
+        self.mutes.append(muted)
 
 
 class AppAudioSessionTests(unittest.TestCase):
@@ -41,6 +57,20 @@ class AppAudioSessionTests(unittest.TestCase):
             self.assertEqual(get_app_audio_sessions("Player.App"), [active_one, active_two, stale])
 
         self.assertEqual(get_all_sessions.call_count, 2)
+
+    def test_sets_volume_and_mute_on_every_active_session(self) -> None:
+        volumes = [_Volume(), _Volume()]
+        sessions = [SimpleNamespace(SimpleAudioVolume=volume) for volume in volumes]
+
+        with patch(
+            "core.widgets.services.media.aumid_process.get_app_audio_sessions",
+            return_value=sessions,
+        ):
+            self.assertTrue(set_app_audio_volume("Player.App", 0.42))
+            self.assertTrue(set_app_audio_muted("Player.App", True))
+
+        self.assertEqual([volume.levels for volume in volumes], [[0.42], [0.42]])
+        self.assertEqual([volume.mutes for volume in volumes], [[True], [True]])
 
 
 if __name__ == "__main__":
