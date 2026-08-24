@@ -56,16 +56,37 @@ python build.py bdist_msi
 | [Codex Usage](./docs/widgets/(Widget)-Codex-Usage.md) | 显示 ChatGPT Codex 用量(tips: 未经过详细测试, 可能不稳定, 不建议使用) |
 
 ## 本地bug修复过的小部件
-| Widget                                      | Description                  |
-| ------------------------------------------- | ---------------------------- |
-| [Volume](./docs/widgets/(Widget)-Volume.md) | 显示并控制系统音量。         |
-| [Cava](./docs/widgets/(Widget)-Cava.md)     | 使用 Cava 显示音频可视化器。 |
-| [Media](./docs/widgets/(Widget)-Media.md)   | 显示媒体控件和信息。         |
+| Widget                                      | Description                  | Docs changed |
+| ------------------------------------------- | ---------------------------- | ------------ |
+| [Volume](./docs/widgets/(Widget)-Volume.md) | 显示并控制系统音量。         | 否           |
+| [Cava](./docs/widgets/(Widget)-Cava.md)     | 使用 Cava 显示音频可视化器。 | 是           |
+| [Media](./docs/widgets/(Widget)-Media.md)   | 显示媒体控件和信息。         | 否           |
 
-## 因 bug 修复更改了文档的小部件
-| Widget                                  | Description                  |
-| --------------------------------------- | ---------------------------- |
-| [Cava](./docs/widgets/(Widget)-Cava.md) | 使用 Cava 显示音频可视化器。 |
+### 修复说明
+
+#### Volume & Media
+
+Windows 应用可能在启动、切歌或切换播放设备时重建音频会话。原实现会长期持有旧的音量接口，并可能优先选中非活动会话，导致 `Volume`、`Media` 和 `Media Lite` 中的应用音量滑块失效、控制错误会话或只调整同一应用的部分声音。
+
+修复后，组件会在打开菜单、读取状态和执行音量操作时重新解析当前会话：
+
+- 优先使用 `State == Active` 的音频会话，并忽略已过期会话；
+- 按 AUMID 或可执行文件识别应用，不再将单个 PID 直接等同于应用；
+- 同步调整同一应用的全部活动会话，不再使用 `PID + GroupingParam` 进行 first-wins 去重；
+- 旧接口失效或应用重建会话后，会继续查找可用的新会话。
+
+#### Cava
+
+原实现遇到频繁重载、Cava 输出停滞、进程异常退出、系统恢复或默认音频设备切换时，可能残留多个 `cava.exe`、无法自动恢复，或在退出时卡住界面线程。此外，Cava 进程仍持续输出时，无法识别“系统有声但波形全零”或“系统静音但波形持续高位”等采集异常；全零音频帧不会触发重绘，部分非法配置和单色渐变也可能造成空转或绘制异常。
+
+修复后，Cava 小组件会统一管理后台进程并安全恢复：
+
+- 使用单一进程所有权、generation 和独立停止事件串行化启动、停止与重载；旧工作线程未确认退出时不会启动新进程；
+- 为工作线程、`terminate`、`kill` 和进程回收设置有限等待，并在输出停滞、进程异常退出、系统唤醒或默认音频设备变化后自动重启；
+- 退出和组件销毁时会清理进程及系统回调，首次清理未完成时保留后续重试路径；
+- 通过 Windows Core Audio endpoint peak 对比 Cava 输出，持续检测“系统有声但 Cava 全零”和“系统静音但 Cava 卡高”；正常静音不会触发恢复，检测阈值与超时时间均可配置；
+- 仅在收到当前 generation 的有效信号后重置重启退避，并记录 PID、generation、峰值、信号时长和明确的重启原因，避免旧帧误报恢复；
+- 全零帧也会刷新画面，并校验柱数、帧率、位格式、边缘淡出等配置；单色渐变不再触发除零错误。
 
 ## 🛠️ 上游 YASB 中当前可用的小部件列表。
 
