@@ -2,7 +2,7 @@ import logging
 import threading
 
 from pycaw.callbacks import AudioEndpointVolumeCallback, MMNotificationClient
-from pycaw.constants import DEVICE_STATE
+from pycaw.constants import DEVICE_STATE, AudioSessionState
 from pycaw.pycaw import AudioUtilities, EDataFlow, ERole
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -44,7 +44,6 @@ class AudioOutputService(QObject):
 
         self._cached_speakers = None
         self._cached_devices = None
-        self._cached_sessions = None
         self._cache_lock = threading.Lock()
         self._initializing = False
         self._speakers_checked = False
@@ -79,10 +78,6 @@ class AudioOutputService(QObject):
                         )
                         self._cached_devices = [(d.id, d.FriendlyName) for d in devices]
 
-                with self._cache_lock:
-                    if self._cached_sessions is None:
-                        self._cached_sessions = AudioUtilities.GetAllSessions()
-
             except Exception:
                 pass
             finally:
@@ -95,7 +90,6 @@ class AudioOutputService(QObject):
         with self._cache_lock:
             self._cached_speakers = None
             self._cached_devices = None
-            self._cached_sessions = None
             self._speakers_checked = False
 
     def register_widget(self, widget):
@@ -226,12 +220,6 @@ class AudioOutputService(QObject):
 
     def get_all_sessions(self):
         """Get audio sessions."""
-        with self._cache_lock:
-            if self._cached_sessions is not None:
-                result = self._cached_sessions
-                self._cached_sessions = None
-                return result
-
         try:
             return AudioUtilities.GetAllSessions()
         except Exception:
@@ -260,13 +248,15 @@ class AudioOutputService(QObject):
     def get_active_audio_sessions(self, get_app_name_callback=None, format_name_callback=None):
         """Get running apps with audio, excluding system processes."""
         sessions = []
-        seen = {}
+        seen = set()
 
         try:
             if not self.get_speakers():
                 return sessions
 
             for session in self.get_all_sessions():
+                if session.State != AudioSessionState.Active:
+                    continue
                 if not session.Process or not session.Process.name():
                     continue
 
@@ -274,18 +264,10 @@ class AudioOutputService(QObject):
                 if proc_name.lower() in [p.lower() for p in BLACKLISTED_PROCESSES]:
                     continue
 
-                try:
-                    grouping = ""
-                    try:
-                        grouping = str(session.GroupingParam)
-                    except:
-                        pass
-                    key = (session.ProcessId, grouping)
-                    if key in seen:
-                        continue
-                    seen[key] = True
-                except:
+                app_id = proc_name.casefold()
+                if app_id in seen:
                     continue
+                seen.add(app_id)
 
                 app_name = None
                 if session.DisplayName:
@@ -304,6 +286,7 @@ class AudioOutputService(QObject):
                 sessions.append(
                     {
                         "name": proc_name,
+                        "app_id": app_id,
                         "app_name": app_name,
                         "volume_interface": session.SimpleAudioVolume,
                         "session": session,

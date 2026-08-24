@@ -18,6 +18,11 @@ from core.utils.win32.bindings import user32
 from core.utils.win32.utils import get_app_name_from_pid
 from core.validation.widgets.yasb.volume import VolumeConfig
 from core.widgets.base import BaseWidget
+from core.widgets.services.media.aumid_process import (
+    get_app_audio_state,
+    set_app_audio_muted,
+    set_app_audio_volume,
+)
 from core.widgets.services.volume.service import AudioOutputService
 
 
@@ -128,22 +133,26 @@ class VolumeWidget(BaseWidget):
             except Exception as e:
                 logging.error("Failed to set volume: %s", e)
 
-    def _set_app_volume(self, volume_interface, value, slider=None):
-        """Set volume for a specific application"""
+    def _set_app_volume(self, app_id, value, slider=None):
+        """Set volume for every active session of an application."""
         try:
-            volume_interface.SetMasterVolume(value / 100, None)
+            set_app_audio_volume(app_id, value / 100)
             # Show tooltip while actively dragging
             if slider:
                 self._show_slider_tooltip(slider, value)
         except Exception as e:
             logging.error("Failed to set application volume: %s", e)
 
-    def _toggle_app_mute(self, volume_interface, icon_label, slider, pid):
-        """Toggle mute state for a specific application"""
+    def _toggle_app_mute(self, app_id, icon_label, slider, pid):
+        """Toggle mute for every active session of an application."""
         try:
-            current_mute = volume_interface.GetMute()
+            state = get_app_audio_state(app_id)
+            if state is None:
+                return
+            _, current_mute = state
             new_mute = not current_mute
-            volume_interface.SetMute(new_mute, None)
+            if not set_app_audio_muted(app_id, new_mute):
+                return
             # Update icon and slider state
             self._update_app_mute_state(icon_label, slider, new_mute, pid)
         except Exception as e:
@@ -424,10 +433,8 @@ class VolumeWidget(BaseWidget):
                 slider_layout.setSpacing(0)
                 slider_layout.setContentsMargins(0, 0, 0, 0)
 
-                try:
-                    is_muted = session_info["volume_interface"].GetMute()
-                except:
-                    is_muted = False
+                app_state = get_app_audio_state(session_info["app_id"])
+                app_volume, is_muted = app_state if app_state is not None else (1.0, False)
 
                 icon_label = None
                 icon_frame = None
@@ -465,18 +472,14 @@ class VolumeWidget(BaseWidget):
                 app_slider.setMaximum(100)
                 self._apply_slider_scroll_step(app_slider)
 
-                try:
-                    app_volume = int(session_info["volume_interface"].GetMasterVolume() * 100)
-                    app_slider.setValue(app_volume)
-                except:
-                    app_slider.setValue(100)
+                app_slider.setValue(int(app_volume * 100))
                 # Disable slider if muted
                 app_slider.setEnabled(not is_muted)
 
                 # Connect to change app volume
                 app_slider.valueChanged.connect(
-                    lambda value, vol_interface=session_info["volume_interface"], slider=app_slider: (
-                        self._set_app_volume(vol_interface, value, slider)
+                    lambda value, app_id=session_info["app_id"], slider=app_slider: self._set_app_volume(
+                        app_id, value, slider
                     )
                 )
                 # Connect slider release to hide tooltip
@@ -485,8 +488,8 @@ class VolumeWidget(BaseWidget):
                 if self.config.audio_menu.show_app_icons and icon_frame and icon_label:
                     # Make icon frame clickable to toggle mute
                     icon_frame.mousePressEvent = (
-                        lambda event, vol_interface=session_info["volume_interface"], icon=icon_label, slider=app_slider, pid=session_info["pid"]: (
-                            self._toggle_app_mute(vol_interface, icon, slider, pid)
+                        lambda event, app_id=session_info["app_id"], icon=icon_label, slider=app_slider, pid=session_info["pid"]: (
+                            self._toggle_app_mute(app_id, icon, slider, pid)
                         )
                     )
 
