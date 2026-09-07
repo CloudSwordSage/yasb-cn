@@ -216,7 +216,7 @@ class CodexUsageWidget(BaseWidget):
             self._refresh_feedback_timer.stop()
             self._refresh_button.setEnabled(False)
             self._refresh_button.start_animation()
-            self._set_refresh_feedback("Refreshing…", "busy")
+            self._set_refresh_feedback("刷新中…", "busy")
         self._service.refresh_now()
 
     def _on_data(self, data: dict[str, Any]) -> None:
@@ -241,7 +241,7 @@ class CodexUsageWidget(BaseWidget):
             self._refresh_button.stop_animation()
             self._refresh_button.setEnabled(True)
         self._set_refresh_feedback(
-            "Refresh successful" if success else "Refresh failed", "success" if success else "error"
+            "刷新成功" if success else "刷新失败", "success" if success else "error"
         )
         self._refresh_feedback_timer.start(2200)
 
@@ -291,18 +291,19 @@ class CodexUsageWidget(BaseWidget):
         if not isinstance(timestamp, (int, float)):
             return "--"
         reset = datetime.fromtimestamp(timestamp)
-        template = "%b %d, %H:%M" if reset.year == datetime.now().year else "%Y-%m-%d %H:%M"
-        return reset.strftime(template)
+        if reset.year == datetime.now().year:
+            return f"{reset.month}月{reset.day}日 {reset:%H:%M}"
+        return f"{reset.year}年{reset.month}月{reset.day}日 {reset:%H:%M}"
 
     @staticmethod
     def _fmt_updated(timestamp: Any) -> str:
         if not isinstance(timestamp, (int, float)) or timestamp <= 0:
-            return "Never"
+            return "从未"
         seconds = max(0, int(time.time() - timestamp))
         if seconds < 60:
-            return "Just now"
+            return "刚刚"
         if seconds < 3600:
-            return f"{seconds // 60}m ago"
+            return f"{seconds // 60}分钟前"
         return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M")
 
     @staticmethod
@@ -338,11 +339,10 @@ class CodexUsageWidget(BaseWidget):
 
     def _toggle_label(self) -> None:
         self._show_alt_label = not self._show_alt_label
-        for widget in self._widgets:
-            widget.setVisible(not self._show_alt_label)
-        for widget in self._widgets_alt:
-            widget.setVisible(self._show_alt_label)
         self._update_label()
+        inactive = self._widgets if self._show_alt_label else self._widgets_alt
+        for widget in inactive:
+            widget.setVisible(False)
 
     def _update_label(self) -> None:
         active_widgets = self._widgets_alt if self._show_alt_label else self._widgets
@@ -372,18 +372,18 @@ class CodexUsageWidget(BaseWidget):
             primary = self._window("primary")
             secondary = self._window("secondary")
             lines = [
-                f"Codex {self._duration_name(primary.get('duration_mins'), 'primary')}: "
-                f"{self._percent(primary.get('remaining'))}% remaining "
-                f"({self._percent(primary.get('used'))}% used)",
+                f"Codex {self._duration_name(primary.get('duration_mins'), '主窗口')}: "
+                f"剩余 {self._percent(primary.get('remaining'))}% "
+                f"(已用 {self._percent(primary.get('used'))}%)",
             ]
             if secondary:
                 lines.append(
-                    f"Codex {self._duration_name(secondary.get('duration_mins'), 'secondary')}: "
-                    f"{self._percent(secondary.get('remaining'))}% remaining "
-                    f"({self._percent(secondary.get('used'))}% used)"
+                    f"Codex {self._duration_name(secondary.get('duration_mins'), '次窗口')}: "
+                    f"剩余 {self._percent(secondary.get('remaining'))}% "
+                    f"(已用 {self._percent(secondary.get('used'))}%)"
                 )
             if self._data.get("stale"):
-                lines.append(f"Cached data: {self._data.get('error') or 'refresh pending'}")
+                lines.append(f"缓存数据：{self._data.get('error') or '等待刷新'}")
             set_tooltip(self, "\n".join(lines))
         refresh_widget_style(*active_widgets)
 
@@ -426,11 +426,11 @@ class CodexUsageWidget(BaseWidget):
         stats_layout = QHBoxLayout(stats)
         stats_layout.setContentsMargins(0, 0, 0, 0)
         stats_layout.setSpacing(0)
-        used = QLabel("--% used")
+        used = QLabel("--% 已用")
         used.setProperty("class", "used")
         stats_layout.addWidget(used)
         stats_layout.addStretch()
-        remaining = QLabel("--% remaining")
+        remaining = QLabel("--% 剩余")
         remaining.setProperty("class", "remaining unknown")
         stats_layout.addWidget(remaining)
         layout.addWidget(stats)
@@ -440,7 +440,7 @@ class CodexUsageWidget(BaseWidget):
         timing_layout = QHBoxLayout(timing)
         timing_layout.setContentsMargins(0, 0, 0, 0)
         timing_layout.setSpacing(8)
-        reset = QLabel("Reset unknown")
+        reset = QLabel("重置时间未知")
         reset.setProperty("class", "reset")
         timing_layout.addWidget(reset)
         timing_layout.addStretch()
@@ -473,17 +473,18 @@ class CodexUsageWidget(BaseWidget):
     @staticmethod
     def _fmt_credit_date(timestamp: Any, prefix: str) -> str:
         if not isinstance(timestamp, (int, float)):
-            return "Does not expire" if prefix == "Expires" else ""
+            return "永不过期" if prefix == "到期" else ""
         value = datetime.fromtimestamp(timestamp)
-        template = "%b %d" if value.year == datetime.now().year else "%b %d, %Y"
-        return f"{prefix} {value.strftime(template)}"
+        if value.year == datetime.now().year:
+            return f"{prefix} {value.month}月{value.day}日"
+        return f"{prefix} {value.year}年{value.month}月{value.day}日"
 
     @staticmethod
     def _reset_credit_title(credit: dict[str, Any]) -> str:
         title = credit.get("title")
         if isinstance(title, str) and title.strip():
             return title.strip()
-        return "Full reset" if credit.get("reset_type") == "codexRateLimits" else "Usage reset"
+        return "完全重置" if credit.get("reset_type") == "codexRateLimits" else "用量重置"
 
     def _build_resets_page(self) -> QFrame:
         page = QFrame()
@@ -497,7 +498,7 @@ class CodexUsageWidget(BaseWidget):
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(8)
-        title = QLabel("Usage limit resets")
+        title = QLabel("用量限制重置")
         title.setProperty("class", "section-title")
         header_layout.addWidget(title)
         header_layout.addStretch()
@@ -507,7 +508,7 @@ class CodexUsageWidget(BaseWidget):
         self._reset_credits_count = count
         layout.addWidget(header)
 
-        empty = QLabel("No reset credits available")
+        empty = QLabel("无可用重置额度")
         empty.setProperty("class", "empty-state reset-credits-empty")
         empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty.setVisible(False)
@@ -520,10 +521,10 @@ class CodexUsageWidget(BaseWidget):
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(0, 0, 0, 0)
             card_layout.setSpacing(2)
-            card_title = QLabel("Full reset")
+            card_title = QLabel("完全重置")
             card_title.setProperty("class", "reset-credit-title")
             card_layout.addWidget(card_title)
-            expiration = QLabel("Expires --")
+            expiration = QLabel("到期 --")
             expiration.setProperty("class", "reset-credit-expiration")
             card_layout.addWidget(expiration)
             card.setVisible(False)
@@ -541,7 +542,7 @@ class CodexUsageWidget(BaseWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        title = QLabel("Models · 30 days")
+        title = QLabel("模型 · 近30天")
         title.setProperty("class", "section-title")
         layout.addWidget(title)
 
@@ -580,7 +581,7 @@ class CodexUsageWidget(BaseWidget):
             tokens_layout = QVBoxLayout(tokens)
             tokens_layout.setContentsMargins(0, 0, 0, 0)
             tokens_layout.setSpacing(0)
-            title = QLabel("Token totals")
+            title = QLabel("Token 总量")
             title.setProperty("class", "section-title")
             tokens_layout.addWidget(title)
 
@@ -591,7 +592,7 @@ class CodexUsageWidget(BaseWidget):
             periods_layout.setHorizontalSpacing(8)
             periods_layout.setVerticalSpacing(2)
             for column, (label, key) in enumerate(
-                (("TODAY", "today"), ("7 DAYS", "week"), ("30 DAYS", "month"), ("YEAR", "year"))
+                (("今日", "today"), ("近7天", "week"), ("近30天", "month"), ("全年", "year"))
             ):
                 name = QLabel(label)
                 name.setProperty("class", "period-name")
@@ -606,7 +607,7 @@ class CodexUsageWidget(BaseWidget):
             self._overview_tokens = tokens
             layout.addWidget(tokens)
 
-            empty = QLabel("Token history is unavailable")
+            empty = QLabel("Token 历史不可用")
             empty.setProperty("class", "empty-state")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty.setVisible(False)
@@ -632,14 +633,14 @@ class CodexUsageWidget(BaseWidget):
         activity_header_layout = QHBoxLayout(activity_header)
         activity_header_layout.setContentsMargins(0, 0, 0, 0)
         activity_header_layout.setSpacing(4)
-        activity_title = QLabel("Activity")
+        activity_title = QLabel("活动")
         activity_title.setProperty("class", "activity-title")
         activity_header_layout.addWidget(activity_title)
         activity_header_layout.addStretch()
         previous = QPushButton(self.config.menu.previous_page_icon)
         previous.setProperty("class", "month-nav previous")
-        previous.setAccessibleName("Previous month")
-        set_tooltip(previous, "Previous month")
+        previous.setAccessibleName("上一个月")
+        set_tooltip(previous, "上一个月")
         previous.clicked.connect(lambda: self._change_heatmap_month(-1))
         activity_header_layout.addWidget(previous)
         self._heatmap_previous = previous
@@ -650,8 +651,8 @@ class CodexUsageWidget(BaseWidget):
         self._heatmap_month_label = month_label
         next_button = QPushButton(self.config.menu.next_page_icon)
         next_button.setProperty("class", "month-nav next")
-        next_button.setAccessibleName("Next month")
-        set_tooltip(next_button, "Next month")
+        next_button.setAccessibleName("下一个月")
+        set_tooltip(next_button, "下一个月")
         next_button.clicked.connect(lambda: self._change_heatmap_month(1))
         activity_header_layout.addWidget(next_button)
         self._heatmap_next = next_button
@@ -664,7 +665,7 @@ class CodexUsageWidget(BaseWidget):
         heatmap_layout.setHorizontalSpacing(4)
         heatmap_layout.setVerticalSpacing(4)
         heatmap_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        for column, weekday in enumerate(("M", "T", "W", "T", "F", "S", "S")):
+        for column, weekday in enumerate(("一", "二", "三", "四", "五", "六", "日")):
             label = QLabel(weekday)
             label.setProperty("class", "weekday")
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -709,7 +710,7 @@ class CodexUsageWidget(BaseWidget):
             history_start = date.today()
         self._heatmap_month = min(current_month, max(earliest_navigation_month, self._heatmap_month))
         if is_valid_qobject(self._heatmap_month_label):
-            self._heatmap_month_label.setText(self._heatmap_month.strftime("%B %Y").upper())
+            self._heatmap_month_label.setText(f"{self._heatmap_month.year}年{self._heatmap_month.month}月")
         if is_valid_qobject(self._heatmap_previous):
             self._heatmap_previous.setEnabled(self._heatmap_month > earliest_navigation_month)
         if is_valid_qobject(self._heatmap_next):
@@ -719,7 +720,7 @@ class CodexUsageWidget(BaseWidget):
         month_end = date(self._heatmap_month.year, self._heatmap_month.month, days_in_month)
         has_local_history = month_end >= history_start
         if is_valid_qobject(self._heatmap_history_note):
-            self._heatmap_history_note.setText("No local token history for this month")
+            self._heatmap_history_note.setText("本月无本地 Token 历史")
             self._heatmap_history_note.setVisible(not has_local_history)
         month_values = [
             daily.get(date(self._heatmap_month.year, self._heatmap_month.month, day).isoformat(), 0)
@@ -745,7 +746,7 @@ class CodexUsageWidget(BaseWidget):
                 level = f"level-{max(1, min(4, round(log1p(value) / log1p(maximum) * 4)))}"
             cell.setProperty("class", f"cell {level}")
             tooltip = (
-                f"{cell_date.isoformat()}: no local token history"
+                f"{cell_date.isoformat()}: 无本地 Token 历史"
                 if cell_date < history_start
                 else f"{cell_date.isoformat()}: {self._format_tokens(value)} tokens"
             )
@@ -761,10 +762,10 @@ class CodexUsageWidget(BaseWidget):
         layout.setVerticalSpacing(4)
 
         rows = (
-            ("Plan", "plan"),
-            ("Credits", "credits"),
-            ("Updated", "updated"),
-            ("Status", "status"),
+            ("套餐", "plan"),
+            ("余额", "credits"),
+            ("更新时间", "updated"),
+            ("状态", "status"),
         )
         for row, (title, key) in enumerate(rows):
             name = QLabel(title)
@@ -798,8 +799,8 @@ class CodexUsageWidget(BaseWidget):
 
         previous = QPushButton(self.config.menu.previous_page_icon)
         previous.setProperty("class", "page-button previous")
-        previous.setAccessibleName("Previous Codex usage page")
-        set_tooltip(previous, "Previous page")
+        previous.setAccessibleName("上一页")
+        set_tooltip(previous, "上一页")
         previous.clicked.connect(lambda: self._change_page(-1))
         navigation_layout.addWidget(previous)
         self._page_previous = previous
@@ -812,8 +813,8 @@ class CodexUsageWidget(BaseWidget):
 
         next_button = QPushButton(self.config.menu.next_page_icon)
         next_button.setProperty("class", "page-button next")
-        next_button.setAccessibleName("Next Codex usage page")
-        set_tooltip(next_button, "Next page")
+        next_button.setAccessibleName("下一页")
+        set_tooltip(next_button, "下一页")
         next_button.clicked.connect(lambda: self._change_page(1))
         navigation_layout.addWidget(next_button)
         self._page_next = next_button
@@ -882,8 +883,8 @@ class CodexUsageWidget(BaseWidget):
         self._page_navigation.setVisible(show_navigation)
         if not show_navigation:
             return
-        overview_title = "Overview" if self.config.menu.show_overview else "Details"
-        titles = {"overview": overview_title, "resets": "Resets", "models": "Models", "activity": "Activity"}
+        overview_title = "概览" if self.config.menu.show_overview else "详情"
+        titles = {"overview": overview_title, "resets": "重置", "models": "模型", "activity": "活动"}
         self._page_previous.setEnabled(index > 0)
         self._page_next.setEnabled(index < len(visible_pages) - 1)
         self._page_indicator.setText(f"{titles[self._current_page]}  ·  {index + 1} / {len(visible_pages)}")
@@ -909,7 +910,7 @@ class CodexUsageWidget(BaseWidget):
         header.setProperty("class", "header")
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
-        title = QLabel("Codex Usage")
+        title = QLabel("Codex 用量")
         title.setProperty("class", "text")
         header_layout.addWidget(title)
         header_layout.addStretch()
@@ -921,15 +922,15 @@ class CodexUsageWidget(BaseWidget):
 
         refresh = RefreshButton(self.config.menu.refresh_icon)
         refresh.setProperty("class", "refresh")
-        refresh.setAccessibleName("Refresh Codex usage")
-        set_tooltip(refresh, "Refresh now")
+        refresh.setAccessibleName("刷新 Codex 用量")
+        set_tooltip(refresh, "立即刷新")
         refresh.clicked.connect(self._refresh)
         header_layout.addSpacing(6)
         header_layout.addWidget(refresh)
         self._refresh_button = refresh
         layout.addWidget(header)
-        layout.addWidget(self._build_section("primary", "Primary"))
-        layout.addWidget(self._build_section("secondary", "Secondary"))
+        layout.addWidget(self._build_section("primary", "主窗口"))
+        layout.addWidget(self._build_section("secondary", "次窗口"))
         layout.addWidget(self._build_pager())
 
     def _sync_reset_credits(self) -> None:
@@ -940,16 +941,15 @@ class CodexUsageWidget(BaseWidget):
             return
         available_count = summary.get("available_count")
         available_count = max(0, int(available_count)) if isinstance(available_count, (int, float)) else 0
-        suffix = "credit" if available_count == 1 else "credits"
-        self._reset_credits_count.setText(f"{available_count} {suffix}")
+        self._reset_credits_count.setText(f"{available_count} 个重置额度")
 
         credits = summary.get("credits")
         credit_items = [credit for credit in credits if isinstance(credit, dict)] if isinstance(credits, list) else []
         if is_valid_qobject(self._reset_credits_empty):
             if credits is None and available_count:
-                message = f"{available_count} reset {suffix} available; details unavailable"
+                message = f"有 {available_count} 个重置额度可用，但详情不可用"
             else:
-                message = "No reset credits available"
+                message = "无可用重置额度"
             self._reset_credits_empty.setText(message)
             self._reset_credits_empty.setVisible(not credit_items)
 
@@ -960,12 +960,12 @@ class CodexUsageWidget(BaseWidget):
                 continue
             credit = credit_items[index]
             title = self._reset_credit_title(credit)
-            expiration = self._fmt_credit_date(credit.get("expires_at"), "Expires")
+            expiration = self._fmt_credit_date(credit.get("expires_at"), "到期")
             widgets["title"].setText(title)
             widgets["expiration"].setText(expiration)
             description = credit.get("description")
             tooltip = description.strip() if isinstance(description, str) and description.strip() else expiration
-            granted = self._fmt_credit_date(credit.get("granted_at"), "Granted")
+            granted = self._fmt_credit_date(credit.get("granted_at"), "授予")
             if granted:
                 tooltip = f"{tooltip}\n{granted}"
             widgets["frame"].setAccessibleName(f"{title}, {expiration}")
@@ -974,7 +974,7 @@ class CodexUsageWidget(BaseWidget):
     def _sync_menu(self) -> None:
         if not is_valid_qobject(self._menu):
             return
-        for name, fallback in (("primary", "Primary"), ("secondary", "Secondary")):
+        for name, fallback in (("primary", "主窗口"), ("secondary", "次窗口")):
             widgets = self._section_widgets.get(name)
             if not widgets:
                 continue
@@ -987,10 +987,10 @@ class CodexUsageWidget(BaseWidget):
             duration = self._duration_name(window.get("duration_mins"), fallback)
             widgets["title"].setText(duration)
             widgets["progress"].set_value(self._percent_value(remaining), level)
-            widgets["used"].setText(f"{self._percent(window.get('used'))}% used")
-            widgets["remaining"].setText(f"{self._percent(remaining)}% remaining")
+            widgets["used"].setText(f"已用 {self._percent(window.get('used'))}%")
+            widgets["remaining"].setText(f"剩余 {self._percent(remaining)}%")
             widgets["remaining"].setProperty("class", f"remaining {level}")
-            widgets["reset"].setText(f"Resets in {self._fmt_reset(window.get('resets_at'))}")
+            widgets["reset"].setText(f"重置于 {self._fmt_reset(window.get('resets_at'))}")
             widgets["date"].setText(self._fmt_reset_at(window.get("resets_at")))
             refresh_widget_style(widgets["remaining"])
 
@@ -1024,7 +1024,7 @@ class CodexUsageWidget(BaseWidget):
             credits = self._data.get("credits")
             self._detail_widgets["credits"].setText(str(credits if credits is not None else "--"))
             self._detail_widgets["updated"].setText(self._fmt_updated(self._data.get("fetched_at")))
-            self._detail_widgets["status"].setText("Cached" if stale else "Live")
+            self._detail_widgets["status"].setText("缓存" if stale else "实时")
             self._detail_widgets["status"].setProperty("class", f"value status {'stale' if stale else 'live'}")
             error = str(self._data.get("error") or "") if stale else ""
             self._detail_widgets["error"].setText(error)
