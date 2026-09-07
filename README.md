@@ -88,6 +88,16 @@ Windows 应用可能在启动、切歌或切换播放设备时重建音频会话
 - 仅在收到当前 generation 的有效信号后重置重启退避，并记录 PID、generation、峰值、信号时长和明确的重启原因，避免旧帧误报恢复；
 - 全零帧也会刷新画面，并校验柱数、帧率、位格式、边缘淡出等配置；单色渐变不再触发除零错误。
 
+#### Cava 崩溃（跨线程信号 / use-after-destruction）
+
+**根因**：`CavaProcessManager` 的管道读线程会直接发射绑定到 `CavaWidget` 的 Qt 信号（`samplesUpdated.emit`），pycaw/comtypes 的 COM 回调（`_CavaAudioDeviceCallback`）和系统唤醒事件过滤器（`_CavaSystemEventFilter`）则会发射 `endpointChanged.emit`。当组件被销毁时（`closeEvent` 关闭，或任务栏用 `deleteLater()` 移除），这些跨线程发射仍可能触碰已经释放的 QObject，导致原生 `0xC0000005` 崩溃（Qt/SIP 生命周期 use-after-destruction）。
+
+修复（`src/core/widgets/yasb/cava.py`）：
+
+- 读线程用 `_state_lock` 与 `stop()` 串行化“是否发射”的判定，一旦发起停止/重载/销毁就不再发布音频帧，避免发射到正在拆除的 QObject；
+- 重写 `CavaWidget.event()` 拦截 `QEvent.DeferredDelete`：在惰性删除真正销毁对象之前先调用 `shutdown()`，停止工作线程（`join` 确认退出）并注销 COM/原生设备回调，确保没有任何跨线程信号发射到即将被释放的 QObject；
+- `closeEvent`/`shutdown` 保持确定性清理，`_make_cava_cleanup` 幂等且保留失败重试路径，避免重复注销或残留 `cava.exe`。
+
 ## 🛠️ 上游 YASB 中当前可用的小部件列表。
 
 | Widget                                                                                            | Description                                                                                                   |

@@ -17,6 +17,7 @@ from pycaw.callbacks import MMNotificationClient
 from pycaw.pycaw import AudioUtilities, IAudioMeterInformation
 from PyQt6.QtCore import (
     QAbstractNativeEventFilter,
+    QEvent,
     QMetaObject,
     QPointF,
     QRectF,
@@ -517,7 +518,13 @@ class CavaProcessManager:
                     self._last_frame_time = time.monotonic()
                 samples = [value / self._byte_norm for value in struct.unpack(frame_format, data)]
                 self._record_signal(samples)
-                self._on_samples(samples, generation)
+                # Guard the cross-thread emit: once stop/reload/shutdown has been
+                # requested, the widget's QObject may already be tearing down.
+                # Never publish a frame after the stop event is set.
+                with self._state_lock:
+                    emit_ok = generation == self._generation and not stop_event.is_set()
+                if emit_ok:
+                    self._on_samples(samples, generation)
         except Exception as error:
             failure_reason = f"worker error: {error}"
             logging.exception("Error running Cava generation=%d PID=%s", generation, getattr(process, "pid", None))
@@ -1139,6 +1146,20 @@ class CavaWidget(BaseWidget):
         """Release process and event resources before the widget closes."""
         self.shutdown()
         super().closeEvent(event)
+
+    def event(self, event) -> bool:
+        """Stop Cava and its callbacks before a deferred-deletion destroys the object.
+
+        ``deleteLater()`` (used by the bar manager to remove a widget) does not go
+        through ``closeEvent``; the native ``QObject`` is destroyed right after a
+        ``QEvent.DeferredDelete`` is handled. Stopping the worker thread and
+        unregistering the COM/native devices here guarantees no cross-thread Qt
+        signal is emitted onto a QObject that is about to be freed (the
+        use-after-destruction that caused the Cava ``0xC0000005`` crash).
+        """
+        if event.type() == QEvent.Type.DeferredDelete:
+            self.shutdown()
+        return super().event(event)
 
     def _invoke_on_widget_thread(self, method_name: str) -> bool:
         if QThread.currentThread() == self.thread():
