@@ -53,7 +53,6 @@ python build.py bdist_msi
 | ----------------------------------------------------- | --------------------------------------------------------------------- |
 | [Input Mode](./docs/widgets/(Widget)-Input-Mode.md)   | 显示当前活动的 Windows 输入法转换模式。                               |
 | [Terminal](./docs/widgets/(Widget)-Terminal.md)       | 在多个终端之间切换并启动选中的终端。                                  |
-| [Codex Usage](./docs/widgets/(Widget)-Codex-Usage.md) | 显示 ChatGPT Codex 用量(tips: 未经过详细测试, 可能不稳定, 不建议使用) |
 
 ## 本地bug修复过的小部件
 | Widget                                      | Description                  | Docs changed |
@@ -104,11 +103,13 @@ Windows 应用可能在启动、切歌或切换播放设备时重建音频会话
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | [Active Windows Title](https://github.com/amnweb/yasb/wiki/(Widget)-Active-Windows-Title)         | Displays the title of the currently active window.                                                            |
 | [Applications](https://github.com/amnweb/yasb/wiki/(Widget)-Applications)                         | Shows a list of predefined applications.                                                                      |
+| [Audio Visualizer](https://github.com/amnweb/yasb/wiki/(Widget)-Audio-Visualizer)                 | Displays a native audio visualizer for the default output device (WASAPI loopback).                            |
 | [Battery](https://github.com/amnweb/yasb/wiki/(Widget)-Battery)                                   | Displays the current battery status.                                                                          |
 | [Bluetooth](https://github.com/amnweb/yasb/wiki/(Widget)-Bluetooth)                               | Shows the current Bluetooth status and connected devices.                                                     |
 | [Brightness](https://github.com/amnweb/yasb/wiki/(Widget)-Brightness)                             | Displays and change the current brightness level.                                                             |
 | [Cava](https://github.com/amnweb/yasb/wiki/(Widget)-Cava)                                         | Displays audio visualizer using Cava.                                                                         |
 | [Claude Usage](https://github.com/amnweb/yasb/wiki/(Widget)-Claude-Usage)                         | Shows your Claude subscription usage.                                                                         |
+| [Codex Usage](https://github.com/amnweb/yasb/wiki/(Widget)-Codex-Usage)                           | Shows the remaining percentage in your ChatGPT Codex rate-limit windows.                                       |
 | [Copilot](https://github.com/amnweb/yasb/wiki/(Widget)-Copilot)                                   | GitHub Copilot usage with a detailed menu showing statistics                                                  |
 | [CPU](https://github.com/amnweb/yasb/wiki/(Widget)-CPU)                                           | Shows the current CPU usage and information.                                                                  |
 | [Clock](https://github.com/amnweb/yasb/wiki/(Widget)-Clock)                                       | Displays the current time and date, with customizable formats.                                                |

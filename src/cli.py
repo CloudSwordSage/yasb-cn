@@ -379,6 +379,14 @@ class CLIHandler:
             help="Find and fix deprecated options in config",
             add_help=False,
         )
+        # No arguments and no -h of its own, everything after `cloud` falls through as
+        # unrecognised and is handed to core.cloud.cli, which has its own parser.
+        subparsers.add_parser(
+            "cloud",
+            help="Back up and restore your config with YASB Cloud",
+            prog="yasbc cloud",
+            add_help=False,
+        )
         parser.add_argument(
             "-v",
             "--version",
@@ -397,8 +405,10 @@ class CLIHandler:
             action="store_true",
             help="Show help message",
         )
-        args = parser.parse_args()
-
+        args, passthrough = parser.parse_known_args()
+        # Only `cloud` is allowed leftovers, every other command stays strict.
+        if passthrough and args.command != "cloud":
+            parser.error(f"unrecognized arguments: {' '.join(passthrough)}")
         if args.command == "start":
             if not args.silent:
                 print(
@@ -429,7 +439,10 @@ class CLIHandler:
             else:
                 self.send_command_to_application("stop")
             sys.exit(0)
+        elif args.command == "cloud":
+            from core.cloud.cli import run as run_cloud
 
+            sys.exit(run_cloud(passthrough))
         elif args.command == "reload":
             if is_process_running("yasb.exe"):
                 if not args.silent:
@@ -714,6 +727,7 @@ class CLIHandler:
                   update                    Update the application
                   log                       Tail yasb process logs (cancel with Ctrl-C)
                   reset                     Restore default config files and clear cache
+                  cloud                     Back up and restore your config with YASB Cloud
                   config-dir                Open config directory in file explorer
                   migrate-config            Find and fix deprecated options in config
                   help                      Print this message
@@ -752,7 +766,26 @@ class CLICrashDumpHandler:
     PARENT_KEY_PATH = "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps"
     KEY_PATH = PARENT_KEY_PATH + "\\yasb.exe"
     DUMP_FOLDER = os.path.join(DEFAULT_CONFIG_DIRECTORY, "dumps")
-    DUMP_TYPE = 1  # 1 = mini dump, 2 = full dump
+    # Minidump missing some information, so we use a custom dump type with the following flags.
+    # See https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps#custom-dump-flags
+    _WITH_DATA_SEGS = 0x0001  # module globals                        (WER default)
+    _WITH_HANDLE_DATA = 0x0004  # handle table, so !handle works
+    _WITH_UNLOADED_MODULES = 0x0020  # catches DLL-unload races        (WER default)
+    _WITH_INDIRECT_MEMORY = 0x0040  # heap reachable from registers/stack
+    _WITH_PROCESS_THREAD_DATA = 0x0100  # PEB/TEB                      (WER default)
+    _WITH_FULL_MEMORY_INFO = 0x0800  # VA layout, so !address works
+    _WITH_THREAD_INFO = 0x1000  # thread times and state
+
+    DUMP_TYPE = 0  # 0 = custom (CUSTOM_DUMP_FLAGS), 1 = mini dump, 2 = full dump
+    CUSTOM_DUMP_FLAGS = (
+        _WITH_DATA_SEGS
+        | _WITH_HANDLE_DATA
+        | _WITH_UNLOADED_MODULES
+        | _WITH_INDIRECT_MEMORY
+        | _WITH_PROCESS_THREAD_DATA
+        | _WITH_FULL_MEMORY_INFO
+        | _WITH_THREAD_INFO
+    )
     DUMP_COUNT = 5
     OWNS_PARENT_VALUE = "YasbCreatedLocalDumps"
 
@@ -771,8 +804,9 @@ class CLICrashDumpHandler:
 
         try:
             with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, self.KEY_PATH, 0, winreg.KEY_SET_VALUE) as key:
-                winreg.SetValueEx(key, "DumpFolder", 0, winreg.REG_SZ, self.DUMP_FOLDER)
+                winreg.SetValueEx(key, "DumpFolder", 0, winreg.REG_EXPAND_SZ, self.DUMP_FOLDER)
                 winreg.SetValueEx(key, "DumpType", 0, winreg.REG_DWORD, self.DUMP_TYPE)
+                winreg.SetValueEx(key, "CustomDumpFlags", 0, winreg.REG_DWORD, self.CUSTOM_DUMP_FLAGS)
                 winreg.SetValueEx(key, "DumpCount", 0, winreg.REG_DWORD, self.DUMP_COUNT)
                 if not parent_existed:
                     winreg.SetValueEx(key, self.OWNS_PARENT_VALUE, 0, winreg.REG_DWORD, 1)

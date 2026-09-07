@@ -56,6 +56,16 @@ jobs:
         python build.py build
       shell: pwsh
 
+    - name: Upload unsigned EXE artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ matrix.unsigned_exe_name }}
+        path: |
+          src/dist/yasb.exe
+          src/dist/yasbc.exe
+          src/dist/yasb_themes.exe
+          src/dist/yasb_cloud.exe
+
     - name: Build MSI
       run: |
         .\venv\Scripts\Activate
