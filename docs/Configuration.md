@@ -111,6 +111,7 @@ tooltip:
 | Option            | Type    | Default       | Description |
 |-------------------|---------|---------------|-------------|
 | `enabled`         | boolean | `true`        | Whether the status bar is enabled. |
+| `absolute_position` | boolean | `false`       | Anchor the left, center, and right widget groups to their absolute horizontal positions. The center group remains centered regardless of the side group widths. |
 | `screens`         | list    | `['*']`       | The screens on which the status bar should be displayed. Use `['*']` for all unassigned screens, `['**']` for all screens (including assigned), or specify screen names like `['DELL P2419H (1)']`. |
 | `class_name`      | string  | `"yasb-bar"`  | The CSS class name for the status bar. |
 | `style`           | string  | `"bar"`       | The visual style of the status bar. Can be `"bar"` or `"adaptive"`. [See below](#bar-style) |

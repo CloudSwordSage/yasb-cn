@@ -76,6 +76,7 @@ class BarLayouts(CustomBaseModel):
 
 class BarConfig(CustomBaseModel):
     enabled: bool = True
+    absolute_position: bool = False
     screens: list[str] = ["*"]
     class_name: str = "yasb-bar"
     style: Literal["bar", "adaptive"] = "bar"

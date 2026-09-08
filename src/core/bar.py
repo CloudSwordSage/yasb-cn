@@ -262,6 +262,11 @@ class Bar(QWidget):
         bar_layout = QGridLayout()
         bar_layout.setContentsMargins(0, 0, 0, 0)
         bar_layout.setSpacing(0)
+        absolute_alignments = {
+            "left": Qt.AlignmentFlag.AlignLeft,
+            "center": Qt.AlignmentFlag.AlignHCenter,
+            "right": Qt.AlignmentFlag.AlignRight,
+        }
 
         for column_num, layout_type in enumerate(["left", "center", "right"]):
             config = self.config.layouts.model_dump()[layout_type]
@@ -279,18 +284,21 @@ class Bar(QWidget):
                     widget.monitor_hwnd = self.monitor_hwnd
                     layout.addWidget(widget, 0)
 
-            if config["alignment"] == "left" and config["stretch"]:
+            if not self.config.absolute_position and config["alignment"] == "left" and config["stretch"]:
                 layout.addStretch(1)
 
-            elif config["alignment"] == "right" and config["stretch"]:
+            elif not self.config.absolute_position and config["alignment"] == "right" and config["stretch"]:
                 layout.insertStretch(0, 1)
 
-            elif config["alignment"] == "center" and config["stretch"]:
+            elif not self.config.absolute_position and config["alignment"] == "center" and config["stretch"]:
                 layout.insertStretch(0, 1)
                 layout.addStretch(1)
 
             layout_container.setLayout(layout)
-            bar_layout.addWidget(layout_container, 0, column_num)
+            if self.config.absolute_position:
+                bar_layout.addWidget(layout_container, 0, 0, absolute_alignments[layout_type])
+            else:
+                bar_layout.addWidget(layout_container, 0, column_num)
 
         self._bar_frame.setLayout(bar_layout)
 
