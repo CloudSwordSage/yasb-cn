@@ -112,7 +112,7 @@ class OpenMeteoWidget(BaseWidget):
             is_cache_valid = False
 
             if not cached_data:
-                self._set_label_text("Fetching data...")
+                self._set_label_text("正在获取数据…")
             else:
                 time_diff_ms = int(time.time() * 1000) - last_updated_ms
                 update_interval_ms = self.config.update_interval * 1000
@@ -131,7 +131,7 @@ class OpenMeteoWidget(BaseWidget):
             if self._widget_id not in OpenMeteoWidget._shared_fetchers:
                 self._start_weather_fetcher(delayed=is_cache_valid)
         else:
-            self._set_label_text("Setup location")
+            self._set_label_text("设置位置")
             logging.info("No saved location for %s. Awaiting user setup.", self._widget_id)
 
         # Clean up stale entries once all widgets have initialized
@@ -615,7 +615,7 @@ class OpenMeteoWidget(BaseWidget):
             instance._location_data = None
             instance._hourly_data = [[] for _ in range(instance.config.forecast_days)]
             instance._current_time = None
-            instance._set_label_text("Setup location")
+            instance._set_label_text("设置位置")
 
         # Reopen the popup with the location setup UI
         self._popup_card()
