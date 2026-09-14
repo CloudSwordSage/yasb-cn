@@ -459,13 +459,13 @@ class OpenMeteoWidget(BaseWidget):
             precip_str = " \u2022 ".join(precip_parts) + " \u2022 "
 
         today_label1 = QLabel(
-            f"Feels like {self._weather_data['{feelslike}']} \u2022 "
+            f"体感温度 {self._weather_data['{feelslike}']} \u2022 "
             f"{self._weather_data['{condition_text}']} \u2022 "
-            f"Humidity {self._weather_data['{humidity}']} \u2022 "
-            f"Pressure {self._weather_data['{pressure}']}\n"
-            f"Cloud {self._weather_data['{cloud}']}% \u2022 "
+            f"湿度 {self._weather_data['{humidity}']} \u2022 "
+            f"气压 {self._weather_data['{pressure}']}\n"
+            f"云量 {self._weather_data['{cloud}']}% \u2022 "
             f"{precip_str}"
-            f"UV Index {self._weather_data['{uv}']}"
+            f"紫外线指数 {self._weather_data['{uv}']}"
         )
         today_label1.setProperty("class", "label")
         today_label1.setAlignment(Qt.AlignmentFlag.AlignCenter)
