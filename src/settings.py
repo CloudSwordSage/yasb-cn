@@ -10,7 +10,9 @@ APP_NAME = "YASB"
 APP_NAME_FULL = "Yet Another Status Bar"
 APP_BAR_TITLE = "YasbBar"
 APP_ID = "YASB.YetAnotherStatusBar"
-IS_FROZEN = getattr(sys, "frozen", False)
+# Frozen detection: Nuitka injects __compiled__ into each compiled module, and
+# src/Makefile exports YASB_NUITKA_BUILD as the Nuitka build marker.
+IS_FROZEN = bool("__compiled__" in globals() or os.environ.get("YASB_NUITKA_BUILD") == "1")
 SCRIPT_PATH = os.path.dirname(sys.executable) if IS_FROZEN else os.path.dirname(os.path.abspath(__file__))
 # URLs
 GITHUB_URL = "https://github.com/amnweb/yasb"

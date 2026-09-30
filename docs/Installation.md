@@ -61,11 +61,11 @@ choco install yasb
 - Navigate to the project directory: `cd yasb`
 - Install the required dependencies: `pip install -e .[packaging]`
 - Navigate to the `src` directory: `cd src`
-- Build the installer using following command:
+- Build all executables with GNU make (MSYS2 make; Nuitka locates MSVC on its own):
 ```powershell
-python build.py build
-python build.py bdist_msi
+make
 ```
+- The build output (all five executables) is placed in `build/nuitka/dist/`.
 
 ### Enabling Autostart (Run on Startup)
 

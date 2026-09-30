@@ -38,10 +38,9 @@ uv venv venv --python=python3.14
 .venv\Scripts\activate
 uv pip install .[packaging]
 cd src
-python build.py build
-python build.py bdist_msi
+make
 ```
-最终的安装程序可以在 `dist/out/` 目录中找到。
+构建产物位于 `build/nuitka/dist/` 目录，包含全部 5 个可执行文件（yasb、yasbc、yasb_themes、yasb-input-mode-helper、yasb_cloud）。构建需要 GNU make（MSYS2 提供）。
 </details>
 
 ## 💻 Demo

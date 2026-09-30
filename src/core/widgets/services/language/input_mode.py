@@ -10,6 +10,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from core.widgets.services.language.input_mode_helper import _bind_win32, _user_sid
 from core.widgets.services.language.mode import input_mode_pipe_name, mode_from_input_mode_code
+from settings import IS_FROZEN
 
 logger = logging.getLogger("input_mode")
 _GENERIC_READ = 0x80000000
@@ -144,9 +145,9 @@ class InputModeMonitor(QObject):
             return
         self._last_launch = time.monotonic()
         helper = Path(sys.executable).with_name("yasb-input-mode-helper.exe")
-        file = str(helper) if getattr(sys, "frozen", False) else sys.executable
-        parameters = None if getattr(sys, "frozen", False) else "-m core.widgets.services.language.input_mode_helper"
-        directory = None if getattr(sys, "frozen", False) else str(Path(__file__).parents[4])
+        file = str(helper) if IS_FROZEN else sys.executable
+        parameters = None if IS_FROZEN else "-m core.widgets.services.language.input_mode_helper"
+        directory = None if IS_FROZEN else str(Path(__file__).parents[4])
         info = _ShellExecuteInfo(
             cbSize=ctypes.sizeof(_ShellExecuteInfo),
             lpVerb="runas",
