@@ -6,9 +6,7 @@ build-backend = "hatchling.build"
 name = "YASB"
 dynamic = ["version"]
 description = "Yet Another Status Bar - A highly configurable Windows status bar written in Python."
-authors = [
-    { name = "AmN" },
-]
+authors = [{ name = "AmN" }]
 license = "MIT"
 readme = "README.md"
 requires-python = ">= 3.14"
@@ -68,9 +66,7 @@ dev = [
     "types-pillow",
     "types-pywin32",
 ]
-packaging = [
-    "cx-freeze==8.6.4"
-]
+packaging = ["nuitka==4.2.2"]
 [tool.hatch.metadata]
 allow-direct-references = true
 
@@ -84,26 +80,15 @@ packages = ["src/core"]
 [tool.ruff]
 line-length = 120
 target-version = "py314"
-extend-exclude = [
-    "__pycache__",
-    ".github",
-    ".vscode",
-    "build",
-    "docs",
-    "demo"
-]
+extend-exclude = ["__pycache__", ".github", ".vscode", "build", "docs", "demo"]
 
 [tool.ruff.lint]
-ignore = [
-    "F405",
-    "F403",
-    "E741",
-]
+ignore = ["F405", "F403", "E741"]
 select = ["I", "F", "UP", "G004"]
 fixable = ["ALL"]
 
 [tool.ruff.format]
-docstring-code-format     = true
-quote-style               = "double"
-indent-style              = "space"
+docstring-code-format = true
+quote-style = "double"
+indent-style = "space"
 skip-magic-trailing-comma = false
