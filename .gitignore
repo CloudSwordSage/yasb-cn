@@ -9,6 +9,7 @@ YASB.egg-info/
 *$py.class
 # Ignore Lock files for package managers
 *.lock
+!uv.lock
 # Ignore virtual environment directories
 .venv/
 venv/
