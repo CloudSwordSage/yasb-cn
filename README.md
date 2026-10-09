@@ -32,14 +32,12 @@
 请从源码安装 YASB。在命令行或 PowerShell 中运行以下命令：
 
 ```powershell
-git clone https://github.com/amnweb/yasb.git
-cd yasb
-uv venv venv --python=python3.14
-.venv\Scripts\activate
-uv pip install .[packaging]
+git clone https://github.com/CloudSwordSage/yasb-cn.git
+cd yasb-cn
+uv sync --extra packaging
 cd src
-python build.py build
-python build.py bdist_msi
+uv run python build.py build
+uv run python build.py bdist_msi
 ```
 最终的安装程序可以在 `dist/out/` 目录中找到。
 </details>
