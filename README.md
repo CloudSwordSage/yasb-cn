@@ -21,9 +21,9 @@
 <details open>
 <summary><strong>从 GitHub 下载 YASB .msi</strong></summary>
 <br/>
-请访问 <a href="https://github.com/amnweb/yasb/releases/latest">上游 YASB GitHub 发布</a>，点击资产以显示下载，选择与您的架构和安装范围匹配的安装程序。对于大多数设备，这是 x64 个人安装程序。
+请访问 <a href="https://github.com/CloudSwordSage/yasb-cn/releases/latest">本地化仓库 GitHub 发布</a>，点击资产以显示下载，选择与您的架构匹配的安装程序。对于大多数设备，这是 x64 安装程序；ARM 设备请选择 aarch64。
 <br/>
-本地化仓库的安装文件暂未构建, 准备跟上游2.0.7同步构建
+如需上游原版，请访问 <a href="https://github.com/amnweb/yasb/releases/latest">上游 YASB GitHub 发布</a>。
 </details>
 
 <details>
