@@ -7055,6 +7055,305 @@
       "title": "HackerNewsProviderConfig",
       "type": "object"
     },
+    "HeartRateCallbacksConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "on_left": {
+          "default": "toggle_device_menu",
+          "title": "On Left",
+          "type": "string"
+        },
+        "on_middle": {
+          "default": "do_nothing",
+          "title": "On Middle",
+          "type": "string"
+        },
+        "on_right": {
+          "default": "toggle_display_mode",
+          "title": "On Right",
+          "type": "string"
+        }
+      },
+      "title": "HeartRateCallbacksConfig",
+      "type": "object"
+    },
+    "HeartRateConfig": {
+      "additionalProperties": false,
+      "description": "BLE heart rate widget configuration validated by WidgetBuilder.",
+      "properties": {
+        "class_name": {
+          "default": "heart-rate-widget",
+          "title": "Class Name",
+          "type": "string"
+        },
+        "graph": {
+          "$ref": "#/$defs/HeartRateGraphConfig"
+        },
+        "display": {
+          "$ref": "#/$defs/HeartRateDisplayConfig"
+        },
+        "connection": {
+          "$ref": "#/$defs/HeartRateConnectionConfig"
+        },
+        "callbacks": {
+          "$ref": "#/$defs/HeartRateCallbacksConfig"
+        },
+        "menu_config": {
+          "$ref": "#/$defs/HeartRateMenuConfig"
+        },
+        "keybindings": {
+          "items": {
+            "$ref": "#/$defs/KeybindingConfig"
+          },
+          "title": "Keybindings",
+          "type": "array"
+        }
+      },
+      "title": "HeartRateConfig",
+      "type": "object"
+    },
+    "HeartRateConnectionConfig": {
+      "additionalProperties": false,
+      "description": "Timeouts in milliseconds; reconnect delay starts after attempt cleanup.",
+      "properties": {
+        "auto_connect": {
+          "default": true,
+          "title": "Auto Connect",
+          "type": "boolean"
+        },
+        "reconnect_interval": {
+          "default": 2000,
+          "maximum": 300000,
+          "minimum": 100,
+          "title": "Reconnect Interval",
+          "type": "integer"
+        },
+        "connect_timeout": {
+          "default": 8000,
+          "maximum": 120000,
+          "minimum": 100,
+          "title": "Connect Timeout",
+          "type": "integer"
+        },
+        "stale_timeout": {
+          "default": 10000,
+          "maximum": 300000,
+          "minimum": 100,
+          "title": "Stale Timeout",
+          "type": "integer"
+        },
+        "scan_timeout": {
+          "default": 5000,
+          "maximum": 120000,
+          "minimum": 100,
+          "title": "Scan Timeout",
+          "type": "integer"
+        },
+        "scan_concurrency": {
+          "default": 2,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Scan Concurrency",
+          "type": "integer"
+        }
+      },
+      "title": "HeartRateConnectionConfig",
+      "type": "object"
+    },
+    "HeartRateDisplayConfig": {
+      "additionalProperties": false,
+      "description": "Two layouts sharing the same source and statistics window.",
+      "properties": {
+        "default_mode": {
+          "default": "normal",
+          "enum": [
+            "normal",
+            "detailed"
+          ],
+          "title": "Default Mode",
+          "type": "string"
+        },
+        "normal": {
+          "$ref": "#/$defs/HeartRateStatisticsConfig"
+        },
+        "detailed": {
+          "$ref": "#/$defs/HeartRateStatisticsConfig"
+        }
+      },
+      "title": "HeartRateDisplayConfig",
+      "type": "object"
+    },
+    "HeartRateEntry": {
+      "properties": {
+        "type": {
+          "const": "yasb.heart_rate.HeartRateWidget",
+          "title": "Type",
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/$defs/HeartRateConfig"
+        }
+      },
+      "required": [
+        "type",
+        "options"
+      ],
+      "title": "HeartRateEntry",
+      "type": "object"
+    },
+    "HeartRateGraphConfig": {
+      "additionalProperties": false,
+      "description": "Time-based graph options; height is always allocated by the bar layout.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "width": {
+          "default": 120,
+          "maximum": 2000,
+          "minimum": 16,
+          "title": "Width",
+          "type": "integer"
+        },
+        "window_seconds": {
+          "default": 60,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Window Seconds",
+          "type": "integer"
+        },
+        "min_y_range": {
+          "default": 20,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Min Y Range",
+          "type": "number"
+        },
+        "show_grid": {
+          "default": false,
+          "title": "Show Grid",
+          "type": "boolean"
+        },
+        "show_average_line": {
+          "default": false,
+          "title": "Show Average Line",
+          "type": "boolean"
+        },
+        "show_latest_point": {
+          "default": true,
+          "title": "Show Latest Point",
+          "type": "boolean"
+        },
+        "gap_on_disconnect": {
+          "default": true,
+          "title": "Gap On Disconnect",
+          "type": "boolean"
+        }
+      },
+      "title": "HeartRateGraphConfig",
+      "type": "object"
+    },
+    "HeartRateMenuConfig": {
+      "additionalProperties": false,
+      "description": "Existing YASB popup positioning and native appearance options.",
+      "properties": {
+        "blur": {
+          "default": true,
+          "title": "Blur",
+          "type": "boolean"
+        },
+        "round_corners": {
+          "default": true,
+          "title": "Round Corners",
+          "type": "boolean"
+        },
+        "round_corners_type": {
+          "default": "normal",
+          "enum": [
+            "normal",
+            "small"
+          ],
+          "title": "Round Corners Type",
+          "type": "string"
+        },
+        "border_color": {
+          "default": "System",
+          "title": "Border Color",
+          "type": "string"
+        },
+        "alignment": {
+          "default": "right",
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "direction": {
+          "default": "down",
+          "enum": [
+            "up",
+            "down"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "offset_top": {
+          "default": 6,
+          "title": "Offset Top",
+          "type": "integer"
+        },
+        "offset_left": {
+          "default": 0,
+          "title": "Offset Left",
+          "type": "integer"
+        }
+      },
+      "title": "HeartRateMenuConfig",
+      "type": "object"
+    },
+    "HeartRateStatisticsConfig": {
+      "additionalProperties": false,
+      "description": "Ordered statistics; spacing is horizontal and never increases bar height.",
+      "properties": {
+        "statistics": {
+          "items": {
+            "enum": [
+              "current",
+              "avg",
+              "min",
+              "max",
+              "median",
+              "stddev",
+              "range",
+              "sample_count"
+            ],
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Statistics",
+          "type": "array"
+        },
+        "separator": {
+          "default": " \u00b7 ",
+          "title": "Separator",
+          "type": "string"
+        },
+        "spacing": {
+          "default": 0,
+          "maximum": 50,
+          "minimum": 0,
+          "title": "Spacing",
+          "type": "integer"
+        }
+      },
+      "title": "HeartRateStatisticsConfig",
+      "type": "object"
+    },
     "HomeConfig": {
       "additionalProperties": false,
       "properties": {
@@ -16568,6 +16867,9 @@
           },
           {
             "$ref": "#/$defs/GrouperWidgetEntry"
+          },
+          {
+            "$ref": "#/$defs/HeartRateEntry"
           },
           {
             "$ref": "#/$defs/HomeEntry"
