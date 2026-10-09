@@ -33,6 +33,7 @@
     - [Glucose Monitor](./(Widget)-Glucose-Monitor)
     - [Grouper](./(Widget)-Grouper)
     - [GPU](./(Widget)-GPU)
+    - [Heart Rate](./(Widget)-Heart-Rate)
     - [Home](./(Widget)-Home)
     - [Komorebi Control](./(Widget)-Komorebi-Control)
     - [Komorebi Layout](./(Widget)-Komorebi-Layout)

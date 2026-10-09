@@ -53,6 +53,7 @@ python build.py bdist_msi
 | ----------------------------------------------------- | --------------------------------------------------------------------- |
 | [Input Mode](./docs/widgets/(Widget)-Input-Mode.md)   | 显示当前活动的 Windows 输入法转换模式。                               |
 | [Terminal](./docs/widgets/(Widget)-Terminal.md)       | 在多个终端之间切换并启动选中的终端。                                  |
+| [Heart Rate](./docs/widgets/(Widget)-Heart-Rate.md)   | 通过 BLE 标准心率服务显示实时心率、趋势曲线与统计信息。               |
 
 ## 本地bug修复过的小部件
 | Widget                                      | Description                  | Docs changed |
