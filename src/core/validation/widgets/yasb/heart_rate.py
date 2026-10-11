@@ -52,6 +52,20 @@ class HeartRateConnectionConfig(CustomBaseModel):
     scan_concurrency: int = Field(default=2, ge=1, le=4)
 
 
+class HeartRateIpcConfig(CustomBaseModel):
+    """TCP JSON-lines transport; ``reconnect_interval`` is measured in milliseconds.
+
+    In ``ble`` mode ``publish`` starts a server bound to ``host``/``port``. In
+    ``ipc`` mode the widget connects to an external publisher as a client and
+    ``publish`` has no effect.
+    """
+
+    publish: bool = True
+    host: str = "127.0.0.1"
+    port: int = Field(default=47837, ge=1, le=65535)
+    reconnect_interval: int = Field(default=2000, ge=100, le=300000)
+
+
 class HeartRateMenuConfig(CustomBaseModel):
     """Existing YASB popup positioning and native appearance options."""
 
@@ -71,12 +85,19 @@ class HeartRateCallbacksConfig(CallbacksConfig):
 
 
 class HeartRateConfig(CustomBaseModel):
-    """BLE heart rate widget configuration validated by WidgetBuilder."""
+    """Heart rate widget configuration validated by WidgetBuilder.
+
+    ``source`` selects the data origin: ``ble`` connects through Bluetooth and
+    may publish over IPC, while ``ipc`` subscribes to an external publisher and
+    never touches Bluetooth.
+    """
 
     class_name: str = "heart-rate-widget"
+    source: Literal["ble", "ipc"] = "ble"
     graph: HeartRateGraphConfig = Field(default_factory=HeartRateGraphConfig)
     display: HeartRateDisplayConfig = Field(default_factory=HeartRateDisplayConfig)
     connection: HeartRateConnectionConfig = Field(default_factory=HeartRateConnectionConfig)
+    ipc: HeartRateIpcConfig = Field(default_factory=HeartRateIpcConfig)
     callbacks: HeartRateCallbacksConfig = Field(default_factory=HeartRateCallbacksConfig)
     menu_config: HeartRateMenuConfig = Field(default_factory=HeartRateMenuConfig)
     keybindings: list[KeybindingConfig] = Field(default_factory=list)

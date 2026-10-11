@@ -7079,11 +7079,20 @@
     },
     "HeartRateConfig": {
       "additionalProperties": false,
-      "description": "BLE heart rate widget configuration validated by WidgetBuilder.",
+      "description": "Heart rate widget configuration validated by WidgetBuilder.\n\n``source`` selects the data origin: ``ble`` connects through Bluetooth and\nmay publish over IPC, while ``ipc`` subscribes to an external publisher and\nnever touches Bluetooth.",
       "properties": {
         "class_name": {
           "default": "heart-rate-widget",
           "title": "Class Name",
+          "type": "string"
+        },
+        "source": {
+          "default": "ble",
+          "enum": [
+            "ble",
+            "ipc"
+          ],
+          "title": "Source",
           "type": "string"
         },
         "graph": {
@@ -7094,6 +7103,9 @@
         },
         "connection": {
           "$ref": "#/$defs/HeartRateConnectionConfig"
+        },
+        "ipc": {
+          "$ref": "#/$defs/HeartRateIpcConfig"
         },
         "callbacks": {
           "$ref": "#/$defs/HeartRateCallbacksConfig"
@@ -7253,6 +7265,38 @@
         }
       },
       "title": "HeartRateGraphConfig",
+      "type": "object"
+    },
+    "HeartRateIpcConfig": {
+      "additionalProperties": false,
+      "description": "TCP JSON-lines transport; ``reconnect_interval`` is measured in milliseconds.\n\nIn ``ble`` mode ``publish`` starts a server bound to ``host``/``port``. In\n``ipc`` mode the widget connects to an external publisher as a client and\n``publish`` has no effect.",
+      "properties": {
+        "publish": {
+          "default": true,
+          "title": "Publish",
+          "type": "boolean"
+        },
+        "host": {
+          "default": "127.0.0.1",
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "default": 47837,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "reconnect_interval": {
+          "default": 2000,
+          "maximum": 300000,
+          "minimum": 100,
+          "title": "Reconnect Interval",
+          "type": "integer"
+        }
+      },
+      "title": "HeartRateIpcConfig",
       "type": "object"
     },
     "HeartRateMenuConfig": {

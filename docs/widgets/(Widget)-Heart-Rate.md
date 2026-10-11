@@ -4,6 +4,9 @@ Displays live heart rate from any standard Bluetooth Low Energy (BLE) heart rate
 smart watches. The widget uses the standard Heart Rate Service (`0x180D`) and Heart Rate Measurement characteristic
 (`0x2A37`) through [bleak](https://github.com/hbldh/bleak) and works without vendor software.
 
+Besides reading a BLE device, the widget can share its samples with other applications over a small TCP/JSON
+interface, or display heart rate published by another process, selected through the `source` and `ipc` options.
+
 The normal layout shows a real-time sparkline on the left and the current heart rate plus a configurable summary on the
 right. A left click opens the BLE device manager popup; a right click switches between the normal layout and a compact
 detailed statistics layout. Both layouts share the same sampling data and time window, so switching never touches the
@@ -14,6 +17,7 @@ heart_rate:
   type: "yasb.heart_rate.HeartRateWidget"
   options:
     class_name: "heart-rate-widget"
+    source: "ble"
     graph:
       enabled: true
       width: 120
@@ -46,6 +50,11 @@ heart_rate:
       stale_timeout: 10000
       scan_timeout: 5000
       scan_concurrency: 2
+    ipc:
+      publish: true
+      host: "127.0.0.1"
+      port: 47837
+      reconnect_interval: 2000
     callbacks:
       on_left: "toggle_device_menu"
       on_middle: "do_nothing"
@@ -57,6 +66,7 @@ heart_rate:
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `class_name` | string | `"heart-rate-widget"` | Additional CSS classes for the widget. |
+| `source` | `"ble"` or `"ipc"` | `"ble"` | `ble` connects to a BLE device and may publish over IPC; `ipc` subscribes to an external publisher and never touches Bluetooth. |
 | `graph.enabled` | boolean | `true` | Show the sparkline in the normal layout. |
 | `graph.width` | integer | `120` | Sparkline width in pixels. There is no height option; height always follows the bar layout. |
 | `graph.window_seconds` | integer | `60` | Time window for the graph and all statistics. |
@@ -78,6 +88,10 @@ heart_rate:
 | `connection.stale_timeout` | integer (ms) | `10000` | Time without a valid measurement before data is marked stale. The BLE link itself is not dropped. |
 | `connection.scan_timeout` | integer (ms) | `5000` | How long an advertisement scan collects results. |
 | `connection.scan_concurrency` | integer (1-4) | `2` | Number of parallel GATT verification connections during a deep scan. |
+| `ipc.publish` | boolean | `true` | With `source: ble`, start a TCP server that broadcasts every sample. Ignored when `source: ipc`. |
+| `ipc.host` | string | `"127.0.0.1"` | Bind address when publishing; remote address when subscribing. |
+| `ipc.port` | integer | `47837` | TCP port used for publishing and subscribing. |
+| `ipc.reconnect_interval` | integer (ms) | `2000` | Wait before reconnecting to the external publisher in `ipc` mode. |
 | `callbacks.on_left` | string | `"toggle_device_menu"` | Open/close the device manager popup. |
 | `callbacks.on_middle` | string | `"do_nothing"` | No action by default. |
 | `callbacks.on_right` | string | `"toggle_display_mode"` | Switch between normal and detailed layouts. |
@@ -97,9 +111,56 @@ never treated as zero, and gaps from disconnections are never filled with synthe
 | `range` | `max - min`. |
 | `sample_count` | Number of valid samples in the window. |
 
+## IPC Transport
+
+The widget can exchange heart rate with other processes over a plain TCP JSON-lines interface:
+
+- With `source: ble` and `ipc.publish: true`, YASB opens a server on `ipc.host:ipc.port` and broadcasts every valid
+  measurement. In `source: ipc` mode `publish` has no effect.
+- With `source: ipc`, the widget connects to the publisher as a client and never touches Bluetooth. While the
+  connection is down it retries every `ipc.reconnect_interval` milliseconds.
+
+Each message is one JSON object on a single line. There are two message types.
+
+A heart rate sample:
+
+```json
+{"v":1,"type":"heart_rate","bpm":78,"timestamp":1791698640000,"seq":102}
+```
+
+| Field | Meaning |
+|---|---|
+| `v` | Protocol version, currently `1`. |
+| `type` | `"heart_rate"` for a sample, `"status"` for a state change. |
+| `bpm` | Heart rate in beats per minute (1-65535). |
+| `timestamp` | Unix epoch milliseconds from the sender's wall clock. |
+| `seq` | Publisher-side counter starting at 1. |
+
+A publisher state change:
+
+```json
+{"v":1,"type":"status","state":"connected","error":"","timestamp":1791698640000}
+```
+
+| Field | Meaning |
+|---|---|
+| `state` | `connected`, `disconnected` or `error`. |
+| `error` | Human-readable detail when `state` is `error`; empty otherwise. |
+
+Behaviour:
+
+- A new client immediately receives the current status followed by the most recent reading (with its original capture
+  timestamp), so its UI does not have to wait for the next notification.
+- When the source drops, the publisher sends `disconnected` (or `error`), then `connected` again once it recovers.
+  Consumers clear the live value but keep historical samples until they fall out of `graph.window_seconds`.
+- Received samples are deduplicated by `seq`, so a replayed reading is not counted twice after a reconnect.
+- The subscriber only reads; the publisher never consumes client data. A client that stops reading is disconnected
+  instead of stalling the sample stream.
+
 ## Device Management
 
-A left click opens the device popup:
+The device manager is only available with `source: ble`; in `ipc` mode a left click does nothing. A left click opens
+the device popup:
 
 - **开始扫描** performs a lightweight advertisement scan. Devices that advertise the Heart Rate Service are listed
   incrementally with name, BLE address and RSSI.
@@ -136,8 +197,8 @@ running and reports a storage error instead of overwriting the file; fix or dele
 
 ## Notes
 
-- `connection` options are shared per YASB process: when the widget is used on multiple bars, every instance must use
-  the same `connection` section. A mismatching instance is skipped with a validation error in the log.
+- `source`, `connection` and `ipc` options are shared per YASB process: when the widget is used on multiple bars, every
+  instance must use the same sections. A mismatching instance is skipped with a validation error in the log.
 - The BLE client runs in a dedicated background thread with its own asyncio loop, so scanning, connecting and
   reconnecting never block the UI thread. The UI updates at most 5 times per second.
 - `BleakScanner` advertisements are the primary discovery source. Not every device advertises the Heart Rate Service,

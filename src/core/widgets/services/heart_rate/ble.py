@@ -7,6 +7,7 @@ from bleak import BleakClient, BleakScanner
 
 from core.validation.widgets.yasb.heart_rate import HeartRateConfig
 from core.widgets.services.heart_rate.data import GAP_SECONDS, SampleWindow, graph_segments, parse_measurement
+from core.widgets.services.heart_rate.ipc import HeartRatePublisher, HeartRateSubscriber
 from core.widgets.services.heart_rate.store import DeviceStore
 
 logger = logging.getLogger(__name__)
@@ -15,11 +16,14 @@ HR_MEASUREMENT_UUID = f"{0x2A37:08x}-0000-1000-8000-00805f9b34fb"
 
 
 class HeartRateBackend:
-    """Single-loop BLE owner. UI commands must be submitted onto its asyncio loop.
+    """Single-loop owner for a BLE or IPC heart rate source.
 
-    A serialized selection lock cancels and awaits the old connection before a new
-    one starts. Only the connection runner registers notify. Temporary validation
-    clients are scoped to the scan and never replace the current source.
+    UI commands must be submitted onto its asyncio loop. A serialized selection
+    lock cancels and awaits the old connection before a new one starts. Only the
+    connection runner registers notify. Temporary validation clients are scoped
+    to the scan and never replace the current source. With ``source: ble`` the
+    backend may additionally serve samples to IPC clients; with ``source: ipc``
+    it subscribes to an external publisher and never touches Bluetooth.
     """
 
     def __init__(
@@ -61,6 +65,9 @@ class HeartRateBackend:
         self._quarantined = False
         self._views = {}
         self._logged_errors: set[str] = set()
+        self._publisher = None
+        self._subscriber_task = None
+        self._ipc_seq = None
 
     def _report_error(self, category: str, message: str) -> None:
         """Log each distinct retry failure once; repeats stay at debug level.
@@ -91,23 +98,112 @@ class HeartRateBackend:
         self._publish()
 
     async def start(self) -> None:
-        """Load saved records and optionally start one default connection runner."""
-        try:
-            self.saved = self.store.load()
-        except OSError, ValueError:
-            logger.exception("Unable to load saved heart rate devices")
-            self.storage_error = "无法读取已保存设备，请检查设备文件及权限"
-        for address, record in self.saved.items():
-            self.devices[address] = {**record, "rssi": None, "verified": None}
+        """Prepare the selected source: load devices, then start BLE or subscribe to IPC."""
+        if self.config.source == "ble":
+            try:
+                self.saved = self.store.load()
+            except (OSError, ValueError):
+                logger.exception("Unable to load saved heart rate devices")
+                self.storage_error = "无法读取已保存设备，请检查设备文件及权限"
+            for address, record in self.saved.items():
+                self.devices[address] = {**record, "rssi": None, "verified": None}
+            if self.config.ipc.publish:
+                await self._start_publisher()
         self._ticker = asyncio.create_task(self._refresh_loop())
-        if self.config.connection.auto_connect:
-            default = next((record for record in self.saved.values() if record["auto_connect"]), None)
-            if default:
-                await self.select(default["address"], default["name"], restoring=True)
+        if self.config.source == "ble":
+            if self.config.connection.auto_connect:
+                default = next((record for record in self.saved.values() if record["auto_connect"]), None)
+                if default:
+                    await self.select(default["address"], default["name"], restoring=True)
+        else:
+            self.state = "connecting"
+            self.name = f"{self.config.ipc.host}:{self.config.ipc.port}"
+            self._subscriber_task = asyncio.create_task(self._ipc_loop())
         self._publish()
+
+    async def _start_publisher(self) -> None:
+        """Serve samples to IPC clients; a bind failure is reported, not fatal."""
+        self._publisher = HeartRatePublisher(self.config.ipc.host, self.config.ipc.port)
+        try:
+            await self._publisher.start()
+        except OSError as error:
+            self._publisher = None
+            self.error = f"心率 IPC 服务启动失败：{error}"
+            logger.warning("Heart rate IPC server failed to start: %s", error)
+
+    async def _ipc_loop(self) -> None:
+        """Subscribe to the external publisher forever; only cancellation ends it."""
+        subscriber = HeartRateSubscriber(
+            self.config.ipc.host,
+            self.config.ipc.port,
+            self.config.ipc.reconnect_interval,
+            self._ipc_sample,
+            self._ipc_status,
+            self._ipc_link,
+            self._ipc_error,
+        )
+        await subscriber.run()
+
+    def _ipc_sample(self, message) -> None:
+        """Add one received measurement; a replayed sample is deduplicated."""
+        if self.closed:
+            return
+        if message.seq is not None:
+            if message.seq == self._ipc_seq:
+                return
+            self._ipc_seq = message.seq
+        now = time.monotonic()
+        # Keep the publisher's original capture time for display; local monotonic
+        # time only orders the sample inside the shared window.
+        wall = message.timestamp / 1000 if message.timestamp is not None else time.time()
+        self.window.add(message.bpm, now, wall, self.segment)
+        for view in self._views.values():
+            view["window"].add(message.bpm, now, wall, self.segment)
+        self.last_monotonic, self.last_wall = now, wall
+        if self.state == "connected":
+            self.current = message.bpm
+        self._dirty = True
+
+    def _ipc_status(self, message) -> None:
+        """Mirror the publisher state; history is kept, live data cleared on loss."""
+        if self.closed:
+            return
+        if message.state == "connected":
+            self.state = "connected"
+            self.error = ""
+        elif message.state == "error":
+            self.state = "error"
+            self.error = message.error or "发布端报告错误"
+            self.current = None
+        else:
+            self.state = "disconnected"
+            self.error = ""
+            self.current = None
+        self._publish()
+
+    def _ipc_link(self, state: str) -> None:
+        """Track the TCP link only; the publisher status decides the data state."""
+        if self.closed:
+            return
+        if state == "connected":
+            # A new TCP session starts a new segment so the graph breaks the line.
+            self.segment += 1
+            self.state = "connecting"
+            self.error = ""
+            self._logged_errors.clear()
+        else:
+            self.state = "reconnecting"
+            self.current = None
+        self._publish()
+
+    def _ipc_error(self, text: str) -> None:
+        self.error = text
+        self._report_error("ipc", f"心率 IPC 连接失败：{text}")
 
     async def select(self, address: str | None, name: str = "", restoring: bool = False) -> None:
         """Select a source or manually disconnect; wait for old resources first."""
+        if self.config.source != "ble":
+            return
         async with self._select_lock:
             if self.closed or self._quarantined:
                 return
@@ -209,6 +305,8 @@ class HeartRateBackend:
                             self.current = value
                             self.last_monotonic, self.last_wall = now, wall
                             self.state = "connected"
+                            if self._publisher is not None:
+                                self._publisher.publish(value, wall)
                             self._dirty = True
                         except Exception as error:
                             self._report_error("notify", f"心率数据处理失败：{type(error).__name__}：{error}")
@@ -276,14 +374,14 @@ class HeartRateBackend:
         try:
             self.store.save(self.saved)
             self.storage_error = ""
-        except OSError, ValueError:
+        except (OSError, ValueError):
             self.storage_error = "无法保存设备，请检查设备文件及权限"
             logger.exception("Unable to save heart rate devices")
         self._dirty = True
 
     async def set_default(self, address: str) -> None:
         """Persist one startup default; selecting it does not reconnect immediately."""
-        if address not in self.devices or self.closed:
+        if self.config.source != "ble" or address not in self.devices or self.closed:
             return
         device = self.devices[address]
         self.saved.setdefault(
@@ -296,7 +394,7 @@ class HeartRateBackend:
 
     async def forget(self, address: str) -> None:
         """Remove a record, first disconnecting it if it is the current source."""
-        if self.closed:
+        if self.config.source != "ble" or self.closed:
             return
         if address == self.address:
             await self.select(None)
@@ -308,6 +406,8 @@ class HeartRateBackend:
 
     async def scan(self, deep: bool = False) -> None:
         """Begin incremental advertisements; deep mode also verifies GATT candidates."""
+        if self.config.source != "ble":
+            return
         async with self._scan_lock:
             if self.closed or self._quarantined or (self.scan_task and not self.scan_task.done()):
                 return
@@ -315,6 +415,8 @@ class HeartRateBackend:
 
     async def stop_scan(self) -> None:
         """Cancel scanner and await every temporary verification client cleanup."""
+        if self.config.source != "ble":
+            return
         async with self._scan_lock:
             await self._cancel(self.scan_task)
             self.scan_task = None
@@ -397,9 +499,21 @@ class HeartRateBackend:
             self.scanning = False
             self._publish()
 
+    def _sync_publisher(self) -> None:
+        """Forward the current data state to IPC clients as a status message."""
+        if self._publisher is None:
+            return
+        if self.state == "connected":
+            self._publisher.set_state("connected")
+        elif self.error:
+            self._publisher.set_state("error", self.error)
+        else:
+            self._publisher.set_state("disconnected")
+
     def _publish(self) -> None:
         if self.closed:
             return
+        self._sync_publisher()
         now = time.monotonic()
         stats = self.window.statistics(now)
         stats["current"] = self.current if self.state == "connected" and self.window.samples else None
@@ -473,5 +587,11 @@ class HeartRateBackend:
             await self.stop_scan()
             await self._cancel(self.connection_task)
             self.connection_task = None
+            if self._subscriber_task is not None:
+                await self._cancel(self._subscriber_task)
+                self._subscriber_task = None
+            if self._publisher is not None:
+                await self._publisher.close()
+                self._publisher = None
             await self._cancel(self._ticker)
             self._ticker = None

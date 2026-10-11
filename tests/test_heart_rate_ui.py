@@ -185,6 +185,21 @@ class UiTests(unittest.TestCase):
         self._widget_deleted = True
         self.assertEqual(self.service.released, 1)
 
+    def test_ipc_source_tooltip_and_disabled_left_click(self):
+        config = HeartRateConfig(source="ipc", ipc={"host": "127.0.0.1", "port": 47837})
+        service = FakeService()
+        with patch.object(self.module.HeartRateService, "acquire", return_value=service):
+            widget = self.module.HeartRateWidget(config)
+        self.addCleanup(widget.shutdown)
+        self.addCleanup(widget.deleteLater)
+        widget._apply_snapshot(snapshot("connected"))
+        tooltip = widget._tooltip_filter.tooltip_text
+        self.assertIn("127.0.0.1:47837", tooltip)
+        self.assertNotIn("Watch", tooltip)
+        # The BLE device manager is unavailable in ipc mode.
+        widget.toggle_device_menu()
+        self.assertIsNone(widget.popup)
+
 
 class ThreadTests(unittest.TestCase):
     def test_worker_shutdown_and_recreation_leave_no_threads(self):

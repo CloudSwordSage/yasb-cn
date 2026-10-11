@@ -29,6 +29,7 @@ STATE_LABELS = {
     "connected": "已连接",
     "reconnecting": "正在重新连接",
     "stale": "数据已过期",
+    "error": "错误",
 }
 COMPACT_LABELS = {
     "current": "HR",
@@ -148,7 +149,7 @@ class HeartRateGraph(QWidget):
 
 
 class HeartRateWidget(BaseWidget):
-    """BLE heart rate source displayed in normal/detailed, height-adaptive layouts."""
+    """Heart rate source (BLE or IPC) shown in normal/detailed, height-adaptive layouts."""
 
     validation_schema = HeartRateConfig
 
@@ -296,9 +297,14 @@ class HeartRateWidget(BaseWidget):
             self.graph.update()
         last = snapshot.get("last_wall")
         last_text = datetime.fromtimestamp(last).strftime("%Y-%m-%d %H:%M:%S") if last is not None else "尚未收到"
+        source_text = (
+            f"IPC：{self.config.ipc.host}:{self.config.ipc.port}"
+            if self.config.source == "ipc"
+            else f"设备：{snapshot.get('name') or '未选择'}"
+        )
         set_tooltip(
             self,
-            f"设备：{snapshot.get('name') or '未选择'}\n"
+            f"{source_text}\n"
             f"状态：{STATE_LABELS.get(state, state)}\n最近有效数据：{last_text}\n"
             f"统计窗口：{self.config.graph.window_seconds} 秒",
         )
@@ -418,7 +424,9 @@ class HeartRateWidget(BaseWidget):
         self.forget_button.setEnabled(bool(device.get("saved")))
 
     def toggle_device_menu(self):
-        """Open/close the persistent device popup without changing the BLE source."""
+        """Open/close the BLE device popup; the IPC source has no device manager."""
+        if self.config.source != "ble":
+            return
         if self.popup is None:
             self._build_menu()
         if self.popup.isVisible():

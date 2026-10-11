@@ -105,12 +105,19 @@ class ConfigTests(unittest.TestCase):
         config = module.HeartRateConfig()
         self.assertEqual(config.display.normal.statistics, ["avg", "max"])
         self.assertEqual(config.connection.reconnect_interval, 2000)
+        self.assertEqual(config.source, "ble")
+        self.assertTrue(config.ipc.publish)
+        self.assertEqual((config.ipc.host, config.ipc.port, config.ipc.reconnect_interval), ("127.0.0.1", 47837, 2000))
+        self.assertEqual(module.HeartRateConfig(source="ipc").source, "ipc")
         for value in (
             {"graph": {"height": 20}},
             {"graph": {"width": 0}},
             {"display": {"normal": {"statistics": ["unknown"]}}},
             {"connection": {"scan_concurrency": 0}},
             {"display": {"default_mode": "bad"}},
+            {"source": "bad"},
+            {"ipc": {"port": 0}},
+            {"ipc": {"reconnect_interval": 0}},
         ):
             with self.subTest(value=value), self.assertRaises(ValidationError):
                 module.HeartRateConfig.model_validate(value)

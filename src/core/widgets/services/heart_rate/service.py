@@ -37,8 +37,12 @@ class HeartRateService(QObject):
         """Acquire the shared source on the Qt thread; reject conflicting settings."""
         if cls._instance is None:
             cls._instance = cls(config)
-        elif cls._instance.config.connection != config.connection:
-            raise ValueError("同一心率数据源的所有小组件必须使用相同的 connection 配置")
+        elif (cls._instance.config.source, cls._instance.config.connection, cls._instance.config.ipc) != (
+            config.source,
+            config.connection,
+            config.ipc,
+        ):
+            raise ValueError("同一心率数据源的所有小组件必须使用相同的 source、connection 和 ipc 配置")
         cls._instance._users += 1
         return cls._instance
 
@@ -52,7 +56,7 @@ class HeartRateService(QObject):
         self._backend = None
         self._pending = []
         self._stop = None
-        self.thread = threading.Thread(target=self._run, name="YASB HeartRate BLE", daemon=False)
+        self.thread = threading.Thread(target=self._run, name="YASB HeartRate", daemon=False)
         self.thread.start()
         app = QApplication.instance()
         if app:
@@ -82,8 +86,8 @@ class HeartRateService(QObject):
                     logger.debug("WinRT STA cleanup helper unavailable", exc_info=True)
             loop.run_until_complete(self._main(loop))
         except Exception:
-            logger.exception("Heart rate BLE worker failed")
-            self._emit({"state": "disconnected", "error": "心率蓝牙服务无法启动，请查看日志"})
+            logger.exception("Heart rate worker failed")
+            self._emit({"state": "disconnected", "error": "心率服务无法启动，请查看日志"})
         finally:
             pending = asyncio.all_tasks(loop)
             for task in pending:
