@@ -10,6 +10,27 @@
 
 ---
 
+## 依赖与环境
+
+项目使用 [uv](https://docs.astral.sh/uv/) 管理 Python 环境与依赖；Python 版本要求以 `pyproject.toml` 的 `requires-python` 为准。
+
+- 同步依赖：`uv sync`（可选 `--extra dev`、`--extra packaging`）
+- 运行任意命令：`uv run <命令>`，例如 `uv run python main.py`
+- 代码检查与格式化：`uv run --extra dev ruff check .`、`uv run --extra dev ruff format .`
+- 打包：在 `src/` 目录执行
+
+  ```
+  uv run --extra packaging build.py build_exe
+  ```
+
+  使用 cx_Freeze，产物输出到 `src/dist/`（`yasb.exe`、`yasbc.exe`、`yasb_themes.exe`、`yasb_cloud.exe`、`yasb-input-mode-helper.exe` 及 `lib/`、`assets/`、`share/`）。
+
+依赖清单以 `pyproject.toml` 为准，`uv.lock` 一并纳入版本控制。不要手工 `pip install` 或绕过 uv 改动环境；确需新增第三方依赖时先征得同意，并同步更新 `pyproject.toml` 与 `uv.lock`。
+
+`nuitka` 分支是实验性打包方案，当前不予采用。
+
+---
+
 ## 分支与工作方式
 
 - 所有工作都在 `i18n` 分支完成。本仓库不需要 `dev` 分支，也不使用独立 worktree。
