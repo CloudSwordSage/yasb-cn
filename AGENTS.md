@@ -1,94 +1,53 @@
 # AGENTS.md
 
-## Project Goal
+## 项目定位
 
-This repository maintains a Simplified Chinese localization of YASB.
+本仓库是 YASB（Windows 11 状态栏）的简体中文本地化分支，并承担必要的上游缺陷修复。
 
-When working on localization-related tasks, the primary objective is to produce a complete, natural, maintainable `zh-CN` translation while preserving upstream behavior and minimizing unrelated code changes.
-
-Localization work must follow the existing architecture of the project. Do not introduce a separate i18n system unless the existing implementation cannot support the required functionality.
-
----
-
-## Repository Workflow
-
-The repository uses the following branch roles:
-
-* `upstream`: mirror of the original upstream project's main branch
-* `i18n`: active localization and integration branch
-* `main`: tested and publishable localized branch
-
-Normal localization work must be performed on `i18n`.
-
-Do not modify, reset, rebase, merge into, or commit directly to `upstream` or `main` unless explicitly instructed.
-
-Do not push to any remote repository unless explicitly requested.
-
-Never run destructive Git operations such as:
-
-```bash
-git reset --hard
-git clean -fd
-git clean -fdx
-git push --force
-git push --force-with-lease
-```
-
-Do not discard existing uncommitted user changes.
-
-Before making significant changes, inspect the current branch and working tree state.
+- 本地化：产出完整、自然、可维护的 `zh-CN` 文案，同时保持上游行为不变。
+- 缺陷修复：只处理影响本分支可用性的实际问题，保持最小改动并说明原因。
+- 沿用项目既有架构与资源加载方式，不引入独立的 i18n 框架。
 
 ---
 
-## Scope Discipline
+## 分支与工作方式
 
-Keep localization changes focused.
-
-Do not perform unrelated:
-
-* refactoring
-* dependency upgrades
-* code cleanup
-* formatting of unrelated files
-* API redesign
-* file reorganization
-* architectural changes
-
-If a small code change is necessary to make localization work correctly, keep it minimal and explain why it is required.
-
-Avoid large formatting-only diffs. Preserve the surrounding style of files whenever practical.
+- 所有工作都在 `i18n` 分支完成。本仓库不需要 `dev` 分支，也不使用独立 worktree。
+- `main`：可发布的本地化版本。未获明确授权，不得修改、合并或提交。
+- `upstream`：上游镜像，只读。禁止修改、reset、rebase 或合并。
+- 未经明确要求，不得推送到任何远程仓库。
+- 禁止破坏性 Git 操作：`git reset --hard`、`git clean -fd`、`git clean -fdx`、`git push --force`、`git push --force-with-lease`。
+- 不得丢弃用户未提交的改动；动手前先确认当前分支与工作区状态。
+- 提交信息格式：`<类型>(<范围>): <动词开头描述>`。一个提交只做一件事，`feat` 与 `refactor` 不得混在一起；提交前检查暂存区只含本次任务文件。
 
 ---
 
-## Localization Principles
+## 修改范围
 
-Translate according to UI context, not word-for-word.
+本地化改动保持聚焦，不做与当前任务无关的重构、依赖升级、代码清理、无关文件格式化、API 改造、文件重组或架构调整。
 
-Translations should read like native Simplified Chinese software UI written for users in mainland China.
-
-Prefer concise UI wording.
-
-Preserve the meaning, tone, and functional intent of the original text.
-
-Avoid machine-translation-style phrasing, unnecessary literal translations, and awkward sentence structures.
-
-When a string is ambiguous, inspect:
-
-* where it is used
-* the related widget or UI component
-* nearby code
-* screenshots or UI structure if available
-* related strings
-
-Do not guess based only on an isolated English string when contextual evidence is available.
+- 为让本地化或修复正确落地而必须改代码时，改动保持最小，并说明为什么必要。
+- 避免纯格式化的大 diff，尽量沿用文件原有风格。
+- 不为「以后可能用到」增加字段、抽象、依赖或扩展点。
 
 ---
 
-## Terminology Consistency
+## 本地化规则
 
-Use consistent terminology throughout the project.
+### 翻译原则
 
-Preferred translations include:
+- 按 UI 语境翻译，不逐词直译；读起来应像面向中国大陆用户的原生中文软件界面。
+- 优先简洁的 UI 措辞，保留原文含义、语气与功能意图。
+- 避免机翻腔、无谓直译和生硬句式。
+- 字符串含义不明时，先查看使用位置、相关小组件、邻近代码与相关字符串，必要时再看截图或 UI 结构；不得仅凭孤立英文猜测。
+
+### 既有译文
+
+- 引入某名词的译文前，先搜索既有译文并尽量复用，保持术语一致。
+- 既有译文视为项目约定，但不视为必然正确。改动前先确认：使用范围有多广、是否确实错误或不一致、改动是否真的提升整体一致性。
+- 避免无意义的译文来回改动。
+
+### 术语表
 
 | English       | Simplified Chinese |
 | ------------- | ------------------ |
@@ -122,330 +81,122 @@ Preferred translations include:
 | Reset         | 重置               |
 | Close         | 关闭               |
 
-This table is guidance rather than a blind substitution dictionary.
+该表是措辞指引，不是机械替换表。语境优先，例如 `Display` 可能指物理显示器，也可能指「显示」这一动作。
 
-Context takes priority. For example, `Display` may refer to a physical monitor or to the act of showing content depending on context.
+### 应本地化
 
-When introducing a translation for a recurring technical term, search existing translations first and reuse established terminology whenever appropriate.
+用户可见内容：菜单、按钮、设置项与说明、对话框、工具提示、通知、面向用户的错误与警告、托盘菜单项、小组件名称与说明、引导文案、可见状态信息等。
 
----
+### 不应本地化
 
-## Text That Should Normally Be Localized
+机器可读或内部内容：变量名、函数名、类名、模块名、配置键、JSON/YAML/TOML 键、内部 ID、枚举值、协议值、API 名、命令名与 CLI 参数、环境变量名、文件系统路径、URL、包名、项目名、技术标识、CSS 选择器、Qt objectName、仅供开发者阅读的日志。
 
-Localize user-facing content such as:
+没有通用中文对应词的专有名词与技术术语，不要为了消除英文而强译。
 
-* menus
-* buttons
-* settings labels
-* setting descriptions
-* dialogs
-* tooltips
-* notifications
-* user-facing errors and warnings
-* tray menu entries
-* widget names
-* widget descriptions
-* onboarding text
-* visible status messages
-* other text presented directly to users
+### 运行时敏感内容必须原样保留
 
----
+占位符：`{name}`、`{value}`、`{0}`、`{}`、`%s`、`%d`、`%(name)s`、`${variable}`、`{{variable}}`。
 
-## Text That Should Normally NOT Be Localized
+另有：HTML/XML 标签、Markdown 结构、转义序列、语义必需的换行、键盘快捷键、加速键标记、命令示例、代码片段、URL、文件路径、格式指令、有功能含义的 Unicode 字符。
 
-Do not translate internal or machine-readable content unless the project architecture explicitly requires it.
+- 除非格式化系统明确支持且中文语法必需，不得增删、改名或调整占位符顺序。
+- 认为翻译完成前，逐条比对源串与译串的占位符。
 
-Examples include:
+### 面向用户的错误
 
-* variable names
-* function names
-* class names
-* module names
-* configuration keys
-* JSON/YAML/TOML keys
-* internal IDs
-* enum values
-* protocol values
-* API names
-* command names
-* CLI arguments
-* environment variable names
-* filesystem paths
-* URLs
-* package names
-* project names
-* technical identifiers
-* CSS selectors
-* Qt object names
-* log messages intended exclusively for developers
+自然翻译说明文字，同时保留排查所需的技术信息。
 
-Do not translate proper names or technical terms that do not have a useful established Chinese equivalent merely for the sake of removing English text.
+例如 `config.yaml`、`PATH`、`HTTP 403`、`ConnectionError`、`WidgetManager` 等标识符应保留原样，只翻译周围的人类可读说明。
+
+### 文案风格
+
+- 用「启用此功能」，不用「对此功能进行启用」。
+- 用「无法加载配置文件」，不用「加载配置文件失败了」。
+- 上下文已明确主体时用短标签：「自动隐藏」而不是「自动隐藏任务栏功能」。
+- 短 UI 标签不加多余标点；中文句子使用中文标点，但不得改动有语法或格式意义的标点。
+
+### 英文文案审计
+
+不得因翻译条目已处理完就认为本地化完成。完成前在仓库中检索仍存在的用户可见英文，逐条归类：
+
+1. 有意保留
+2. 内部／非用户可见
+3. 专有名词或技术标识
+4. 漏译的界面文案
+
+只有第 4 类通常需要翻译，不得机械翻译检索出的每一条英文。
+
+### 重复与相似字符串
+
+同一概念的多条源串应尽量统一中文措辞，但语境不同时不强行一致。
+
+例如 `Open` 在文件或窗口场景可译为「打开」，在其他语法语境下可能有更合适的译法。统一前先确认用法。
+
+### 上游文案变化
+
+上游新增用户可见文案时补充对应 `zh-CN` 译文；上游删除或改名时同步更新本地化资源。不因历史存在而保留已废弃条目，除非本地化机制本就支持未使用的回退条目。
 
 ---
 
-## Preserve Runtime-Sensitive Content
+## 代码修复规则
 
-When translating strings, preserve all runtime-sensitive syntax exactly.
+只做必要的修复，并遵循：
 
-This includes, but is not limited to:
-
-```text
-{name}
-{value}
-{0}
-{}
-%s
-%d
-%(name)s
-${variable}
-{{variable}}
-```
-
-Also preserve:
-
-* HTML/XML tags
-* Markdown structure
-* escape sequences
-* newlines where semantically required
-* keyboard shortcuts
-* accelerator markers
-* command examples
-* code snippets
-* URLs
-* file paths
-* formatting directives
-* Unicode characters with functional meaning
-
-Never add, remove, rename, or reorder placeholders unless the formatting system explicitly supports it and the change is required by Chinese grammar.
-
-Before considering a translation complete, compare placeholders between the source and translated strings.
+1. **先测量、后改动**：用实际运行结果、日志或系统 API 返回确认现象，不靠推测下结论。
+2. **定位根因**：优先修复共享根因，检查全部相关入口，不为单条复现路径打补丁。
+3. **最小正确改动**：只改与问题直接相关的代码，不做顺手优化。
+4. **对齐外部语义**：涉及 Win32、Qt 等外部行为时以官方文档为准，不得以记忆代替查证。
+5. **必须可验证**：见下一节。
 
 ---
 
-## User-Facing Errors
+## 验证
 
-User-facing errors should be translated naturally while preserving technical information useful for troubleshooting.
+完成改动后至少执行一种可复现验证：构建、测试、运行或最小自检。优先使用仓库既有命令与工具，不另造验证框架。
 
-Do not translate identifiers embedded in an error when doing so would make debugging harder.
-
-For example, preserve items such as:
-
-```text
-config.yaml
-PATH
-HTTP 403
-ConnectionError
-WidgetManager
-```
-
-while translating the surrounding human-readable explanation.
+- 依据改动范围选择：语法／解析检查、lint、单元测试、相关应用测试、占位符一致性检查、加载 `zh-CN`、全仓库未译界面文案审计。
+- 必须检查命令的 exit code、stderr 与实际输出；失败结果先处理，不得当作成功继续。
+- 未实际执行不得声称通过；环境导致无法验证时，说明未验证部分、原因与剩余风险。
+- 若失败源于既有的无关问题，必须与本次改动引入的失败区分说明。
 
 ---
 
-## Translation Style
+## UI 注意事项
 
-Prefer:
+中文与英文的宽度特性不同。修改 UI 相关本地化时留意：标签截断、描述截断、固定宽度控件、换行、菜单宽度、提示可读性、标点间距。
 
-```text
-启用此功能
-```
-
-over overly formal wording such as:
-
-```text
-对此功能进行启用
-```
-
-Prefer:
-
-```text
-无法加载配置文件
-```
-
-over mechanically translated wording such as:
-
-```text
-加载配置文件失败了
-```
-
-Prefer concise labels:
-
-```text
-自动隐藏
-```
-
-instead of:
-
-```text
-自动隐藏任务栏功能
-```
-
-when the surrounding UI already establishes the subject.
-
-Avoid unnecessary punctuation in short UI labels.
-
-Use Chinese punctuation in normal Chinese sentences, but never alter punctuation that has syntactic or formatting significance.
+不要预防性地重做布局；只有确实由本地化引发 UI 问题时，才做最小布局改动。
 
 ---
 
-## English Text Audit
+## 动手之前
 
-Do not assume localization is complete merely because all translation resource entries were processed.
+改动不熟悉的本地化区域前：查看相关文件、理解字符串如何加载、查找同类既有译文、检查含义不明字符串的调用点，然后再改。
 
-Before completion, search the repository for remaining user-visible English text.
-
-For each remaining English string, determine whether it is:
-
-1. intentionally retained
-2. internal/non-user-facing
-3. a proper name or technical identifier
-4. an untranslated user-facing string
-
-Only category 4 should normally be localized.
-
-Do not blindly translate every English string returned by repository-wide search.
+不要在未理解文本用途时做大范围替换。
 
 ---
 
-## Duplicate and Similar Strings
+## 自主工作
 
-When multiple source strings express the same concept, prefer consistent Chinese wording.
+明确的任务要连续推进到相关文件与验证，不反复要求确认；任务跨多个文件也不要中途停下。
 
-However, do not force identical translations when context differs.
+只有确实缺少无法从仓库推断或获取的信息、访问权限时才停下并报告阻塞。
 
-Examples:
-
-```text
-Open
-```
-
-may mean:
-
-```text
-打开
-```
-
-for a file or window, but another translation may be appropriate in a different grammatical context.
-
-Always inspect usage before normalizing ambiguous strings.
+风险低但不确定时，采取最保守的合理改动；不确定性可能改变程序行为或破坏本地化资源时，先调查再改。
 
 ---
 
-## Existing Translations
+## 完成标准
 
-Treat existing Chinese translations as project conventions, but not as automatically correct.
+满足以下条件才算完成：
 
-Before changing an established translation:
+- 请求的界面区域已翻译
+- 译文自然、术语基本一致
+- 占位符与格式保留完好
+- 本地化资源有效
+- 未包含无关的大范围改动
+- 已执行相关验证
+- 剩余英文界面文案已审查，而非直接忽略
 
-1. inspect how widely it is used
-2. determine whether it is actually incorrect or inconsistent
-3. consider whether changing it improves overall terminology consistency
-
-Avoid unnecessary churn in existing translations.
-
----
-
-## Source Changes
-
-When upstream code introduces new user-facing strings, add corresponding `zh-CN` translations as part of localization work.
-
-When upstream removes or renames strings, update localization resources accordingly.
-
-Do not preserve obsolete translation entries solely because they existed previously unless the localization system intentionally supports unused fallback entries.
-
----
-
-## Validation
-
-After localization changes, run the most relevant validation available in the repository.
-
-Prefer existing project commands and tooling rather than inventing custom validation unnecessarily.
-
-Validation should include, where applicable:
-
-* syntax/parsing checks
-* localization resource validation
-* lint
-* unit tests
-* relevant application tests
-* placeholder consistency checks
-* loading `zh-CN`
-* repository-wide untranslated UI text audit
-
-If running the full test suite is impractical, run the subset most relevant to the files changed.
-
-Do not claim a test passed unless it was actually executed successfully.
-
-If a validation command fails because of an existing unrelated problem, distinguish that clearly from failures introduced by the current change.
-
----
-
-## UI Considerations
-
-Chinese text frequently has different width characteristics from English.
-
-When modifying UI-related localization, watch for:
-
-* clipped labels
-* truncated descriptions
-* fixed-width controls
-* line wrapping
-* menu width
-* tooltip readability
-* punctuation spacing
-
-Do not redesign layouts preemptively.
-
-Only modify layout code when there is evidence that localization causes an actual UI problem, and keep such changes minimal.
-
----
-
-## Investigation Before Editing
-
-Before modifying an unfamiliar localization area:
-
-1. inspect the relevant files
-2. understand how strings are loaded
-3. find similar existing translations
-4. inspect call sites for ambiguous strings
-5. then edit
-
-Do not make broad substitutions without understanding how the text is used.
-
----
-
-## Autonomous Work
-
-For a clearly defined localization task, continue working through related files and validation without repeatedly asking for confirmation.
-
-Do not stop merely because the task spans many files.
-
-Stop and report the blocker only when progress genuinely requires information or access that cannot be inferred or obtained from the repository.
-
-When uncertain but the risk is low, make the most conservative reasonable change.
-
-When uncertainty could alter program behavior or corrupt localization resources, investigate further before editing.
-
----
-
-## Completion Standard
-
-Localization work is considered complete only when:
-
-* requested user-facing areas are translated
-* translations are natural Simplified Chinese
-* terminology is reasonably consistent
-* placeholders and formatting are preserved
-* localization resources remain valid
-* no unrelated large-scale changes are included
-* relevant validation has been run
-* remaining English UI strings have been reviewed rather than blindly ignored
-
-At the end of substantial localization work, summarize:
-
-* major areas translated
-* important files changed
-* validation performed
-* remaining uncertain strings or areas requiring manual review
-
-Keep the summary concise and factual.
+实质性工作结束时简要汇报：主要翻译区域、重要改动文件、执行的验证、仍需人工确认的字符串或区域。汇报保持简洁、客观。
