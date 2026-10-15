@@ -4,6 +4,9 @@ from ctypes import POINTER, Structure, c_ulong, sizeof, windll, wintypes
 
 import win32con
 from PyQt6.QtGui import QScreen
+from win32con import HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE
+
+from core.utils.win32.bindings import SetWindowPos
 
 shell32 = windll.shell32
 user32 = windll.user32
@@ -116,6 +119,21 @@ class Win32AppBar:
         # Only reserve screen space if requested windows_app_bar: true
         if reserve_space:
             self.set_position()
+
+        # SetWindowLongPtrW only caches GWL_EXSTYLE, so the style change above does not reach
+        # the window until SetWindowPos runs (see SetWindowLongPtrW remarks on MS Learn).
+        # Skipping it leaves WS_EX_TOPMOST readable in the style bits while the bar never
+        # enters the topmost z-order band, so a borderless fullscreen window covers the bar
+        # and nothing puts it back once the z-order is reshuffled.
+        SetWindowPos(
+            hwnd,
+            HWND_TOPMOST if always_on_top else HWND_NOTOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
 
     def position_bar(
         self, app_bar_height: int, screen: QScreen, scale_screen: bool = False, bar_name: str = None
