@@ -3,18 +3,22 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.parse
 from functools import partial
 
-from PyQt6.QtCore import QMimeData, QPoint, Qt, QTimer
+from PyQt6.QtCore import QDate, QDateTime, QMimeData, QPoint, Qt, QTime, QTimer
 from PyQt6.QtGui import QAction, QDrag, QIcon
 from PyQt6.QtWidgets import (
+    QCheckBox,
+    QDateTimeEdit,
     QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMenu,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -29,6 +33,83 @@ from core.utils.utilities import PopupWidget, refresh_widget_style
 from core.utils.win32.utils import apply_qmenu_style
 from core.validation.widgets.yasb.todo import TodoConfig
 from core.widgets.base import BaseWidget
+
+# 时间状态只用于渲染与统计，不写入 todo.json，避免跨天后数据需要迁移。
+_STATE_ORDER = {
+    "overdue": 0,
+    "today_overdue": 1,
+    "today": 1,
+    "tomorrow": 2,
+    "soon": 3,
+    "later": 4,
+    "none": 5,
+}
+_STATE_GROUPS = (
+    ("overdue", "逾期"),
+    ("today", "今天"),
+    ("tomorrow", "明天"),
+    ("soon", "即将到期"),
+    ("later", "以后"),
+    ("none", "无期限"),
+)
+_WEEKDAYS = ("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+
+
+def _parse_due_at(value: str | None) -> datetime.datetime | None:
+    """解析 due_at，兼容仅日期（补 23:59）与完整 ISO 时间。"""
+    if not value or not isinstance(value, str):
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        if len(text) == 10:
+            return datetime.datetime.combine(datetime.date.fromisoformat(text), datetime.time(23, 59))
+        parsed = datetime.datetime.fromisoformat(text)
+    except TypeError, ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
+
+
+def _due_state(due_at: datetime.datetime | None, now: datetime.datetime, soon_days: int) -> str:
+    """Return the display state for a due timestamp.
+
+    States: overdue (before today), today_overdue (today but past), today,
+    tomorrow, soon (within soon_days), later, none (no due date).
+    """
+    if due_at is None:
+        return "none"
+    due_date = due_at.date()
+    today = now.date()
+    if due_date < today:
+        return "overdue"
+    if due_date == today:
+        return "today_overdue" if due_at < now else "today"
+    if due_date == today + datetime.timedelta(days=1):
+        return "tomorrow"
+    if soon_days > 0 and due_date <= today + datetime.timedelta(days=soon_days):
+        return "soon"
+    return "later"
+
+
+def _state_group(state: str) -> str:
+    """Map both today states to the single "今天" group."""
+    return "today" if state in ("today", "today_overdue") else state
+
+
+def _completed_until(task: dict, fallback: datetime.date) -> datetime.date:
+    """最后一天仍显示在“已完成”里（含）。
+
+    无期限任务只保留完成当天；有截止日期的保留到截止日与完成日中较晚的一天。
+    """
+    completed = _parse_due_at(task.get("completed_at"))
+    end = completed.date() if completed else fallback
+    due = _parse_due_at(task.get("due_at"))
+    if due and due.date() > end:
+        end = due.date()
+    return end
 
 
 class TodoWidget(BaseWidget):
@@ -46,8 +127,10 @@ class TodoWidget(BaseWidget):
         self._selected_category = "default"
         self._category_buttons = []
         self._expanded_task_id = None
-        self._show_completed = False
+        self._view_mode = "active"
         self._category_filter = None
+        self._sort_mode = "due"
+        self._time_signature = None
 
         self._init_container()
         self.build_widget_label(self.config.label, self.config.label_alt)
@@ -60,6 +143,19 @@ class TodoWidget(BaseWidget):
 
         self._load_tasks()
         self._update_label()
+        self._time_signature = self._current_signature()
+
+        self.destroyed.connect(self._on_destroyed)
+        # 跨零点、以及“今天已超时”状态变化时刷新标签和已打开的菜单。
+        self._date_timer = QTimer(self)
+        self._date_timer.timeout.connect(self._check_time_state)
+        self._date_timer.start(60_000)
+
+    def _on_destroyed(self, _obj=None):
+        try:
+            TodoWidget._instances.remove(self)
+        except ValueError:
+            pass
 
     @classmethod
     def update_all(cls):
@@ -75,23 +171,59 @@ class TodoWidget(BaseWidget):
     def _load_tasks(self):
         try:
             tasks_file = self._get_tasks_file_path()
-            if os.path.exists(tasks_file):
-                with open(tasks_file, encoding="utf-8") as f:
-                    self._tasks = json.load(f)
-                self._tasks.sort(key=lambda t: t["order"], reverse=True)
-            else:
+            if not os.path.exists(tasks_file):
                 self._tasks = []
+                return
+            with open(tasks_file, encoding="utf-8") as f:
+                raw = json.load(f)
+            if not isinstance(raw, list):
+                raise ValueError("todo.json 必须是数组")
+            now = datetime.datetime.now()
+            tasks = []
+            for index, item in enumerate(raw):
+                if not isinstance(item, dict):
+                    continue
+                task = dict(item)
+                if not task.get("id"):
+                    task["id"] = time.time_ns() + index
+                task.setdefault("title", "")
+                task.setdefault("description", "")
+                task.setdefault("category", "default")
+                task.setdefault("completed", False)
+                task.setdefault("created_at", now.isoformat(timespec="seconds"))
+                try:
+                    task["order"] = int(task.get("order", 0))
+                except TypeError, ValueError:
+                    task["order"] = 0
+                # 旧数据的已完成任务没有 completed_at，用创建时间回退，避免历史丢失。
+                if task.get("completed") and not task.get("completed_at"):
+                    task["completed_at"] = task.get("created_at") or now.isoformat(timespec="seconds")
+                tasks.append(task)
+            tasks.sort(key=lambda t: (t["order"], str(t["id"])), reverse=True)
+            self._tasks = tasks
         except Exception as e:
             logging.error("Error loading tasks: %s", e)
             self._tasks = []
 
     def _save_tasks(self):
+        tasks_file = self._get_tasks_file_path()
+        tmp_file = f"{tasks_file}.tmp"
         try:
-            tasks_file = self._get_tasks_file_path()
-            with open(tasks_file, "w", encoding="utf-8") as f:
+            directory = os.path.dirname(tasks_file)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(self._tasks, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_file, tasks_file)
         except Exception as e:
             logging.error("Error saving tasks: %s", e)
+            try:
+                if os.path.exists(tmp_file):
+                    os.remove(tmp_file)
+            except OSError:
+                pass
 
     def _add_new_task(self, dialog):
         title = self._title_input.text().strip()
@@ -99,19 +231,21 @@ class TodoWidget(BaseWidget):
         if not title:
             return
         task_data = {
-            "id": int(datetime.datetime.now().timestamp()),
+            "id": time.time_ns(),
             "title": title,
             "description": description,
             "category": self._selected_category,
-            "created_at": datetime.datetime.now().isoformat(),
+            "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "completed": False,
+            "completed_at": None,
+            "due_at": self._selected_due_at(),
             "order": len(self._tasks),
         }
         self._tasks.insert(0, task_data)
         self._save_tasks()
         TodoWidget.update_all()
         dialog.accept()
-        self._show_completed = False
+        self._view_mode = "active"
         self._show_menu()
 
     def _edit_task(self, dialog, task):
@@ -124,20 +258,27 @@ class TodoWidget(BaseWidget):
                 t["title"] = title
                 t["description"] = description
                 t["category"] = self._selected_category
+                t["due_at"] = self._selected_due_at()
                 break
         self._save_tasks()
         TodoWidget.update_all()
         dialog.accept()
-        self._show_completed = False
+        self._view_mode = "active"
         self._expanded_task_id = task["id"]
         self._show_menu()
+
+    def _selected_due_at(self) -> str | None:
+        """返回对话框里选中的截止时间；未勾选表示无期限。"""
+        if not self._due_checkbox.isChecked():
+            return None
+        return self._due_edit.dateTime().toString("yyyy-MM-ddTHH:mm")
 
     def _show_task_dialog(self, dialog_title, save_button_text, on_save, task=None):
         self._menu.hide()
         self._selected_category = task.get("category", "default") if task else "default"
         dialog = QDialog(self._menu)
         dialog.setWindowTitle(dialog_title)
-        dialog.setMinimumSize(500, 200)
+        dialog.setMinimumSize(500, 260)
         dialog.setProperty("class", "app-dialog")
         dialog.setWindowFlags(
             Qt.WindowType.Dialog
@@ -192,6 +333,38 @@ class TodoWidget(BaseWidget):
             btn.setChecked(cat_name == self._selected_category)
 
         content_layout.addWidget(category_container)
+
+        due_container = QFrame()
+        due_container.setProperty("class", "due-container")
+        due_layout = QHBoxLayout(due_container)
+        due_layout.setContentsMargins(0, 0, 0, 0)
+        due_layout.setSpacing(8)
+
+        self._due_checkbox = QCheckBox("设置截止日期")
+        self._due_checkbox.setProperty("class", "due-checkbox")
+
+        self._due_edit = QDateTimeEdit()
+        self._due_edit.setProperty("class", "due-field")
+        self._due_edit.setCalendarPopup(True)
+        self._due_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
+        self._due_edit.setDateTime(QDateTime(QDate.currentDate(), QTime(23, 59)))
+
+        existing_due = _parse_due_at(task.get("due_at")) if task else None
+        if existing_due:
+            self._due_checkbox.setChecked(True)
+            self._due_edit.setDateTime(
+                QDateTime(
+                    QDate(existing_due.year, existing_due.month, existing_due.day),
+                    QTime(existing_due.hour, existing_due.minute),
+                )
+            )
+        self._due_edit.setEnabled(self._due_checkbox.isChecked())
+        self._due_checkbox.toggled.connect(self._due_edit.setEnabled)
+
+        due_layout.addWidget(self._due_checkbox)
+        due_layout.addWidget(self._due_edit, 1)
+        content_layout.addWidget(due_container)
+
         dialog_layout.addWidget(content_container)
 
         button_container = QFrame()
@@ -226,27 +399,97 @@ class TodoWidget(BaseWidget):
 
         self._update_label()
 
-    def _get_filtered_tasks(self, completed=None, category=None):
-        """Return tasks filtered by completed status and/or category."""
-        tasks = self._tasks
-        if completed is not None:
-            tasks = [t for t in tasks if t.get("completed", False) == completed]
-        if category:
-            tasks = [t for t in tasks if t.get("category") == category]
-        return tasks
+    def _now(self) -> datetime.datetime:
+        return datetime.datetime.now()
+
+    def _due_sort_key(self, now: datetime.datetime):
+        def key(task: dict):
+            due = _parse_due_at(task.get("due_at"))
+            state = _due_state(due, now, self.config.due_soon_days)
+            return (_STATE_ORDER[state], due or datetime.datetime.max, -task.get("order", 0))
+
+        return key
+
+    def _active_tasks(self) -> list[dict]:
+        tasks = [t for t in self._tasks if not t.get("completed")]
+        if self._category_filter:
+            tasks = [t for t in tasks if t.get("category") == self._category_filter]
+        if self._sort_mode == "custom":
+            return sorted(tasks, key=lambda t: (t.get("order", 0), str(t.get("id"))), reverse=True)
+        return sorted(tasks, key=self._due_sort_key(self._now()))
+
+    def _completed_tasks(self) -> list[dict]:
+        today = self._now().date()
+        tasks = [t for t in self._tasks if t.get("completed") and _completed_until(t, today) >= today]
+        return sorted(tasks, key=self._completed_sort_key(), reverse=True)
+
+    def _history_tasks(self) -> list[dict]:
+        today = self._now().date()
+        tasks = [t for t in self._tasks if t.get("completed") and _completed_until(t, today) < today]
+        return sorted(tasks, key=self._completed_sort_key(), reverse=True)
+
+    def _completed_sort_key(self):
+        return lambda t: _parse_due_at(t.get("completed_at")) or datetime.datetime.min
+
+    def _current_signature(self):
+        """签名为“日期 + 今天已超时的任务集合”，只有它变化才需要刷新 UI。"""
+        now = self._now()
+        today_overdue = tuple(
+            sorted(
+                str(t.get("id"))
+                for t in self._tasks
+                if not t.get("completed")
+                and _due_state(_parse_due_at(t.get("due_at")), now, self.config.due_soon_days) == "today_overdue"
+            )
+        )
+        return now.date(), today_overdue
+
+    def _check_time_state(self):
+        signature = self._current_signature()
+        if signature == self._time_signature:
+            return
+        self._time_signature = signature
+        self._update_label()
+        try:
+            if self._menu and self._menu.isVisible():
+                self._refresh_menu_task_list()
+        except RuntimeError:
+            self._menu = None
 
     def _update_label(self):
         active_widgets = self._widgets_alt if self._show_alt_label else self._widgets
         active_label_content = self.config.label_alt if self._show_alt_label else self.config.label
 
+        now = self._now()
+        today = now.date()
+        active_tasks = [t for t in self._tasks if not t.get("completed")]
+        completed_today = sum(
+            1
+            for t in self._tasks
+            if t.get("completed") and (_parse_due_at(t.get("completed_at")) or now).date() == today
+        )
+
+        state_counts = dict.fromkeys(_STATE_ORDER, 0)
+        for task in active_tasks:
+            state_counts[_due_state(_parse_due_at(task.get("due_at")), now, self.config.due_soon_days)] += 1
+
+        deadline_count = state_counts["overdue"] + state_counts["today"] + state_counts["today_overdue"]
+        soon_count = state_counts["tomorrow"] + state_counts["soon"]
+        replacements = {
+            "{deadline}": str(deadline_count),
+            "{count}": str(len(active_tasks)),
+            "{total}": str(len(self._tasks)),
+            "{completed}": str(completed_today),
+            "{overdue}": str(state_counts["overdue"]),
+            "{today}": str(state_counts["today"] + state_counts["today_overdue"]),
+            "{soon}": str(soon_count),
+        }
+        if deadline_count == 0:
+            # 默认格式 {deadline}/{count}/{completed}，为 0 时整段隐藏，不留前导斜杠。
+            active_label_content = re.sub(r"\{deadline\}\s*/\s*", "", active_label_content)
+
         label_parts = re.split("(<span.*?>.*?</span>)", active_label_content)
         label_parts = [part for part in label_parts if part]
-
-        active_tasks = self._get_filtered_tasks(completed=False)
-        completed_tasks = self._get_filtered_tasks(completed=True)
-        total_tasks = len(self._tasks)
-        active_count = len(active_tasks)
-        completed_count = len(completed_tasks)
 
         for widget_index, part in enumerate(label_parts):
             if widget_index >= len(active_widgets) or not isinstance(active_widgets[widget_index], QLabel):
@@ -258,29 +501,23 @@ class TodoWidget(BaseWidget):
                 icon = re.sub(r"<span.*?>|</span>", "", part).strip()
                 current_widget.setText(icon)
             else:
-                formatted_text = (
-                    part.replace("{count}", str(active_count))
-                    .replace("{total}", str(total_tasks))
-                    .replace("{completed}", str(completed_count))
-                )
+                formatted_text = part
+                for placeholder, value in replacements.items():
+                    formatted_text = formatted_text.replace(placeholder, value)
                 current_widget.setText(formatted_text)
-            widget_index += 1
 
-        # Tooltip: show number of tasks per category, skip 0s
-        category_counts = {}
-        for cat_key, cat_conf in self.config.categories.items():
-            count = len([t for t in self._tasks if t.get("category") == cat_key and not t.get("completed", False)])
-            if count > 0:
-                category_counts[cat_conf.label] = count
-        if category_counts:
-            tooltip_lines = [f"{label}: {count}" for label, count in category_counts.items()]
-            tooltip_text = "\n".join(tooltip_lines)
-        else:
-            tooltip_text = "没有任务。"
-        set_tooltip(self._widget_container, tooltip_text)
+        tooltip_counts = {
+            "逾期": state_counts["overdue"],
+            "今天": state_counts["today"] + state_counts["today_overdue"],
+            "即将到期": soon_count,
+            "以后": state_counts["later"],
+            "无期限": state_counts["none"],
+        }
+        tooltip_text = "\n".join(f"{label}: {count}" for label, count in tooltip_counts.items() if count > 0)
+        set_tooltip(self._widget_container, tooltip_text or "没有任务。")
 
     def _toggle_menu(self):
-        self._show_completed = False
+        self._view_mode = "active"
         self._expanded_task_id = None
         self._show_menu()
 
@@ -313,15 +550,21 @@ class TodoWidget(BaseWidget):
 
         self._in_progress_btn = QPushButton("进行中")
         self._in_progress_btn.setCheckable(True)
-        self._in_progress_btn.setChecked(not self._show_completed)
+        self._in_progress_btn.setChecked(self._view_mode == "active")
         self._in_progress_btn.setProperty("class", "tab-buttons in-progress")
-        self._in_progress_btn.clicked.connect(lambda: self._set_show_completed(False))
+        self._in_progress_btn.clicked.connect(lambda: self._set_view_mode("active"))
 
         self._completed_btn = QPushButton("已完成")
         self._completed_btn.setCheckable(True)
-        self._completed_btn.setChecked(self._show_completed)
+        self._completed_btn.setChecked(self._view_mode == "completed")
         self._completed_btn.setProperty("class", "tab-buttons completed")
-        self._completed_btn.clicked.connect(lambda: self._set_show_completed(True))
+        self._completed_btn.clicked.connect(lambda: self._set_view_mode("completed"))
+
+        self._history_btn = QPushButton("历史")
+        self._history_btn.setCheckable(True)
+        self._history_btn.setChecked(self._view_mode == "history")
+        self._history_btn.setProperty("class", "tab-buttons history")
+        self._history_btn.clicked.connect(lambda: self._set_view_mode("history"))
 
         self._order_btn = QPushButton(self.config.icons.sort)
         self._order_btn.setProperty("class", "tab-buttons sort")
@@ -329,6 +572,7 @@ class TodoWidget(BaseWidget):
 
         header_layout.addWidget(self._in_progress_btn)
         header_layout.addWidget(self._completed_btn)
+        header_layout.addWidget(self._history_btn)
         header_layout.addWidget(self._order_btn)
 
         main_layout.addWidget(header_container)
@@ -356,8 +600,8 @@ class TodoWidget(BaseWidget):
         scroll_layout.setContentsMargins(0, 0, 0, 0)
         scroll_layout.setSpacing(0)
 
-        tasks = self._get_filtered_tasks(completed=False, category=self._category_filter)
-        if self._expanded_task_id is None and tasks:
+        tasks = self._tasks_for_view()
+        if self._view_mode == "active" and self._expanded_task_id is None and tasks:
             self._expanded_task_id = tasks[0]["id"]
 
         self._refresh_task_list(scroll_layout, tasks)
@@ -381,17 +625,19 @@ class TodoWidget(BaseWidget):
             QMenu::indicator:checked { background: transparent;color:transparent }
         """)
         apply_qmenu_style(menu)
-        sort_by_date = QAction("按日期排序（最新优先）", self)
-        sort_by_date_old = QAction("按日期排序（最早优先）", self)
-        sort_reset = QAction("重置排序", self)
 
-        menu.addAction(sort_by_date)
-        menu.addAction(sort_by_date_old)
-        menu.addAction(sort_reset)
+        sort_due = QAction("按截止时间", self)
+        sort_due.setCheckable(True)
+        sort_due.setChecked(self._sort_mode == "due")
+        sort_due.triggered.connect(lambda: self._set_sort_mode("due"))
 
-        sort_by_date.triggered.connect(lambda: self._sort_and_filter_tasks(sort_mode="date"))
-        sort_by_date_old.triggered.connect(lambda: self._sort_and_filter_tasks(sort_mode="date", reverse=True))
-        sort_reset.triggered.connect(lambda: self._sort_and_filter_tasks(sort_mode="default"))
+        sort_custom = QAction("自定义排序", self)
+        sort_custom.setCheckable(True)
+        sort_custom.setChecked(self._sort_mode == "custom")
+        sort_custom.triggered.connect(lambda: self._set_sort_mode("custom"))
+
+        menu.addAction(sort_due)
+        menu.addAction(sort_custom)
         menu.addSeparator()
 
         show_all_action = QAction("显示所有分类", self)
@@ -403,7 +649,7 @@ class TodoWidget(BaseWidget):
             action = QAction(f"仅显示 {cat_config.label}", self)
             action.setCheckable(True)
             action.setChecked(self._category_filter == cat_key)
-            action.triggered.connect(lambda checked, c=cat_key: self._sort_and_filter_tasks(category_key=c))
+            action.triggered.connect(lambda checked, c=cat_key: self._set_category_filter(c))
             menu.addAction(action)
 
         button_pos = self._order_btn.mapToGlobal(self._order_btn.rect().bottomLeft())
@@ -411,38 +657,39 @@ class TodoWidget(BaseWidget):
         pos = button_pos - QPoint(menu_width - self._order_btn.sizeHint().width(), -6)
         menu.exec(pos)
 
-    def _sort_and_filter_tasks(self, sort_mode=None, category_key=None, reverse=False):
-        if category_key is not None:
-            self._category_filter = category_key
-
-        if sort_mode == "date" and not reverse:
-            self._tasks.sort(key=lambda t: t.get("created_at", ""), reverse=True)
-        elif sort_mode == "date" and reverse:
-            self._tasks.sort(key=lambda t: t.get("created_at", ""), reverse=False)
-        elif sort_mode == "default":
-            self._tasks.sort(key=lambda t: t.get("order", ""), reverse=True)
-            self._category_filter = None
-
-        # Reset expanded task ID when sorting or filtering
+    def _set_sort_mode(self, mode):
+        self._sort_mode = mode
         self._expanded_task_id = None
+        self._refresh_menu_task_list()
 
+    def _set_category_filter(self, category_key):
+        self._category_filter = category_key
+        self._expanded_task_id = None
         self._refresh_menu_task_list()
 
     def _clear_category_filter(self):
         self._category_filter = None
-        TodoWidget.update_all()
+        self._expanded_task_id = None
         self._refresh_menu_task_list()
 
-    def _set_show_completed(self, show_completed):
-        self._show_completed = show_completed
-        self._in_progress_btn.setChecked(not show_completed)
-        self._completed_btn.setChecked(show_completed)
-        if show_completed:
-            self._expanded_task_id = None  # Collapse all when switching to completed
+    def _set_view_mode(self, mode):
+        self._view_mode = mode
+        self._in_progress_btn.setChecked(mode == "active")
+        self._completed_btn.setChecked(mode == "completed")
+        self._history_btn.setChecked(mode == "history")
+        if mode != "active":
+            self._expanded_task_id = None
         self._refresh_menu_task_list()
+
+    def _tasks_for_view(self) -> list[dict]:
+        if self._view_mode == "completed":
+            return self._completed_tasks()
+        if self._view_mode == "history":
+            return self._history_tasks()
+        return self._active_tasks()
 
     def _refresh_task_list(self, layout, tasks=None):
-        """Refresh the task list."""
+        """Refresh the task list for the current view."""
         while layout.count():
             item = layout.takeAt(0)
             widget = item.widget()
@@ -450,42 +697,76 @@ class TodoWidget(BaseWidget):
                 widget.setParent(None)
 
         if tasks is None:
-            if not self._show_completed:
-                tasks = self._get_filtered_tasks(completed=False, category=self._category_filter)
-            else:
-                tasks = self._get_filtered_tasks(completed=True, category=self._category_filter)
+            tasks = self._tasks_for_view()
 
-        if tasks:
+        if not tasks:
+            self._add_empty_state(layout)
+            return
+
+        if self._view_mode == "active" and self._sort_mode == "due":
+            grouped = {}
+            now = self._now()
             for task in tasks:
-                self._add_task_to_menu(task, layout, completed=self._show_completed)
+                state = _due_state(_parse_due_at(task.get("due_at")), now, self.config.due_soon_days)
+                grouped.setdefault(_state_group(state), []).append(task)
+            for group_key, group_title in _STATE_GROUPS:
+                group_tasks = grouped.get(group_key)
+                if not group_tasks:
+                    continue
+                self._add_group_title(layout, group_title)
+                for task in group_tasks:
+                    self._add_task_to_menu(task, layout)
+        elif self._view_mode == "history":
+            current_date = None
+            for task in tasks:
+                completed = _parse_due_at(task.get("completed_at"))
+                completed_date = completed.date() if completed else self._now().date()
+                if completed_date != current_date:
+                    current_date = completed_date
+                    self._add_group_title(layout, self._format_history_date(completed_date))
+                self._add_task_to_menu(task, layout)
         else:
-            category_label = ""
-            if self._category_filter:
-                cat_key = self._category_filter
-                cat_conf = self.config.categories.get(cat_key)
-                category_label = f"（<b>{cat_conf.label if cat_conf else cat_key}</b>）"
+            for task in tasks:
+                self._add_task_to_menu(task, layout)
 
-            if not self._show_completed:
-                msg = (
-                    f"暂无任务{category_label}。<br>点击<b>新建任务</b>创建第一项任务！"
-                    if not category_label
-                    else f"没有任务{category_label}。<br>点击<b>新建任务</b>创建第一项任务！"
-                )
+    def _add_group_title(self, layout, title: str):
+        label = QLabel(title)
+        label.setProperty("class", "task-group-title")
+        layout.addWidget(label)
+
+    @staticmethod
+    def _format_history_date(value: datetime.date) -> str:
+        return f"{value.month}月{value.day}日 {_WEEKDAYS[value.weekday()]}"
+
+    def _add_empty_state(self, layout):
+        category_label = ""
+        if self._view_mode == "active" and self._category_filter:
+            cat_key = self._category_filter
+            cat_conf = self.config.categories.get(cat_key)
+            category_label = f"（<b>{cat_conf.label if cat_conf else cat_key}</b>）"
+
+        if self._view_mode == "active":
+            if category_label:
+                msg = f"没有任务{category_label}。<br>点击<b>新建任务</b>创建第一项任务！"
             else:
-                msg = f"暂无已完成任务{category_label}。"
+                msg = "暂无任务。<br>点击<b>新建任务</b>创建第一项任务！"
+        elif self._view_mode == "completed":
+            msg = "今日没有已完成任务。"
+        else:
+            msg = "暂无历史任务。"
 
-            no_tasks_icon = QLabel(self.config.icons.no_tasks)
-            no_tasks_icon.setProperty("class", "no-tasks-icon")
-            no_tasks_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        no_tasks_icon = QLabel(self.config.icons.no_tasks)
+        no_tasks_icon.setProperty("class", "no-tasks-icon")
+        no_tasks_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            no_tasks_label = QLabel(msg)
-            no_tasks_label.setProperty("class", "no-tasks")
-            no_tasks_label.setWordWrap(True)
-            no_tasks_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            no_tasks_label.setTextFormat(Qt.TextFormat.RichText)
-            no_tasks_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addWidget(no_tasks_icon)
-            layout.addWidget(no_tasks_label)
+        no_tasks_label = QLabel(msg)
+        no_tasks_label.setProperty("class", "no-tasks")
+        no_tasks_label.setWordWrap(True)
+        no_tasks_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        no_tasks_label.setTextFormat(Qt.TextFormat.RichText)
+        no_tasks_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(no_tasks_icon)
+        layout.addWidget(no_tasks_label)
 
     def _refresh_menu_task_list(self):
         """Refresh the task list in the menu if it exists."""
@@ -495,12 +776,7 @@ class TodoWidget(BaseWidget):
                 scroll_area = scroll_areas[0]
                 scroll_widget = scroll_area.widget()
                 if scroll_widget:
-                    # Use filtered tasks for refresh
-                    if not self._show_completed:
-                        tasks = self._get_filtered_tasks(completed=False, category=self._category_filter)
-                    else:
-                        tasks = self._get_filtered_tasks(completed=True, category=self._category_filter)
-                    self._refresh_task_list(scroll_widget.layout(), tasks)
+                    self._refresh_task_list(scroll_widget.layout(), self._tasks_for_view())
 
     def _expand_task(self, task_id):
         self._expanded_task_id = task_id
@@ -510,9 +786,7 @@ class TodoWidget(BaseWidget):
         self._show_task_dialog(dialog_title="添加新任务", save_button_text="添加任务", on_save=self._add_new_task)
 
     def _show_edit_task_dialog(self, task):
-        self._show_task_dialog(
-            dialog_title="编辑任务", save_button_text="保存更改", on_save=self._edit_task, task=task
-        )
+        self._show_task_dialog(dialog_title="编辑任务", save_button_text="保存更改", on_save=self._edit_task, task=task)
 
     def widget_context_menu(self, widget):
         def show_custom_menu(point):
@@ -550,7 +824,46 @@ class TodoWidget(BaseWidget):
         for cat_name, btn in self._category_buttons:
             btn.setChecked(cat_name == category_name)
 
-    def _add_task_to_menu(self, task, layout, completed=False):
+    def _due_badge(self, due: datetime.datetime | None, state: str) -> tuple[str, str]:
+        if due is None:
+            return "", ""
+        today = self._now().date()
+        if state == "overdue":
+            return f"逾期 {(today - due.date()).days} 天 · {due.strftime('%m-%d %H:%M')}", "overdue"
+        if state == "today_overdue":
+            return f"今天 {due.strftime('%H:%M')} · 已超时", "overdue"
+        if state == "today":
+            return f"今天 {due.strftime('%H:%M')} 截止", "today"
+        if state == "tomorrow":
+            return f"明天 {due.strftime('%H:%M')}", "soon"
+        if state == "soon":
+            return f"{(due.date() - today).days} 天后 · {due.strftime('%m-%d %H:%M')}", "soon"
+        return due.strftime("%m-%d %H:%M"), "later"
+
+    def _friendly_date(self, value: datetime.datetime) -> str:
+        delta = self._now() - value
+        if delta.days == 0:
+            if delta.seconds < 60:
+                return "刚刚"
+            if delta.seconds < 3600:
+                return f"{delta.seconds // 60} 分钟前"
+            return f"{delta.seconds // 3600} 小时前"
+        if delta.days == 1:
+            return "昨天"
+        if delta.days < 30:
+            return f"{delta.days} 天前"
+        return value.strftime("%Y-%m-%d")
+
+    def _add_task_to_menu(self, task, layout):
+        completed = bool(task.get("completed"))
+        due = _parse_due_at(task.get("due_at"))
+        state = _due_state(due, self._now(), self.config.due_soon_days)
+        category = task.get("category", "default")
+        category_class = category if category in self.config.categories else "default"
+        category_config = self.config.categories.get(category)
+        category_text = category_config.label if category_config else category
+        expanded = self._expanded_task_id == task["id"]
+
         container = TaskFrame(
             self,
             task,
@@ -558,57 +871,57 @@ class TodoWidget(BaseWidget):
             self.config.icons,
             self.config.categories,
             expand_callback=self._expand_task,
-            archive_callback=self._archive_task,
             delete_callback=self._delete_task,
             reorder_callback=self._reorder_tasks,
+            draggable=self._view_mode == "active" and self._sort_mode == "custom",
         )
-        expanded = self._expanded_task_id == task["id"]
-        class_list = [
-            "task-item",
-            "completed" if completed else "",
-            task.get("category", "default"),
-            "expanded" if expanded else "",
-        ]
-        container.setProperty("class", " ".join(filter(None, class_list)))
+        class_list = ["task-item"]
+        if completed:
+            class_list.append("completed")
+        class_list.append(category_class)
+        if expanded:
+            class_list.append("expanded")
+        if state == "overdue":
+            class_list.append("overdue")
+        elif state in ("today", "today_overdue"):
+            class_list.append("due-today")
+        elif state in ("tomorrow", "soon"):
+            class_list.append("due-soon")
+        container.setProperty("class", " ".join(class_list))
+        container._base_class = " ".join(class_list)
         container.setContentsMargins(0, 0, 0, 0)
         container_layout = QHBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(0)
 
         checkbox = QPushButton(self.config.icons.checked if completed else self.config.icons.unchecked)
-        checkbox.setChecked(completed)
         checkbox.setProperty("class", "task-checkbox")
+        checkbox.setCheckable(True)
+        checkbox.setChecked(completed)
         if completed:
-            checkbox.setCheckable(True)
-            checkbox.setChecked(True)
-
-            def uncomplete_task():
-                self._uncomplete_task(task)
-
-            checkbox.clicked.connect(uncomplete_task)
-        if not completed:
-            checkbox.setCheckable(True)
-            checkbox.setChecked(False)
+            checkbox.clicked.connect(lambda: self._uncomplete_task(task))
+        else:
 
             def delayed_archive(checked, t=task, cb=checkbox):
                 cb.setChecked(True)
                 cb.setEnabled(False)
-                container.setProperty("class", f"task-item completed {task.get('category', 'default')}")
+                container.setProperty("class", f"task-item completed {category_class}")
                 refresh_widget_style(container)
-                checkbox.setText(self.config.icons.checked)
+                cb.setText(self.config.icons.checked)
 
                 def do_archive():
-                    for i, existing_task in enumerate(self._tasks):
+                    for existing_task in self._tasks:
                         if existing_task["id"] == t["id"]:
-                            self._tasks[i]["completed"] = True
+                            existing_task["completed"] = True
+                            existing_task["completed_at"] = datetime.datetime.now().isoformat(timespec="seconds")
                             break
                     self._save_tasks()
                     TodoWidget.update_all()
                     try:
-                        if hasattr(self, "_menu") and self._menu and self._menu.isVisible():
+                        if self._menu and self._menu.isVisible():
                             self._refresh_menu_task_list()
                     except RuntimeError:
-                        pass
+                        self._menu = None
 
                 QTimer.singleShot(200, do_archive)
 
@@ -627,7 +940,17 @@ class TodoWidget(BaseWidget):
 
         text_layout.addWidget(title_label)
 
-        if self._expanded_task_id == task["id"]:
+        badge_text, badge_tone = self._due_badge(due, state)
+        if completed:
+            completed_at = _parse_due_at(task.get("completed_at"))
+            badge_text = f"完成于 {completed_at.strftime('%m-%d %H:%M')}" if completed_at else "已完成"
+            badge_tone = "done"
+        if badge_text:
+            badge = QLabel(badge_text)
+            badge.setProperty("class", f"due-badge {badge_tone}")
+            text_layout.addWidget(badge)
+
+        if expanded:
             if task.get("description"):
                 desc_label = QLabel()
                 desc_label.setProperty("class", "description")
@@ -640,7 +963,7 @@ class TodoWidget(BaseWidget):
 
                     def replacer(match):
                         url = match.group(1)
-                        domain = urllib.parse.urlparse(url).netloc or "link"
+                        domain = urllib.parse.urlparse(url).netloc or "链接"
                         return f'<a style="text-decoration:none" href="{url}">{domain}</a>'
 
                     desc = re.sub(r"(https?://[^\s]+)", replacer, desc)
@@ -648,60 +971,51 @@ class TodoWidget(BaseWidget):
                 if completed:
                     desc_label.setProperty("class", "description completed")
                 text_layout.addWidget(desc_label)
-            try:
-                created_at = datetime.datetime.fromisoformat(task["created_at"])
-                now = datetime.datetime.now()
-                delta = now - created_at
-                if delta.days == 0:
-                    if delta.seconds < 60:
-                        friendly_date = "刚刚"
-                    elif delta.seconds < 3600:
-                        minutes = delta.seconds // 60
-                        friendly_date = f"{minutes} min ago"
-                    else:
-                        hours = delta.seconds // 3600
-                        friendly_date = f"{hours} hour{'s' if hours != 1 else ''} ago"
-                elif delta.days == 1:
-                    friendly_date = "昨天"
-                elif 1 < delta.days < 30:
-                    friendly_date = f"{delta.days} days ago"
-                else:
-                    friendly_date = created_at.strftime("%Y-%m-%d")
+
+            time_text = ""
+            if completed:
+                completed_at = _parse_due_at(task.get("completed_at"))
+                if completed_at:
+                    time_text = f"完成于 {completed_at.strftime('%m-%d %H:%M')}"
+            elif due:
+                time_text = f"截止 {due.strftime('%m-%d %H:%M')}"
+            else:
+                created_at = _parse_due_at(task.get("created_at"))
+                if created_at:
+                    time_text = f"创建于 {self._friendly_date(created_at)}"
+
+            info_row = QFrame()
+            info_row.setProperty("class", "task-info-row")
+            info_layout = QHBoxLayout(info_row)
+            info_layout.setContentsMargins(0, 0, 0, 0)
+            info_layout.setSpacing(0)
+            if time_text:
                 date_label_icon = QLabel(self.config.icons.date)
                 date_label_icon.setProperty("class", "date-icon")
-                date_label = QLabel(friendly_date)
+                date_label = QLabel(time_text)
                 date_label.setProperty("class", "date-text")
-
-                category = task.get("category", "default")
-                category_config = self.config.categories.get(category)
-                cat_label_icon = QLabel(self.config.icons.category)
-                cat_label_icon.setProperty("class", f"category-icon {category}")
-                cat_label = QLabel(category_config.label if category_config else category)
-                cat_label.setProperty("class", f"category-text {category}")
-
-                edit_btn = QPushButton(self.config.icons.edit)
-                edit_btn.setProperty("class", "edit-task-button")
-                edit_btn.clicked.connect(lambda _, t=task: self._show_edit_task_dialog(t))
-
-                delete_btn = QPushButton(self.config.icons.delete)
-                delete_btn.setProperty("class", "delete-task-button")
-                delete_btn.clicked.connect(lambda _, t=task: self._delete_task(t))
-
-                info_row = QFrame()
-                info_row.setProperty("class", "task-info-row")
-                info_layout = QHBoxLayout(info_row)
-                info_layout.setContentsMargins(0, 0, 0, 0)
-                info_layout.setSpacing(0)
                 info_layout.addWidget(date_label_icon)
                 info_layout.addWidget(date_label)
-                info_layout.addWidget(cat_label_icon)
-                info_layout.addWidget(cat_label)
-                info_layout.addStretch()
-                info_layout.addWidget(edit_btn)
-                info_layout.addWidget(delete_btn)
-                text_layout.addWidget(info_row)
-            except (ValueError, TypeError) as e:
-                logging.error("Error formatting task info: %s", e)
+
+            cat_label_icon = QLabel(self.config.icons.category)
+            cat_label_icon.setProperty("class", f"category-icon {category_class}")
+            cat_label = QLabel(category_text)
+            cat_label.setProperty("class", f"category-text {category_class}")
+            info_layout.addWidget(cat_label_icon)
+            info_layout.addWidget(cat_label)
+            info_layout.addStretch()
+
+            edit_btn = QPushButton(self.config.icons.edit)
+            edit_btn.setProperty("class", "edit-task-button")
+            edit_btn.clicked.connect(lambda _, t=task: self._show_edit_task_dialog(t))
+
+            delete_btn = QPushButton(self.config.icons.delete)
+            delete_btn.setProperty("class", "delete-task-button")
+            delete_btn.clicked.connect(lambda _, t=task: self._delete_task(t))
+
+            info_layout.addWidget(edit_btn)
+            info_layout.addWidget(delete_btn)
+            text_layout.addWidget(info_row)
 
         container_layout.addWidget(text_container)
         container.setAcceptDrops(True)
@@ -712,58 +1026,36 @@ class TodoWidget(BaseWidget):
         layout.addWidget(container)
 
     def _uncomplete_task(self, task):
-        for i, existing_task in enumerate(self._tasks):
+        for existing_task in self._tasks:
             if existing_task["id"] == task["id"]:
-                self._tasks[i]["completed"] = False
+                existing_task["completed"] = False
+                existing_task["completed_at"] = None
                 break
         self._save_tasks()
         TodoWidget.update_all()
         self._refresh_menu_task_list()
 
-    def _archive_task(self, task):
-        for i, existing_task in enumerate(self._tasks):
-            if existing_task["id"] == task["id"]:
-                self._tasks[i]["completed"] = True
-                break
-        self._save_tasks()
-        TodoWidget.update_all()
-        self._remove_task_widget_from_menu(task["id"])
-
     def _delete_task(self, task):
+        if self._view_mode == "history":
+            reply = QMessageBox.question(
+                self,
+                "删除任务",
+                f"确定删除“{task.get('title', '')}”？删除后无法恢复。",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
         self._tasks = [t for t in self._tasks if t["id"] != task["id"]]
+        if self._expanded_task_id == task["id"]:
+            self._expanded_task_id = None
         self._save_tasks()
         TodoWidget.update_all()
-        self._remove_task_widget_from_menu(task["id"])
-
-    def _remove_task_widget_from_menu(self, task_id):
-        """Remove the widget for a given task_id from the menu, and refresh if needed."""
-        if hasattr(self, "_menu") and self._menu:
-            scroll_areas = self._menu.findChildren(QScrollArea)
-            if scroll_areas:
-                scroll_area = scroll_areas[0]
-                scroll_widget = scroll_area.widget()
-                if scroll_widget:
-                    layout = scroll_widget.layout()
-                    widget_to_remove = None
-                    for i in range(layout.count()):
-                        w = layout.itemAt(i).widget()
-                        if hasattr(w, "_task_id") and w._task_id == task_id:
-                            widget_to_remove = w
-                            break
-                    if widget_to_remove:
-                        widget_to_remove.setParent(None)
-                    # Only refresh if no task items left after removal
-                    task_items_left = [
-                        layout.itemAt(i).widget()
-                        for i in range(layout.count())
-                        if hasattr(layout.itemAt(i).widget(), "_task_id")
-                    ]
-                    if len(task_items_left) == 0:
-                        self._refresh_menu_task_list()
+        self._refresh_menu_task_list()
 
     def _reorder_tasks(self, source_id, target_id):
         try:
-            tasks_sorted = sorted(self._tasks, key=lambda t: t["order"], reverse=True)
+            tasks_sorted = sorted(self._tasks, key=lambda t: (t["order"], str(t["id"])), reverse=True)
             source_index = next((i for i, t in enumerate(tasks_sorted) if str(t["id"]) == source_id), -1)
             target_index = next((i for i, t in enumerate(tasks_sorted) if str(t["id"]) == target_id), -1)
             if source_index != -1 and target_index != -1 and source_index != target_index:
@@ -772,7 +1064,8 @@ class TodoWidget(BaseWidget):
                 for idx, t in enumerate(tasks_sorted):
                     t["order"] = len(tasks_sorted) - idx - 1
 
-                self._tasks = sorted(tasks_sorted, key=lambda t: t["order"], reverse=True)
+                self._tasks = sorted(tasks_sorted, key=lambda t: (t["order"], str(t["id"])), reverse=True)
+                self._sort_mode = "custom"
                 self._save_tasks()
                 self._refresh_menu_task_list()
         except Exception as e:
@@ -788,9 +1081,9 @@ class TaskFrame(QFrame):
         icons,
         categories,
         expand_callback,
-        archive_callback,
         delete_callback,
         reorder_callback,
+        draggable=False,
     ):
         super().__init__(main_widget)
         self._main_widget = main_widget
@@ -802,9 +1095,10 @@ class TaskFrame(QFrame):
         self._icons = icons
         self._categories = categories
         self._expand_callback = expand_callback
-        self._archive_callback = archive_callback
         self._delete_callback = delete_callback
         self._reorder_callback = reorder_callback
+        self._draggable = draggable
+        self._base_class = "task-item"
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -813,8 +1107,10 @@ class TaskFrame(QFrame):
                 self._expand_callback(self._task_id)
 
     def mouseMoveEvent(self, event):
+        if not self._draggable:
+            return
         if event.buttons() & Qt.MouseButton.LeftButton and self._drag_start_position:
-            if (event.pos() - self._drag_start_position).manhattanLength() >= 1:
+            if (event.pos() - self._drag_start_position).manhattanLength() >= 4:
                 drag = QDrag(self)
                 mime_data = QMimeData()
                 mime_data.setText(str(self._task_id))
@@ -822,9 +1118,12 @@ class TaskFrame(QFrame):
                 drag.exec(Qt.DropAction.MoveAction)
 
     def dragEnterEvent(self, event):
+        if not self._draggable:
+            event.ignore()
+            return
         if event.mimeData().hasText():
             self._drop_highlight = True
-            self.setProperty("class", f"task-item drop-highlight {self._task.get('category', 'default')}")
+            self.setProperty("class", f"{self._base_class} drop-highlight")
             refresh_widget_style(self)
             self.update()
             event.acceptProposedAction()
@@ -833,7 +1132,7 @@ class TaskFrame(QFrame):
 
     def dragLeaveEvent(self, event):
         self._drop_highlight = False
-        self.setProperty("class", f"task-item {self._task.get('category', 'default')}")
+        self.setProperty("class", self._base_class)
         refresh_widget_style(self)
         self.update()
 
@@ -853,7 +1152,7 @@ class TaskFrame(QFrame):
 
     def dropEvent(self, event):
         self._drop_highlight = False
-        self.setProperty("class", f"task-item {self._task.get('category', 'default')}")
+        self.setProperty("class", self._base_class)
         refresh_widget_style(self)
         self.update()
         source_id = event.mimeData().text()

@@ -43,9 +43,10 @@ class CallbacksTodoConfig(CallbacksConfig):
 
 
 class TodoConfig(CustomBaseModel):
-    label: str = "\uf4a0 {count}/{completed}"
+    label: str = "\uf4a0 {deadline}/{count}/{completed}"
     label_alt: str = "\uf4a0 任务：{count}"
     data_path: str = ""
+    due_soon_days: int = Field(default=3, ge=0)
     menu: TodoMenuConfig = TodoMenuConfig()
     icons: TodoIconsConfig = TodoIconsConfig()
     categories: dict[str, CategoryConfig] = Field(
@@ -53,8 +54,6 @@ class TodoConfig(CustomBaseModel):
             "default": CategoryConfig(label="常规"),
             "urgent": CategoryConfig(label="紧急"),
             "important": CategoryConfig(label="重要"),
-            "soon": CategoryConfig(label="即将完成"),
-            "today": CategoryConfig(label="当天结束前"),
         }
     )
     keybindings: list[KeybindingConfig] = []

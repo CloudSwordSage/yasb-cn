@@ -14154,7 +14154,7 @@
       "additionalProperties": false,
       "properties": {
         "label": {
-          "default": "\uf4a0 {count}/{completed}",
+          "default": "\uf4a0 {deadline}/{count}/{completed}",
           "title": "Label",
           "type": "string"
         },
@@ -14167,6 +14167,12 @@
           "default": "",
           "title": "Data Path",
           "type": "string"
+        },
+        "due_soon_days": {
+          "default": 3,
+          "minimum": 0,
+          "title": "Due Soon Days",
+          "type": "integer"
         },
         "menu": {
           "$ref": "#/$defs/TodoMenuConfig",
@@ -14208,12 +14214,6 @@
             },
             "important": {
               "label": "\u91cd\u8981"
-            },
-            "soon": {
-              "label": "\u5373\u5c06\u5b8c\u6210"
-            },
-            "today": {
-              "label": "\u5f53\u5929\u7ed3\u675f\u524d"
             }
           },
           "title": "Categories",

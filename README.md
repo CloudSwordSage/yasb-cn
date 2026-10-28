@@ -53,6 +53,20 @@ uv run python build.py bdist_msi
 | [Terminal](./docs/widgets/(Widget)-Terminal.md)       | 在多个终端之间切换并启动选中的终端。                                  |
 | [Heart Rate](./docs/widgets/(Widget)-Heart-Rate.md)   | 通过 BLE 标准心率服务显示实时心率、趋势曲线与统计信息。               |
 
+## 本地新增功能的小部件
+
+| Widget                                  | Description                                              | Docs changed |
+| --------------------------------------- | -------------------------------------------------------- | ------------ |
+| [Todo](./docs/widgets/(Widget)-Todo.md) | 增加可选截止时间、按截止日分组、今日完成窗口与历史视图。 | 是           |
+
+### Todo 截止日期与历史
+
+- 任务可设置截止日期与时间（默认当天 23:59），不设置则为无期限；
+- 进行中按逾期、今天、明天、即将到期、以后、无期限分组，逾期与今日已超时标红；
+- 标签默认 `{deadline}/{count}/{completed}`，`{deadline}` 为逾期 + 今天，为 0 时隐藏该段；
+- 已完成只保留到“完成日与截止日中较晚的一天”，之后进入按完成日分组的历史；
+- 支持按截止时间或自定义排序，拖拽仅在自定义模式下启用。
+
 ## 本地bug修复过的小部件
 | Widget                                      | Description                  | Docs changed |
 | ------------------------------------------- | ---------------------------- | ------------ |
@@ -139,7 +153,7 @@ Windows 应用可能在启动、切歌或切换播放设备时重建音频会话
 | [Server Monitor](https://github.com/amnweb/yasb/wiki/(Widget)-Server-Monitor)                     | Monitors server status.                                                                                       |
 | [Systray](https://github.com/amnweb/yasb/wiki/(Widget)-Systray)                                   | Displays system tray icons.                                                                                   |
 | [Traffic](https://github.com/amnweb/yasb/wiki/(Widget)-Traffic)                                   | Displays network traffic information.                                                                         |
-| [Todo](https://github.com/amnweb/yasb/wiki/(Widget)-Todo)                                         | Organizes your tasks and to-do lists.                                                                         |
+| [Todo](https://github.com/amnweb/yasb/wiki/(Widget)-Todo)                                         | Organizes tasks with optional due dates, daily due-date groups, and completion history.                       |
 | [Taskbar](https://github.com/amnweb/yasb/wiki/(Widget)-Taskbar)                                   | A customizable taskbar for launching applications.                                                            |
 | [Pomodoro](https://github.com/amnweb/yasb/wiki/(Widget)-Pomodoro)                                 | A Pomodoro timer widget.                                                                                      |
 | [Power Menu](https://github.com/amnweb/yasb/wiki/(Widget)-Power-Menu)                             | A menu for power options.                                                                                     |

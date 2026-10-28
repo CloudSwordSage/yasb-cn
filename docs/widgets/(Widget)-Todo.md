@@ -1,16 +1,17 @@
 # Todo Widget
 
-The Todo widget provides a simple task management interface directly in your YASB bar. It displays the number of tasks, completed tasks, and allows you to add, check, categorize, and delete tasks. The widget is highly customizable with icons, categories, and menu options. Widget data is stored in a JSON file (`todo.json`) in the YASB config directory.
+The Todo widget provides a simple task management interface directly in your YASB bar. It displays the number of tasks, completed tasks, and allows you to add, check, categorize, and delete tasks. Tasks can have an optional due date; the menu groups active tasks by due date and keeps a per-day history of completed tasks. The widget is highly customizable with icons, categories, and menu options. Widget data is stored in a JSON file (`todo.json`) in the YASB config directory.
 
-| Option         | Type    | Default                                      | Description                                                                 |
-|----------------|---------|----------------------------------------------|-----------------------------------------------------------------------------|
-| `label`        | string  | `\uf4a0 {count}`                 | Main label format.  Use `{count}` for total tasks, `{completed}` for completed tasks, {total} for total tasks. |
-| `label_alt`    | string  | `\uf4a0 Tasks: {count}`                      | Alternative label format.                                                    |
-| `data_path`    | string  | `""`                                        | Custom path to JSON file for storing tasks. Leave empty to use default location (`~/.config/yasb/todo.json`). Supports `~` for home directory. |
-| `menu`         | dict    | See example below                                    | Popup menu settings.                                                         |
-| `icons`        | dict    | See example below                                    | Icons for add, delete, check, etc.                                           |
-| `categories`   | dict    | See example below                                    | Task categories and their labels.                                            |
-| `callbacks`    | dict    | `{on_left: "toggle_menu", on_middle: "do_nothing", on_right: "toggle_label"}` | Mouse event callbacks.                  |
+| Option           | Type    | Default                                                                       | Description                                                                 |
+|------------------|---------|-------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| `label`          | string  | `\uf4a0 {deadline}/{count}/{completed}`                                       | Main label format. `{deadline}` is overdue + due today, `{count}` active tasks, `{completed}` tasks completed today, `{total}` all tasks. `{deadline}/` is removed entirely when it is 0. |
+| `label_alt`      | string  | `\uf4a0 任务：{count}`                                                        | Alternative label format.                                                    |
+| `data_path`      | string  | `""`                                                                          | Custom path to JSON file for storing tasks. Leave empty to use default location (`~/.config/yasb/todo.json`). Supports `~` for home directory. |
+| `due_soon_days`  | int     | `3`                                                                           | How many days ahead count as "due soon".                                      |
+| `menu`           | dict    | See example below                                                             | Popup menu settings.                                                         |
+| `icons`          | dict    | See example below                                                             | Icons for add, delete, check, etc.                                           |
+| `categories`     | dict    | `default/urgent/important`                                                    | Manual categories (priority labels). Their labels are user-defined. Time states are derived from `due_at` and do not use categories. |
+| `callbacks`      | dict    | `{on_left: "toggle_menu", on_middle: "do_nothing", on_right: "toggle_label"}` | Mouse event callbacks.                                                       |
 
 
 
@@ -20,9 +21,10 @@ The Todo widget provides a simple task management interface directly in your YAS
 todo:
   type: "yasb.todo.TodoWidget"
   options:
-    label: "\uf0ae {count}/{completed}"
+    label: "\uf0ae {deadline}/{count}/{completed}"
     label_alt: "\uf0ae Tasks: {count}"
     # data_path: "~/Documents/my-todos.json"  # Optional: custom JSON file path
+    due_soon_days: 3
     menu:
       blur: true
       round_corners: true
@@ -45,10 +47,6 @@ todo:
     categories:
       default:
         label: "General"
-      soon:
-        label: "Complete soon"
-      today:
-        label: "End of day"
       urgent:
         label: "Urgent"
       important:
@@ -61,9 +59,10 @@ todo:
 
 ## Description of Options
 
-- **label**:  Main label format, supports `{count}` for total tasks, `{completed}` for completed tasks, and `{total}` for total tasks.
-- **label_alt**: Alternative label format.
+- **label**: Main label format. Supports `{deadline}` (overdue + due today), `{count}` (active tasks), `{completed}` (completed today), `{total}`, `{overdue}`, `{today}` and `{soon}`. When `{deadline}` is 0, a `{deadline}/` segment is removed entirely, so the default label shows `5/1` instead of `0/5/1`.
+- **label_alt**: Alternative label format, toggled by right-clicking the widget.
 - **data_path**: Optional custom path to the JSON file where tasks are stored. If empty or not specified, uses the default location (`~/.config/yasb/todo.json`). Supports `~` for home directory expansion (e.g., `~/Documents/my-todos.json` or `C:/Users/YourName/my-todos.json`).
+- **due_soon_days**: Number of days ahead that count as "due soon" (default `3`). Set to `0` to disable the "Due soon" group.
 - **menu**: Popup menu appearance and behavior:
   - **blur**: Enable blur effect.
   - **round_corners**: Enable rounded corners.
@@ -83,9 +82,40 @@ todo:
   - **unchecked** Icon for unchecked tasks.
   - **sort**: Icon for sorting tasks.
   - **no_tasks** Icon displayed when no tasks are available.
-- **categories**: Define task categories and their labels.
+- **categories**: Manual categories (priority labels) and their display names. Time states are derived from `due_at`; the default set no longer includes `soon`/`today`.
 - **callbacks**: Map mouse actions to widget functions.
 
+## Due Dates and Views
+
+Each task can store an optional `due_at` (local time, ISO `YYYY-MM-DDTHH:mm`). The menu derives its state automatically:
+
+| State | Condition | Shown as |
+|-------|-----------|----------|
+| Overdue | due date is before today | `Overdue N days · MM-DD HH:mm` |
+| Due today, past | due date is today and the time has passed | `Today HH:mm · overdue` |
+| Due today | due date is today, time not passed | `Today HH:mm` |
+| Tomorrow | due date is tomorrow | `Tomorrow HH:mm` |
+| Due soon | within `due_soon_days` | `N days · MM-DD HH:mm` |
+| Later | beyond `due_soon_days` | `MM-DD HH:mm` |
+| No due date | `due_at` is empty | no badge |
+
+The "Active" tab groups tasks in this order: Overdue, Today, Tomorrow, Due soon, Later, No due date. Sorting can be switched between **by due date** (default) and **custom**; dragging is only enabled in custom mode.
+
+Completed tasks stay in the "Completed" tab until the later of the completion day and the due day (inclusive). After that they move to the "History" tab, grouped by completion date. The `{completed}` placeholder only counts tasks completed today.
+
+Fields stored per task:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | int | Unique id (nanosecond timestamp) |
+| `title` | string | Task title |
+| `description` | string | Optional description |
+| `category` | string | Key from `categories` |
+| `created_at` | string | ISO creation time |
+| `completed` | bool | Completion flag |
+| `completed_at` | string or null | ISO completion time |
+| `due_at` | string or null | ISO due time |
+| `order` | int | Manual sort order |
 
 > [!IMPORTANT]  
 > Todo widget uses the `QMenu` for the context menu, which supports various styles. You can customize the appearance of the menu using CSS styles. For more information on styling, refer to the [Context Menu Styling](https://github.com/amnweb/yasb/wiki/Styling#context-menu-styling).
@@ -106,9 +136,11 @@ todo:
 .todo-menu .header .tab-buttons.completed {}
 .todo-menu .header .tab-buttons.in-progress:checked {}
 .todo-menu .header .tab-buttons.completed:checked {}
+.todo-menu .header .tab-buttons.history {}
+.todo-menu .header .tab-buttons.history:checked {}
 .todo-menu .header .tab-buttons.sort {}
 .todo-menu .header .tab-buttons.sort:pressed {}
-.todo-menu .header .toggle-tab.in-progress {}
+.todo-menu .task-group-title {}
 .todo-menu .no-tasks {}
 .todo-menu .no-tasks-icon {}
 /* todo-menu task item styles */
@@ -117,14 +149,22 @@ todo:
 /* todo-menu task item styles based on category */
 .todo-menu .task-item.important {}
 .todo-menu .task-item.urgent {}
-.todo-menu .task-item.soon {}
-.todo-menu .task-item.today {}
 .todo-menu .task-item.default {}
+/* due-date states */
+.todo-menu .task-item.overdue {}
+.todo-menu .task-item.due-today {}
+.todo-menu .task-item.due-soon {}
 
 .todo-menu .task-item.drop-highlight {}
 .todo-menu .task-item.drop-highlight:hover {}
 .todo-menu .task-item.drop-highlight:focus {}
 .todo-menu .task-item .title {}
+.todo-menu .task-item .due-badge {}
+.todo-menu .task-item .due-badge.overdue {}
+.todo-menu .task-item .due-badge.today {}
+.todo-menu .task-item .due-badge.soon {}
+.todo-menu .task-item .due-badge.later {}
+.todo-menu .task-item .due-badge.done {}
 .todo-menu .task-item.completed .title {}
 .todo-menu .task-item.completed .description {}
 .todo-menu .task-item .description {}
@@ -148,6 +188,9 @@ todo:
 /* todo-menu dialog styles */
 .todo-menu .app-dialog {}
 .todo-menu .app-dialog .category-container {}
+.todo-menu .app-dialog .due-container {}
+.todo-menu .app-dialog .due-checkbox {}
+.todo-menu .app-dialog .due-field {}
 .todo-menu .app-dialog .buttons-container {}
 .todo-menu .app-dialog .title-field {}
 .todo-menu .app-dialog .desc-field {}
@@ -264,6 +307,18 @@ todo:
     background-color: rgba(211, 214, 219, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
+.todo-menu .task-item.overdue {
+    border-color: rgba(255, 88, 59, 0.45);
+}
+.todo-menu .task-item.due-today {
+    border-color: rgba(249, 226, 175, 0.4);
+}
+.todo-menu .task-group-title {
+    color: #8b939b;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 16px 2px 16px;
+}
 .todo-menu .task-item.drop-highlight,
 .todo-menu .task-item.drop-highlight:hover,
 .todo-menu .task-item.drop-highlight:focus {
@@ -290,6 +345,16 @@ todo:
     padding: 0 8px 8px 8px;
     font-family: 'Segoe UI';
 }
+.todo-menu .task-item .due-badge {
+    color: #9aa2a9;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0 8px 6px 8px;
+}
+.todo-menu .task-item .due-badge.overdue { color: #ff8f7a; }
+.todo-menu .task-item .due-badge.today { color: #f9e2af; }
+.todo-menu .task-item .due-badge.soon { color: #7fffd4; }
+.todo-menu .task-item .due-badge.done { color: #7f8c8d; }
 .todo-menu .task-checkbox {
     background-color: transparent;
     border: none;
@@ -453,6 +518,17 @@ todo:
 .todo-menu .app-dialog .category-button:checked {
     background-color: #535353;
     color: #ffffff;
+}
+.todo-menu .app-dialog .due-container {
+    margin-top: 8px;
+}
+.todo-menu .app-dialog .due-field {
+    background-color: #181818;
+    border: 1px solid #303030;
+    border-radius: 4px;
+    color: #ffffff;
+    min-height: 28px;
+    padding: 0 6px;
 }
 ```
 
