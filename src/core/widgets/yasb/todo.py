@@ -7,11 +7,12 @@ import time
 import urllib.parse
 from functools import partial
 
-from PyQt6.QtCore import QDate, QDateTime, QMimeData, QPoint, Qt, QTime, QTimer
-from PyQt6.QtGui import QAction, QDrag, QIcon
+from PyQt6.QtCore import QDate, QLocale, QMimeData, QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QDrag, QIcon, QPalette
 from PyQt6.QtWidgets import (
+    QApplication,
+    QCalendarWidget,
     QCheckBox,
-    QDateTimeEdit,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -22,6 +23,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QTableView,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -269,9 +271,51 @@ class TodoWidget(BaseWidget):
 
     def _selected_due_at(self) -> str | None:
         """返回对话框里选中的截止时间；未勾选表示无期限。"""
-        if not self._due_checkbox.isChecked():
+        if not self._due_checkbox.isChecked() or self._due_value is None:
             return None
-        return self._due_edit.dateTime().toString("yyyy-MM-ddTHH:mm")
+        return self._due_value.strftime("%Y-%m-%dT%H:%M")
+
+    def _on_due_toggled(self, checked: bool):
+        self._due_button.setEnabled(checked)
+        if checked:
+            if self._due_value is None:
+                self._due_value = datetime.datetime.combine(datetime.date.today(), datetime.time(23, 59))
+        else:
+            self._due_value = None
+        self._update_due_button()
+
+    def _update_due_button(self):
+        if self._due_checkbox.isChecked() and self._due_value is not None:
+            self._due_button.setText(self._due_value.strftime("%Y-%m-%d %H:%M"))
+        else:
+            self._due_button.setText("未设置 · 无期限")
+
+    def _ensure_due_picker(self) -> DateTimePicker:
+        if self._due_picker is None:
+            self._due_picker = DateTimePicker(self._due_button.window(), self._apply_due_value, self._clear_due_value)
+        return self._due_picker
+
+    def _open_due_picker(self):
+        if not self._due_checkbox.isChecked():
+            self._due_checkbox.setChecked(True)
+        if self._due_value is None:
+            self._due_value = datetime.datetime.combine(datetime.date.today(), datetime.time(23, 59))
+            self._update_due_button()
+        picker = self._ensure_due_picker()
+        picker.set_value(self._due_value)
+        picker.show_at(self._due_button)
+
+    def _apply_due_value(self, value: datetime.datetime):
+        self._due_value = value
+        if not self._due_checkbox.isChecked():
+            self._due_checkbox.setChecked(True)
+        self._update_due_button()
+
+    def _clear_due_value(self):
+        self._due_value = None
+        self._due_checkbox.setChecked(False)
+        self._due_button.setEnabled(False)
+        self._update_due_button()
 
     def _show_task_dialog(self, dialog_title, save_button_text, on_save, task=None):
         self._menu.hide()
@@ -343,26 +387,22 @@ class TodoWidget(BaseWidget):
         self._due_checkbox = QCheckBox("设置截止日期")
         self._due_checkbox.setProperty("class", "due-checkbox")
 
-        self._due_edit = QDateTimeEdit()
-        self._due_edit.setProperty("class", "due-field")
-        self._due_edit.setCalendarPopup(True)
-        self._due_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
-        self._due_edit.setDateTime(QDateTime(QDate.currentDate(), QTime(23, 59)))
-
         existing_due = _parse_due_at(task.get("due_at")) if task else None
-        if existing_due:
-            self._due_checkbox.setChecked(True)
-            self._due_edit.setDateTime(
-                QDateTime(
-                    QDate(existing_due.year, existing_due.month, existing_due.day),
-                    QTime(existing_due.hour, existing_due.minute),
-                )
-            )
-        self._due_edit.setEnabled(self._due_checkbox.isChecked())
-        self._due_checkbox.toggled.connect(self._due_edit.setEnabled)
+        self._due_value = existing_due
+        self._due_picker = None
+
+        self._due_button = QPushButton()
+        self._due_button.setProperty("class", "due-field")
+        self._due_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._due_button.clicked.connect(self._open_due_picker)
+        self._due_button.setEnabled(existing_due is not None)
+
+        self._due_checkbox.setChecked(existing_due is not None)
+        self._update_due_button()
+        self._due_checkbox.toggled.connect(self._on_due_toggled)
 
         due_layout.addWidget(self._due_checkbox)
-        due_layout.addWidget(self._due_edit, 1)
+        due_layout.addWidget(self._due_button, 1)
         content_layout.addWidget(due_container)
 
         dialog_layout.addWidget(content_container)
@@ -1160,3 +1200,444 @@ class TaskFrame(QFrame):
         if source_id != target_id:
             self._reorder_callback(source_id, target_id)
         event.acceptProposedAction()
+
+
+class TimeField(QLabel):
+    """两位数字时间框：无光标，点击后逐位输入，支持滚轮。"""
+
+    valueChanged = pyqtSignal(int)
+
+    def __init__(self, maximum: int, parent=None):
+        super().__init__(parent)
+        self._maximum = maximum
+        self._buffer = "00"
+        self._editing = False
+        self._entered = 0
+        self.setProperty("class", "time-field")
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFixedWidth(40)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setText(self._buffer)
+
+    def value(self) -> int:
+        return int(self._buffer)
+
+    def set_value(self, value: int):
+        # 时分是循环列表：23/59 继续增加回到 00，00 减小回到 23/59。
+        value = int(value) % (self._maximum + 1)
+        self._buffer = f"{value:02d}"
+        self._editing = False
+        self._entered = 0
+        self.setText(self._buffer)
+        self.valueChanged.emit(value)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setFocus()
+            self._editing = True
+            self._entered = 0
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self._editing = True
+        self._entered = 0
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self._editing = False
+
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y()
+        if delta:
+            # 向下滚动（delta < 0）增大，向上滚动减小；基于当前值切换。
+            self.set_value(self.value() + (-1 if delta > 0 else 1))
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Backspace:
+            self._backspace()
+            event.accept()
+            return
+        if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+            self.set_value(self.value() + (1 if event.key() == Qt.Key.Key_Up else -1))
+            event.accept()
+            return
+        text = event.text()
+        if text.isdigit():
+            self._type_digit(text)
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def _type_digit(self, digit: str):
+        if self._entered >= 2:
+            self._entered = 0
+        if self._entered == 0:
+            if digit == "0":
+                # 0 不能作为第一位；保持当前值，等待下一个有效数字。
+                return
+            self._buffer = f"0{digit}"
+            self._entered = 1
+        else:
+            # 第二位与前一位组成 xx；超出范围时保持 0x。
+            value = int(self._buffer[1] + digit)
+            if value > self._maximum:
+                return
+            self._buffer = f"{self._buffer[1]}{digit}"
+            self._entered = 2
+        self.setText(self._buffer)
+        self.update()
+        self.valueChanged.emit(self.value())
+
+    def _backspace(self):
+        if self._entered == 2:
+            # xx -> 0x：保留十位作为新的个位，例如 53 -> 05。
+            self._buffer = f"0{self._buffer[0]}"
+            self._entered = 1
+        elif self._entered == 1:
+            self._buffer = "00"
+            self._entered = 0
+        else:
+            # 首次退格把当前值退成 0x（保留个位），例如 23 -> 03。
+            value = self.value()
+            self._buffer = f"0{value % 10}" if value else "00"
+            self._entered = 1 if value else 0
+        self.setText(self._buffer)
+        self.update()
+        self.valueChanged.emit(self.value())
+
+
+class TimeColumn(QWidget):
+    """时间列：上/下为暗淡相邻值，中间可输入并支持滚轮。"""
+
+    def __init__(self, maximum: int, parent=None):
+        super().__init__(parent)
+        self._maximum = maximum
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.upper = QLabel()
+        self.upper.setProperty("class", "time-neighbor")
+        self.upper.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.field = TimeField(maximum)
+        self.field.valueChanged.connect(self._sync_neighbors)
+
+        self.lower = QLabel()
+        self.lower.setProperty("class", "time-neighbor")
+        self.lower.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.unit = QLabel("时" if maximum == 23 else "分")
+        self.unit.setProperty("class", "picker-unit")
+        self.unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        layout.addWidget(self.upper)
+        layout.addWidget(self.field)
+        layout.addWidget(self.lower)
+        layout.addWidget(self.unit)
+        self._sync_neighbors()
+
+    def _sync_neighbors(self, *_args):
+        value = self.field.value()
+        cycle = self._maximum + 1
+        self.upper.setText(f"{(value - 1) % cycle:02d}")
+        self.lower.setText(f"{(value + 1) % cycle:02d}")
+
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y()
+        if delta:
+            self.field.set_value(self.field.value() + (-1 if delta > 0 else 1))
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+
+class ValueList(QFrame):
+    """5 行滚轮列表：中间为当前值，首尾暗淡，可点击选择。"""
+
+    valueChanged = pyqtSignal(int)
+
+    def __init__(self, minimum, maximum, selected, parent=None, cyclic=False, formatter=None):
+        super().__init__(parent)
+        self.setProperty("class", "scroll-list")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._minimum = minimum
+        self._maximum = maximum
+        self._cyclic = cyclic
+        self._formatter = formatter or str
+        self._selected = selected
+        self._rows = 5
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(0)
+
+        self._labels = []
+        for index in range(self._rows):
+            label = QLabel()
+            label.setProperty("class", "scroll-row")
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setCursor(Qt.CursorShape.PointingHandCursor)
+            label.mousePressEvent = lambda event, i=index: self._pick_row(i)
+            layout.addWidget(label)
+            self._labels.append(label)
+
+        self._refresh()
+
+    def set_selected(self, value: int):
+        self._selected = self._normalize(value)
+        self._refresh()
+
+    def _normalize(self, value: int) -> int:
+        if self._cyclic:
+            span = self._maximum - self._minimum + 1
+            return ((value - self._minimum) % span) + self._minimum
+        return max(self._minimum, min(self._maximum, value))
+
+    def _refresh(self):
+        for index in range(self._rows):
+            value = self._normalize(self._selected + index - 1)
+            label = self._labels[index]
+            label.setText(self._formatter(value))
+            classes = ["scroll-row"]
+            if index == 1:
+                classes.append("selected")
+            elif index in (0, self._rows - 1):
+                classes.append("dim")
+            label.setProperty("class", " ".join(classes))
+            refresh_widget_style(label)
+
+    def _step(self, delta: int):
+        value = self._normalize(self._selected + delta)
+        if value == self._selected:
+            return
+        self._selected = value
+        self._refresh()
+        self.valueChanged.emit(value)
+
+    def _pick_row(self, index: int):
+        if index == 1:
+            return
+        self._step(index - 1)
+        self.hide()
+
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y()
+        if delta:
+            self._step(-1 if delta > 0 else 1)
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+
+class DateTimePicker(QFrame):
+    """截止时间弹出面板：左侧日历，右侧 24 小时制时分。"""
+
+    def __init__(self, parent, on_accept, on_clear):
+        super().__init__(
+            parent,
+            Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint,
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self._on_accept = on_accept
+        self._on_clear = on_clear
+
+        content = QFrame(self)
+        content.setProperty("class", "datetime-picker")
+        self._content = content
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(content)
+
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(6)
+
+        header = QHBoxLayout()
+        header.setSpacing(2)
+        self._prev_btn = QPushButton("‹")
+        self._prev_btn.setProperty("class", "picker-nav")
+        self._year_btn = QPushButton()
+        self._year_btn.setProperty("class", "picker-title")
+        self._month_btn = QPushButton()
+        self._month_btn.setProperty("class", "picker-title")
+        self._next_btn = QPushButton("›")
+        self._next_btn.setProperty("class", "picker-nav")
+        header.addWidget(self._prev_btn)
+        header.addWidget(self._year_btn)
+        header.addWidget(self._month_btn)
+        header.addWidget(self._next_btn)
+        header.addStretch()
+        layout.addLayout(header)
+
+        body = QHBoxLayout()
+        body.setSpacing(10)
+
+        self._calendar = QCalendarWidget()
+        self._calendar.setProperty("class", "picker-calendar")
+        self._calendar.setFixedSize(290, 220)
+        self._calendar.setNavigationBarVisible(False)
+        self._calendar.setGridVisible(False)
+        self._calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        self._calendar.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
+        self._calendar.setLocale(QLocale(QLocale.Language.Chinese, QLocale.Country.China))
+        table = self._calendar.findChild(QTableView)
+        if table:
+            table.setProperty("class", "calendar-table")
+            palette = table.palette()
+            palette.setColor(QPalette.ColorRole.Highlight, QColor(0, 0, 0, 0))
+            palette.setColor(QPalette.ColorRole.HighlightedText, palette.color(QPalette.ColorRole.Text))
+            table.setPalette(palette)
+        body.addWidget(self._calendar, 1)
+
+        time_col = QVBoxLayout()
+        time_col.setSpacing(6)
+        time_col.addStretch()
+
+        fields = QHBoxLayout()
+        fields.setSpacing(18)
+        self._hour_col = TimeColumn(23)
+        self._minute_col = TimeColumn(59)
+        self._hour = self._hour_col.field
+        self._minute = self._minute_col.field
+        fields.addWidget(self._hour_col)
+        fields.addWidget(self._minute_col)
+        time_col.addLayout(fields)
+
+        time_hint = QLabel("点击输入 · 滚轮增减")
+        time_hint.setProperty("class", "picker-caption")
+        time_hint.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        time_hint.setWordWrap(True)
+        time_col.addWidget(time_hint)
+        time_col.addStretch()
+        body.addLayout(time_col)
+        layout.addLayout(body)
+
+        footer = QHBoxLayout()
+        footer.setSpacing(4)
+        for text, handler in (("23:59", self._set_2359), ("09:00", self._set_0900), ("清除", self._clear)):
+            btn = QPushButton(text)
+            btn.setProperty("class", "picker-quick")
+            btn.clicked.connect(handler)
+            footer.addWidget(btn)
+        footer.addStretch()
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setProperty("class", "picker-button")
+        cancel_btn.clicked.connect(self.hide)
+        ok_btn = QPushButton("确定")
+        ok_btn.setProperty("class", "picker-button primary")
+        ok_btn.clicked.connect(self._accept)
+        footer.addWidget(cancel_btn)
+        footer.addWidget(ok_btn)
+        layout.addLayout(footer)
+
+        self._year_list = ValueList(1970, 2100, self._calendar.yearShown(), content, cyclic=False, formatter=str)
+        self._year_list.hide()
+        self._year_list.valueChanged.connect(self._on_year_selected)
+
+        self._month_list = ValueList(
+            1, 12, self._calendar.monthShown(), content, cyclic=True, formatter=lambda m: f"{m} 月"
+        )
+        self._month_list.hide()
+        self._month_list.valueChanged.connect(self._on_month_selected)
+
+        self._prev_btn.clicked.connect(lambda: self._shift_month(-1))
+        self._next_btn.clicked.connect(lambda: self._shift_month(1))
+        self._year_btn.clicked.connect(self._show_year_list)
+        self._month_btn.clicked.connect(self._show_month_list)
+        self._calendar.currentPageChanged.connect(self._sync_header)
+        self._sync_header()
+
+    def _set_2359(self):
+        self._hour.set_value(23)
+        self._minute.set_value(59)
+
+    def _set_0900(self):
+        self._hour.set_value(9)
+        self._minute.set_value(0)
+
+    def _clear(self):
+        self._on_clear()
+        self.hide()
+
+    def _accept(self):
+        date = self._calendar.selectedDate()
+        value = datetime.datetime(date.year(), date.month(), date.day(), self._hour.value(), self._minute.value())
+        self._on_accept(value)
+        self.hide()
+
+    def _shift_month(self, delta: int):
+        year = self._calendar.yearShown()
+        month = self._calendar.monthShown() + delta
+        if month < 1:
+            month = 12
+            year -= 1
+        elif month > 12:
+            month = 1
+            year += 1
+        self._calendar.setCurrentPage(year, month)
+
+    def _sync_header(self, *_args):
+        year = self._calendar.yearShown()
+        month = self._calendar.monthShown()
+        self._year_btn.setText(f"{year} 年")
+        self._month_btn.setText(f"{month} 月")
+        self._year_list.set_selected(year)
+        self._month_list.set_selected(month)
+
+    def _on_year_selected(self, year: int):
+        self._calendar.setCurrentPage(year, self._calendar.monthShown())
+
+    def _on_month_selected(self, month: int):
+        self._calendar.setCurrentPage(self._calendar.yearShown(), month)
+
+    def _show_year_list(self):
+        self._toggle_list(self._year_list, self._year_btn)
+
+    def _show_month_list(self):
+        self._toggle_list(self._month_list, self._month_btn)
+
+    def _toggle_list(self, widget: ValueList, button: QPushButton):
+        if widget.isVisible():
+            widget.hide()
+            return
+        self._year_list.hide()
+        self._month_list.hide()
+        widget.adjustSize()
+        pos = button.mapTo(self._content, QPoint(0, button.height() + 4))
+        pos.setX(max(0, min(pos.x(), self._content.width() - widget.width())))
+        widget.move(pos)
+        widget.show()
+        widget.raise_()
+
+    def set_value(self, value: datetime.datetime):
+        self._calendar.setSelectedDate(QDate(value.year, value.month, value.day))
+        self._calendar.setCurrentPage(value.year, value.month)
+        self._hour.set_value(value.hour)
+        self._minute.set_value(value.minute)
+        self._sync_header()
+
+    def show_at(self, anchor: QWidget):
+        self.adjustSize()
+        pos = anchor.mapToGlobal(QPoint(0, anchor.height() + 6))
+        screen = QApplication.screenAt(pos) or QApplication.primaryScreen()
+        if screen:
+            geo = screen.availableGeometry()
+            if pos.y() + self.height() > geo.bottom():
+                pos.setY(anchor.mapToGlobal(QPoint(0, 0)).y() - self.height() - 6)
+            if pos.x() + self.width() > geo.right() + 1:
+                pos.setX(geo.right() - self.width() + 1)
+            pos.setX(max(geo.left(), pos.x()))
+            pos.setY(max(geo.top(), pos.y()))
+        self.move(pos)
+        self.show()
+        self.raise_()
+        self.activateWindow()

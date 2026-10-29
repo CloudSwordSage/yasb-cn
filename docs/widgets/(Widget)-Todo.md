@@ -87,7 +87,7 @@ todo:
 
 ## Due Dates and Views
 
-Each task can store an optional `due_at` (local time, ISO `YYYY-MM-DDTHH:mm`). The menu derives its state automatically:
+Each task can store an optional `due_at` (local time, ISO `YYYY-MM-DDTHH:mm`). Clicking the due date field in the task dialog opens a picker: the calendar is on the left (click the year or month to jump), and the 24-hour hour/minute fields are on the right. The time fields accept direct typing; the mouse wheel changes the current value, including after the field loses focus. The menu derives its state automatically:
 
 | State | Condition | Shown as |
 |-------|-----------|----------|
@@ -192,6 +192,15 @@ Fields stored per task:
 .todo-menu .app-dialog .due-checkbox {}
 .todo-menu .app-dialog .due-field {}
 .todo-menu .app-dialog .buttons-container {}
+.datetime-picker {}
+.datetime-picker .picker-nav {}
+.datetime-picker .picker-title {}
+.datetime-picker .picker-caption {}
+.datetime-picker .picker-unit {}
+.datetime-picker .time-field {}
+.datetime-picker .picker-quick {}
+.datetime-picker .picker-button {}
+.datetime-picker .calendar-table {}
 .todo-menu .app-dialog .title-field {}
 .todo-menu .app-dialog .desc-field {}
 .todo-menu .app-dialog .title-field:focus {}
