@@ -113,7 +113,6 @@ class InputModeMonitor(QObject):
             return None
         try:
             payload = ctypes.create_string_buffer(1)
-            count = wintypes.DWORD()
             overlapped = OVERLAPPED(hEvent=event)
             if not ReadFileOverlapped(handle, payload, ctypes.byref(overlapped)):
                 error = ctypes.get_last_error()
@@ -125,10 +124,11 @@ class InputModeMonitor(QObject):
                     CancelIoEx(handle, ctypes.byref(overlapped))
                     GetOverlappedResult(handle, ctypes.byref(overlapped), True)
                     return None
-                success, _ = GetOverlappedResult(handle, ctypes.byref(overlapped), False)
-                if not success:
-                    return None
-            return payload.raw if count.value == 1 else None
+                success, transferred = GetOverlappedResult(handle, ctypes.byref(overlapped), False)
+                return payload.raw if success and transferred == 1 else None
+            # 同步完成时包装函数没有写回字节数，统一用 GetOverlappedResult 读取。
+            success, transferred = GetOverlappedResult(handle, ctypes.byref(overlapped), False)
+            return payload.raw if success and transferred == 1 else None
         finally:
             CloseHandle(event)
 
