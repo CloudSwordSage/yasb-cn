@@ -1,14 +1,14 @@
 import logging
 import os
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, cast, override
 
+import PyQt6.QtCore as QtCore
 from PIL import Image, ImageFilter
 from PIL.ImageQt import ImageQt
 from pycaw.pycaw import AudioUtilities
-from PyQt6 import QtCore
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRectF, Qt, QTimer, pyqtSlot
-from PyQt6.QtGui import QMouseEvent, QPainter, QPainterPath, QPaintEvent, QPixmap, QWheelEvent
+from PyQt6.QtGui import QEnterEvent, QMouseEvent, QPainter, QPainterPath, QPaintEvent, QPixmap, QWheelEvent
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -16,26 +16,28 @@ from PyQt6.QtWidgets import (
     QLabel,
     QSizePolicy,
     QSlider,
+    QStyle,
+    QStyleOption,
     QVBoxLayout,
     QWidget,
 )
 from qasync import asyncSlot  # type: ignore
 
+from core.utils.icons.service import AppIcon, IconService, ProcessIcon
 from core.utils.qobject import is_valid_qobject
 from core.utils.tooltip import set_tooltip
 from core.utils.utilities import ElidedLabel, PopupWidget, ScrollingLabel, refresh_widget_style
-from core.utils.win32.app_icons import get_icon_for_aumid, get_process_icon
-from core.utils.win32.aumid import activate_app_by_aumid
-from core.validation.widgets.yasb.media_lite import MediaLiteWidgetConfig
-from core.widgets.base import BaseWidget
-from core.widgets.services.media.aumid_process import (
+from core.utils.win32.aumid import activate_app_by_aumid, get_pid_for_window_aumid
+from core.utils.win32.aumid_process import (
     get_app_audio_sessions,
     get_app_audio_state,
-    get_pid_for_window_aumid,
     get_process_name_for_aumid,
+    resolve_shell_app,
     set_app_audio_muted,
     set_app_audio_volume,
 )
+from core.validation.widgets.yasb.media_lite import MediaLiteWidgetConfig
+from core.widgets.base import BaseWidget
 from core.widgets.services.media.media import SessionState, WindowsMedia
 from core.widgets.services.media.source_apps import resolve_source_app_name
 from settings import SCRIPT_PATH
@@ -68,8 +70,11 @@ class MediaWidget(BaseWidget):
         self.dialog: PopupWidget | None = None
         self._seeking = False
         self._empty_thumb_cache: dict[tuple[int, float], QPixmap] = {}
-        self._source_icon_cache: dict[tuple[str, float], QPixmap] = {}
+        self._icons = IconService.instance()
+        self._icons.icons_changed.connect(self._refresh_source_icon)
+        self._source_pid_cache: tuple[str, int | None] | None = None
         self._default_source_icon: dict[float, QPixmap] = {}
+        self._artwork_dpr: float | None = None
         self._app_is_muted = False
 
         # Bar layout: thumb + title/artist
@@ -168,11 +173,11 @@ class MediaWidget(BaseWidget):
             if self.config.show_title or self.config.show_artist:
                 self._text_col_widget.show()
             return
-        if self.isVisible() and not self._bar_hide_timer.isActive():
+        if not self.isHidden() and not self._bar_hide_timer.isActive():
             self._bar_hide_timer.start()
 
     def _hide_bar_now(self) -> None:
-        if self.current_session is not None or not self.isVisible():
+        if self.current_session is not None or self.isHidden():
             return
         self.hide()
         if self._bar_scroll_label is not None:
@@ -229,7 +234,7 @@ class MediaWidget(BaseWidget):
             offset_top=self.config.media_menu.offset_top,
         )
         self.dialog.show()
-        self._update_artwork_background()
+        self.update_artwork_background()
 
     def _create_media_popup(self):
         menu = self.config.media_menu
@@ -248,7 +253,6 @@ class MediaWidget(BaseWidget):
         outer.setSpacing(0)
 
         self._artwork_bg_label = QLabel(self.dialog)
-        self._artwork_bg_label.setProperty("class", "artwork-background")
         self._artwork_bg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._artwork_bg_label.setScaledContents(True)
         self._artwork_bg_label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -271,8 +275,12 @@ class MediaWidget(BaseWidget):
         header.setContentsMargins(0, 0, 0, 0)
         header.setSpacing(0)
 
-        self._volume_hover = VolumeHoverWidget(self)
-        header.addWidget(self._volume_hover, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.volume_hover = VolumeHoverWidget(self)
+        self._volume_icon = self.volume_hover.icon
+        self.app_volume_slider = self.volume_hover.slider
+        self.app_volume_slider.valueChanged.connect(self._on_app_volume_slider_changed)
+        self._set_tip(self.volume_hover, "Mute")
+        header.addWidget(self.volume_hover, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         header.addStretch(1)
 
         self._popup_source_label = ClickableLabel(self)
@@ -407,6 +415,7 @@ class MediaWidget(BaseWidget):
         session = self.current_session
         if session is None or not is_valid_qobject(self.dialog):
             return
+        self._source_pid_cache = None
         self._apply_source_icon(session)
         self._apply_timeline(session)
         self._update_app_volume_slider()
@@ -457,6 +466,16 @@ class MediaWidget(BaseWidget):
         self._popup_title_label.setText(title or "未知标题")
         self._popup_artist_label.setText(artist or "未知艺术家")
 
+    @override
+    def event(self, a0: QEvent | None) -> bool:
+        if a0 is not None and a0.type() == QEvent.Type.DevicePixelRatioChange:
+            dpr = self.devicePixelRatioF()
+            if dpr != self._artwork_dpr:
+                self._artwork_dpr = dpr
+                if self.current_session is not None:
+                    self._apply_artwork(self.current_session)
+        return super().event(a0)
+
     def _apply_artwork(self, session: SessionState) -> None:
         cover = session.thumbnail
         if self.config.show_thumbnail:
@@ -468,7 +487,7 @@ class MediaWidget(BaseWidget):
         if is_valid_qobject(self.dialog):
             self._popup_thumbnail_label.setPixmap(self._pixmap_from_cover(cover, self.config.media_menu.image_size))
         if self._popup_open():
-            self._update_artwork_background()
+            self.update_artwork_background()
 
     def _apply_transport(self, session: SessionState) -> None:
         if not is_valid_qobject(self.dialog):
@@ -573,7 +592,7 @@ class MediaWidget(BaseWidget):
             screen = self.dialog.screen()
         return float(screen.devicePixelRatio()) if screen is not None else 1.0
 
-    def _update_artwork_background(self):
+    def update_artwork_background(self):
         if not is_valid_qobject(self._artwork_bg_label) or not is_valid_qobject(self.dialog):
             return
         menu = self.config.media_menu
@@ -607,51 +626,82 @@ class MediaWidget(BaseWidget):
                 return
             if opacity < 1.0:
                 alpha = cropped.getchannel("A")
-                alpha = alpha.point(lambda a: int(a * opacity))
+                alpha = alpha.point([int(a * opacity) for a in range(256)])  # pyright: ignore[reportUnknownMemberType]
                 cropped.putalpha(alpha)
-            pix = QPixmap.fromImage(ImageQt(cropped).copy())
-            pix.setDevicePixelRatio(dpr)
-            self._artwork_bg_label.setPixmap(pix)
+            self._artwork_bg_label.setPixmap(self._clip_to_menu(cropped, dpr))
             self._artwork_bg_label.show()
         except Exception as e:
             logger.error("Error updating artwork background: %s", e)
             self._artwork_bg_label.hide()
 
+    def _clip_to_menu(self, image: Image.Image, dpr: float) -> QPixmap:
+        # Qt stylesheets don't clip child widgets, so we cut the artwork to the menu shape ourselves.
+        # A hidden copy of the menu frame paints the shape with solid colors (only alpha matters),
+        # then the artwork is kept inside it and the border is erased.
+        # We don't use render() here, it resizes the popup and triggers ArtworkResizeFilter again.
+        art = ImageQt(image)
+        art.setDevicePixelRatio(dpr)
+        pix = QPixmap(art.size())
+        pix.setDevicePixelRatio(dpr)
+        pix.fill(Qt.GlobalColor.transparent)
+        probe = QFrame(self.dialog)
+        probe.deleteLater()
+        probe.setProperty("class", "media-lite-menu")
+        probe.setStyleSheet("background: #000; border-color: transparent;")
+        probe.ensurePolished()
+        style = probe.style()
+        if style is None or self.dialog is None:
+            return QPixmap.fromImage(art)
+        option = QStyleOption()
+        option.initFrom(probe)
+        option.rect = self.dialog.rect()
+        painter = QPainter(pix)
+        style.drawPrimitive(QStyle.PrimitiveElement.PE_Widget, option, painter, probe)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.drawImage(0, 0, art)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationOut)
+        probe.setStyleSheet("background: transparent; border-color: #000;")
+        style.drawPrimitive(QStyle.PrimitiveElement.PE_Widget, option, painter, probe)
+        painter.end()
+        return pix
+
     def _get_source_app_icon(self, aumid: str) -> QPixmap | None:
+        """Source app icon, blank while it loads (_refresh_source_icon applies it on icons_changed)."""
         if not aumid:
             return None
         dpr = self._dpr()
-        cached = self._source_icon_cache.get((aumid, dpr))
-        if cached is not None:
-            return cached
         try:
-            phys = max(1, int(round(SOURCE_ICON_SIZE * dpr)))
-            img = get_icon_for_aumid(aumid, size=phys)
-            if img is None:
-                pid = get_pid_for_window_aumid(aumid)
-                if not pid:
-                    sessions = get_app_audio_sessions(aumid)
-                    proc = getattr(sessions[0], "Process", None) if sessions else None
-                    if proc is not None:
-                        pid = getattr(proc, "pid", None)
-                if not pid:
-                    exe = get_process_name_for_aumid(aumid)
-                    if exe:
-                        pid = self._find_pid_by_executable(exe)
-                if pid:
-                    img = get_process_icon(int(pid))
-            if img is None:
-                return None
-            if img.mode != "RGBA":
-                img = img.convert("RGBA")
-            if img.size != (phys, phys):
-                img = img.resize((phys, phys), Image.LANCZOS)
-            pixmap = self._pil_to_pixmap(img, dpr)
-            self._source_icon_cache[(aumid, dpr)] = pixmap
-            return pixmap
+            # Only an app ID Windows lists has an app icon; for an unpackaged player SMTC gives its exe name instead
+            if resolve_shell_app(aumid)[0] is not None:
+                return self._icons.get_icon(AppIcon(aumid), SOURCE_ICON_SIZE, dpr)
+            pid = self._source_pid(aumid)
+            return self._icons.get_icon(ProcessIcon(pid), SOURCE_ICON_SIZE, dpr) if pid else None
         except Exception:
             logger.exception("Error getting source app icon")
             return None
+
+    def _source_pid(self, aumid: str) -> int | None:
+        if self._source_pid_cache is None or self._source_pid_cache[0] != aumid:
+            self._source_pid_cache = (aumid, self._find_source_pid(aumid))
+        return self._source_pid_cache[1]
+
+    def _find_source_pid(self, aumid: str) -> int | None:
+        pid = get_pid_for_window_aumid(aumid)
+        if not pid:
+            sessions = get_app_audio_sessions(aumid)
+            proc = getattr(sessions[0], "Process", None) if sessions else None
+            if proc is not None:
+                pid = getattr(proc, "pid", None)
+        if not pid:
+            exe = get_process_name_for_aumid(aumid)
+            if exe:
+                pid = self._find_pid_by_executable(exe)
+        return int(pid) if pid else None
+
+    def _refresh_source_icon(self) -> None:
+        session = self.current_session
+        if session is not None and is_valid_qobject(self.dialog):
+            self._apply_source_icon(session)
 
     @staticmethod
     def _pil_to_pixmap(img: Image.Image, dpr: float = 1.0) -> QPixmap:
@@ -764,7 +814,7 @@ class MediaWidget(BaseWidget):
         return text
 
     def _toggle_play_pause(self):
-        self.media.play_pause()
+        _ = self.media.play_pause()
 
     def _open_media_source(self):
         if self.current_session and self.current_session.app_id:
@@ -828,7 +878,7 @@ class MediaWidget(BaseWidget):
         if is_valid_qobject(self._popup_current_time_label):
             self._popup_current_time_label.setText(self._format_time((value / 1000.0) * self.current_session.duration))
 
-    def _volume_available(self) -> bool:
+    def volume_available(self) -> bool:
         app_id = self.current_session.app_id if self.current_session else None
         return bool(app_id and get_app_audio_state(app_id) is not None)
 
@@ -838,7 +888,7 @@ class MediaWidget(BaseWidget):
         app_id = self.current_session.app_id if self.current_session else None
         state = get_app_audio_state(app_id) if app_id else None
         if state is None:
-            self._volume_hover.hide_slider()
+            self.volume_hover.hide_slider()
             self.app_volume_slider.setEnabled(False)
             self._update_volume_icon()
             return
@@ -863,12 +913,12 @@ class MediaWidget(BaseWidget):
         except Exception as e:
             logger.error("Failed to set app volume: %s", e)
 
-    def _adjust_volume_by_delta(self, delta: int):
-        if not is_valid_qobject(self.dialog) or not self._volume_available():
+    def adjust_volume_by_delta(self, delta: int):
+        if not is_valid_qobject(self.dialog) or not self.volume_available():
             return
         self.app_volume_slider.setValue(max(0, min(100, self.app_volume_slider.value() + delta)))
 
-    def _toggle_app_mute(self):
+    def toggle_app_mute(self):
         app_id = self.current_session.app_id if self.current_session else None
         state = get_app_audio_state(app_id) if app_id else None
         if state is None:
@@ -892,9 +942,9 @@ class MediaWidget(BaseWidget):
             self._volume_icon.setText(icons.volume)
             self._volume_icon.setProperty("class", "volume-button unavailable")
             refresh_widget_style(self._volume_icon)
-            if is_valid_qobject(self._volume_hover):
-                self._set_tip(self._volume_hover, "Volume unavailable")
-                self._volume_hover.setCursor(Qt.CursorShape.ArrowCursor)
+            if is_valid_qobject(self.volume_hover):
+                self._set_tip(self.volume_hover, "Volume unavailable")
+                self.volume_hover.setCursor(Qt.CursorShape.ArrowCursor)
             return
         try:
             _, is_muted = state
@@ -902,9 +952,9 @@ class MediaWidget(BaseWidget):
             self._volume_icon.setText(icons.mute if is_muted else icons.volume)
             self._volume_icon.setProperty("class", "volume-button muted" if is_muted else "volume-button")
             refresh_widget_style(self._volume_icon)
-            if is_valid_qobject(self._volume_hover):
-                self._set_tip(self._volume_hover, "Unmute" if is_muted else "Mute")
-                self._volume_hover.setCursor(Qt.CursorShape.PointingHandCursor)
+            if is_valid_qobject(self.volume_hover):
+                self._set_tip(self.volume_hover, "Unmute" if is_muted else "Mute")
+                self.volume_hover.setCursor(Qt.CursorShape.PointingHandCursor)
         except Exception as e:
             logger.error("Failed to update volume icon: %s", e)
 
@@ -938,7 +988,7 @@ class RoundedClickableLabel(ClickableLabel):
 
     def paintEvent(self, a0: QPaintEvent | None):
         pix = self.pixmap()
-        if pix is None or pix.isNull() or self._corner_radius <= 0:
+        if pix.isNull() or self._corner_radius <= 0:
             super().paintEvent(a0)
             return
         painter = QPainter(self)
@@ -965,29 +1015,25 @@ class VolumeHoverWidget(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self._icon = QLabel(self)
-        self._icon.setProperty("class", "volume-button")
-        self._icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._icon.setText(media_widget.config.media_menu.icons.volume)
-        layout.addWidget(self._icon)
-        media_widget._volume_icon = self._icon
-        media_widget._set_tip(self, "Mute")
+        self.icon = QLabel(self)
+        self.icon.setProperty("class", "volume-button")
+        self.icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon.setText(media_widget.config.media_menu.icons.volume)
+        layout.addWidget(self.icon)
 
-        self._slider_popup = QFrame(media_widget.dialog)
-        self._slider_popup.setProperty("class", "volume-slider-popup")
-        self._slider_popup.hide()
+        self.slider_popup = QFrame(media_widget.dialog)
+        self.slider_popup.setProperty("class", "volume-slider-popup")
+        self.slider_popup.hide()
 
-        popup_layout = QVBoxLayout(self._slider_popup)
+        popup_layout = QVBoxLayout(self.slider_popup)
         popup_layout.setContentsMargins(0, 0, 0, 0)
         popup_layout.setSpacing(0)
 
-        slider = QSlider(Qt.Orientation.Vertical)
-        slider.setProperty("class", "volume-slider")
-        slider.setMinimum(0)
-        slider.setMaximum(100)
-        slider.valueChanged.connect(media_widget._on_app_volume_slider_changed)
-        popup_layout.addWidget(slider, 0, Qt.AlignmentFlag.AlignCenter)
-        media_widget.app_volume_slider = slider
+        self.slider = QSlider(Qt.Orientation.Vertical)
+        self.slider.setProperty("class", "volume-slider")
+        self.slider.setMinimum(0)
+        self.slider.setMaximum(100)
+        popup_layout.addWidget(self.slider, 0, Qt.AlignmentFlag.AlignCenter)
 
         self._show_timer = QTimer(self)
         self._show_timer.setSingleShot(True)
@@ -998,22 +1044,24 @@ class VolumeHoverWidget(QFrame):
         self._hide_timer.setSingleShot(True)
         self._hide_timer.setInterval(350)
         self._hide_timer.timeout.connect(self.hide_slider)
-        self._slider_popup.installEventFilter(self)
+        self.slider_popup.installEventFilter(self)
 
-    def enterEvent(self, event: QEvent | None):
-        if self.media_widget._volume_available():
+    @override
+    def enterEvent(self, event: QEnterEvent | None) -> None:
+        if self.media_widget.volume_available():
             self._hide_timer.stop()
             self._show_timer.start()
         super().enterEvent(event)
 
-    def leaveEvent(self, event: QEvent | None):
+    @override
+    def leaveEvent(self, a0: QEvent | None) -> None:
         self._show_timer.stop()
         self._hide_timer.start()
-        super().leaveEvent(event)
+        super().leaveEvent(a0)
 
     def mouseReleaseEvent(self, a0: QMouseEvent | None):
-        if a0 is not None and a0.button() == Qt.MouseButton.LeftButton and self.media_widget._volume_available():
-            self.media_widget._toggle_app_mute()
+        if a0 is not None and a0.button() == Qt.MouseButton.LeftButton and self.media_widget.volume_available():
+            self.media_widget.toggle_app_mute()
             a0.accept()
             return
         super().mouseReleaseEvent(a0)
@@ -1021,14 +1069,14 @@ class VolumeHoverWidget(QFrame):
     def wheelEvent(self, a0: QWheelEvent | None):
         if a0 is None:
             return
-        if not self.media_widget._volume_available():
+        if not self.media_widget.volume_available():
             a0.ignore()
             return
-        self.media_widget._adjust_volume_by_delta(5 if a0.angleDelta().y() > 0 else -5)
+        self.media_widget.adjust_volume_by_delta(5 if a0.angleDelta().y() > 0 else -5)
         a0.accept()
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
-        if obj is self._slider_popup:
+        if obj is self.slider_popup:
             if event.type() == QEvent.Type.Enter:
                 self._hide_timer.stop()
             elif event.type() == QEvent.Type.Leave:
@@ -1036,21 +1084,21 @@ class VolumeHoverWidget(QFrame):
         return super().eventFilter(obj, event)
 
     def _show_slider(self):
-        if not self.media_widget._volume_available():
+        if not self.media_widget.volume_available():
             return
-        if not is_valid_qobject(self._slider_popup) or not is_valid_qobject(self.media_widget.dialog):
+        if not is_valid_qobject(self.slider_popup) or not is_valid_qobject(self.media_widget.dialog):
             return
         dialog = self.media_widget.dialog
-        self._slider_popup.adjustSize()
-        icon_pos = self._icon.mapTo(dialog, QPoint(0, self._icon.height()))
-        x = icon_pos.x() + (self._icon.width() - self._slider_popup.width()) // 2
-        self._slider_popup.move(max(0, x), icon_pos.y())
-        self._slider_popup.show()
-        self._slider_popup.raise_()
+        self.slider_popup.adjustSize()
+        icon_pos = self.icon.mapTo(dialog, QPoint(0, self.icon.height()))
+        x = icon_pos.x() + (self.icon.width() - self.slider_popup.width()) // 2
+        self.slider_popup.move(max(0, x), icon_pos.y())
+        self.slider_popup.show()
+        self.slider_popup.raise_()
 
     def hide_slider(self):
-        if is_valid_qobject(self._slider_popup):
-            self._slider_popup.hide()
+        if is_valid_qobject(self.slider_popup):
+            self.slider_popup.hide()
 
 
 class ArtworkResizeFilter(QObject):
@@ -1060,7 +1108,7 @@ class ArtworkResizeFilter(QObject):
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
         if event.type() == QEvent.Type.Resize and obj is self.media_widget.dialog:
-            self.media_widget._update_artwork_background()
+            self.media_widget.update_artwork_background()
         return False
 
 
@@ -1077,15 +1125,15 @@ class WheelEventFilter(QObject):
         if not is_valid_qobject(dialog) or not dialog.geometry().contains(event.globalPosition().toPoint()):
             return False
 
-        hover = self.media_widget._volume_hover
+        hover = self.media_widget.volume_hover
         if is_valid_qobject(hover):
             hover_rect = QtCore.QRect(hover.mapToGlobal(QPoint(0, 0)), hover.size())
             if hover_rect.contains(event.globalPosition().toPoint()):
                 return False
-            if is_valid_qobject(hover._slider_popup) and hover._slider_popup.isVisible():
+            if is_valid_qobject(hover.slider_popup) and hover.slider_popup.isVisible():
                 slider_rect = QtCore.QRect(
-                    hover._slider_popup.mapToGlobal(QPoint(0, 0)),
-                    hover._slider_popup.size(),
+                    hover.slider_popup.mapToGlobal(QPoint(0, 0)),
+                    hover.slider_popup.size(),
                 )
                 if slider_rect.contains(event.globalPosition().toPoint()):
                     return False

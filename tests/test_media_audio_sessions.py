@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from core.widgets.services.media.aumid_process import (
+from core.utils.win32.aumid_process import (
     get_app_audio_sessions,
     get_app_audio_state,
     set_app_audio_muted,
@@ -47,15 +47,15 @@ class AppAudioSessionTests(unittest.TestCase):
 
         with (
             patch(
-                "core.widgets.services.media.aumid_process.AudioUtilities.GetAllSessions",
+                "core.utils.win32.aumid_process.AudioUtilities.GetAllSessions",
                 side_effect=[[stale], [stale, active_one, expired, unrelated, active_two]],
             ) as get_all_sessions,
             patch(
-                "core.widgets.services.media.aumid_process.get_process_name_for_aumid",
+                "core.utils.win32.aumid_process.get_process_name_for_aumid",
                 return_value="player.exe",
             ),
             patch(
-                "core.widgets.services.media.aumid_process.get_process_aumid",
+                "core.utils.win32.aumid_process.get_aumid_for_process",
                 return_value=None,
             ),
         ):
@@ -69,7 +69,7 @@ class AppAudioSessionTests(unittest.TestCase):
         sessions = [SimpleNamespace(SimpleAudioVolume=volume) for volume in volumes]
 
         with patch(
-            "core.widgets.services.media.aumid_process.get_app_audio_sessions",
+            "core.utils.win32.aumid_process.get_app_audio_sessions",
             return_value=sessions,
         ):
             self.assertTrue(set_app_audio_volume("Player.App", 0.42))
@@ -86,7 +86,7 @@ class AppAudioSessionTests(unittest.TestCase):
         ]
 
         with patch(
-            "core.widgets.services.media.aumid_process.get_app_audio_sessions",
+            "core.utils.win32.aumid_process.get_app_audio_sessions",
             return_value=sessions,
         ):
             self.assertEqual(get_app_audio_state("Player.App"), (0.65, True))
@@ -97,15 +97,15 @@ class AppAudioSessionTests(unittest.TestCase):
 
         with (
             patch(
-                "core.widgets.services.media.aumid_process.AudioUtilities.GetAllSessions",
+                "core.utils.win32.aumid_process.AudioUtilities.GetAllSessions",
                 return_value=[direct_aumid, executable_match],
             ),
             patch(
-                "core.widgets.services.media.aumid_process.get_process_name_for_aumid",
+                "core.utils.win32.aumid_process.get_process_name_for_aumid",
                 return_value="player.exe",
             ),
             patch(
-                "core.widgets.services.media.aumid_process.get_process_aumid",
+                "core.utils.win32.aumid_process.get_aumid_for_process",
                 side_effect=lambda pid: "Player.App" if pid == 11 else None,
             ),
         ):

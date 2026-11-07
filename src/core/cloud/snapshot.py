@@ -84,9 +84,9 @@ def collect_files(root: Path, exclude: tuple[str, ...] = ()) -> list[_Candidate]
     escape the directory entirely.
     """
     if not root.exists():
-        raise SnapshotError(f"Configuration directory does not exist: {root}")
+        raise SnapshotError(f"配置目录不存在：{root}")
     if not root.is_dir():
-        raise SnapshotError(f"Configuration path is not a directory: {root}")
+        raise SnapshotError(f"配置路径不是目录：{root}")
 
     resolved_root = root.resolve()
     included: list[_Candidate] = []
@@ -146,7 +146,7 @@ def create_archive(
     declared = sum(candidate.size for candidate in included)
     if max_total_bytes != UNLIMITED and declared > max_total_bytes:
         raise QuotaExceededError(
-            f"This snapshot is {format_size(declared)}, your plan allows {format_size(max_total_bytes)}."
+            f"此快照为 {format_size(declared)}，你的套餐上限为 {format_size(max_total_bytes)}。"
         )
 
     staging = destination.with_name(destination.name + ".partial")
@@ -160,7 +160,7 @@ def create_archive(
                 try:
                     archive.write(candidate.absolute, arcname=candidate.relative)
                 except OSError as exc:
-                    raise SnapshotError(f"Could not read {candidate.relative}: {exc.strerror or exc}") from exc
+                    raise SnapshotError(f"无法读取 {candidate.relative}：{exc.strerror or exc}") from exc
                 total_bytes += candidate.size
 
         staging.replace(destination)

@@ -5,18 +5,20 @@ every call here runs on a short-lived event loop and returns when it finishes.
 """
 
 import argparse
+import io
 import re
 import signal
 import sys
 import time
 import unicodedata
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from PyQt6.QtCore import QCoreApplication, QTimer
 
 from core.cloud import logs
-from core.cloud.api import ApiClient, ApiError, approve_uri
+from core.cloud.api import ApiClient, ApiError, Call, approve_uri
 from core.cloud.constants import (
     BAD_SIGN_IN,
     CALL_TIMEOUT_MS,
@@ -30,23 +32,24 @@ from core.cloud.constants import (
 )
 from core.cloud.models import Account, Snapshot, format_size
 from core.cloud.operations import BackupOperation, Operation, RestoreOperation, SaveCopyOperation
+from core.cloud.restore import RestoreOutcome
 from core.cloud.session import Session
 from core.cloud.workers import (
     device_name,
 )
 from core.utils.shell_utils import shell_open
 
-SIGN_IN_HINT = "Not signed in. Run `yasbc cloud auth` first."
+SIGN_IN_HINT = "尚未登录。请先运行 `yasbc cloud auth`。"
 
 
 class _Failed(Exception):
     """Anything that should print a message and exit non-zero."""
 
 
-_APP: QCoreApplication | None = None
-_INTERRUPTED = False
-_TICKER: QTimer | None = None
-_OPERATION: Any = None
+_qt_app: QCoreApplication | None = None
+_interrupted = False
+_ticker: QTimer | None = None
+_operation: Operation | None = None
 """The operation running on this thread, so the interrupt handler can cancel it."""
 
 
@@ -56,10 +59,10 @@ def _app() -> QCoreApplication:
     A module global on purpose: a QCoreApplication with no Python reference is collected the
     moment it is created.
     """
-    global _APP
-    if _APP is None:
-        _APP = QCoreApplication.instance() or QCoreApplication(sys.argv[:1])
-    return _APP
+    global _qt_app
+    if _qt_app is None:
+        _qt_app = QCoreApplication.instance() or QCoreApplication(sys.argv[:1])
+    return _qt_app
 
 
 def _watch_for_interrupt() -> None:
@@ -67,27 +70,27 @@ def _watch_for_interrupt() -> None:
 
     exec() sits in C++ and only delivers a signal when it returns to the interpreter.
     """
-    global _TICKER
-    if _TICKER is not None:
+    global _ticker
+    if _ticker is not None:
         return
 
     app = _app()
 
-    def interrupted(*_args) -> None:
-        global _INTERRUPTED
-        _INTERRUPTED = True
+    def interrupted(*_args: object) -> None:
+        global _interrupted
+        _interrupted = True
         # Cancel here, not on the flag: a running zip or decrypt never checks it.
-        if _OPERATION is not None:
-            _OPERATION.cancel()
+        if _operation is not None:
+            _operation.cancel()
         app.quit()
 
     signal.signal(signal.SIGINT, interrupted)
     # Ctrl-Break kills the process outright on Windows without this.
     if hasattr(signal, "SIGBREAK"):
         signal.signal(signal.SIGBREAK, interrupted)
-    _TICKER = QTimer()
-    _TICKER.timeout.connect(lambda: None)
-    _TICKER.start(200)
+    _ticker = QTimer()
+    _ticker.timeout.connect(lambda: None)
+    _ticker.start(200)
 
 
 def _sleep(seconds: float) -> None:
@@ -98,25 +101,32 @@ def _sleep(seconds: float) -> None:
     """
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
-        if _INTERRUPTED:
+        if _interrupted:
             raise KeyboardInterrupt
         time.sleep(0.05)
-    if _INTERRUPTED:
+    if _interrupted:
         raise KeyboardInterrupt
 
 
-def _run_operation(operation: Operation):
+def _run_operation(operation: Operation) -> object:
     """Run one Operation to completion and return its result. Ctrl-C cancels it."""
-    global _OPERATION
+    global _operation
     app = _app()
-    outcome: list = []
+    outcome: list[object] = []
     problem: list[str] = []
 
-    operation.status.connect(lambda text: print(text, flush=True))
-    operation.failed.connect(problem.append)
-    operation.finished.connect(lambda result: (outcome.append(result), app.quit()))
+    def on_status(text: str) -> None:
+        print(text, flush=True)
 
-    _OPERATION = operation
+    def on_finished(result: object) -> None:
+        outcome.append(result)
+        app.quit()
+
+    operation.status.connect(on_status)
+    operation.failed.connect(problem.append)
+    operation.finished.connect(on_finished)
+
+    _operation = operation
     try:
         operation.start()
         if not outcome:  # start() settles on the spot when it is refused
@@ -124,15 +134,15 @@ def _run_operation(operation: Operation):
             app.exec()
             ceiling.stop()
     finally:
-        _OPERATION = None
+        _operation = None
         operation.cancel()
 
-    if _INTERRUPTED:
+    if _interrupted:
         raise KeyboardInterrupt
     if problem:
         raise _Failed(problem[0])
     if not outcome:
-        raise _Failed("YASB Cloud did not respond. Check your connection and try again.")
+        raise _Failed("YASB Cloud 未响应。请检查网络连接后重试。")
     return outcome[0]
 
 
@@ -144,19 +154,19 @@ def _ceiling(app: QCoreApplication, timeout_ms: int) -> QTimer:
     return timer
 
 
-def _run_call(call, timeout_ms: int = CALL_TIMEOUT_MS) -> tuple[dict | None, ApiError | None]:
+def _run_call(call: Call, timeout_ms: int = CALL_TIMEOUT_MS) -> tuple[dict[str, Any] | None, ApiError | None]:
     """Run one API call to completion on a short-lived event loop.
 
     Both halves come back so the sign-in poll can tell "still waiting" from "denied".
     """
     app = _app()
-    outcome: dict = {}
+    outcome: dict[str, Any] = {}
 
-    def succeeded(payload) -> None:
-        outcome["payload"] = payload if isinstance(payload, dict) else {}
+    def succeeded(payload: object) -> None:
+        outcome["payload"] = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
         app.quit()
 
-    def failed(error) -> None:
+    def failed(error: ApiError) -> None:
         outcome["error"] = error
         app.quit()
 
@@ -167,19 +177,19 @@ def _run_call(call, timeout_ms: int = CALL_TIMEOUT_MS) -> tuple[dict | None, Api
     app.exec()
     ceiling.stop()
 
-    if _INTERRUPTED:
+    if _interrupted:
         call.abort()
         raise KeyboardInterrupt
 
     return outcome.get("payload"), outcome.get("error")
 
 
-def _wait(call, timeout_ms: int = CALL_TIMEOUT_MS) -> dict:
+def _wait(call: Call, timeout_ms: int = CALL_TIMEOUT_MS) -> dict[str, Any]:
     payload, error = _run_call(call, timeout_ms)
     if error is not None:
         raise _Failed(str(error))
     if payload is None:
-        raise _Failed("YASB Cloud did not respond. Check your connection and try again.")
+        raise _Failed("YASB Cloud 未响应。请检查网络连接后重试。")
     return payload
 
 
@@ -226,11 +236,11 @@ def _find(client: ApiClient, wanted: str) -> Snapshot:
         # Offset 0 and newest first, so the first row is the latest.
         rows, _ = _page(client)
         if not rows:
-            raise _Failed("You have no backups yet.")
+            raise _Failed("你还没有备份。")
         return rows[0]
 
     if not BACKUP_ID.match(wanted):
-        raise _Failed(f"{wanted!r} is not a backup id. Run `yasbc cloud list` and copy one, or use `latest`.")
+        raise _Failed(f"{wanted!r} 不是有效的备份 ID。请运行 `yasbc cloud list` 并复制一个，或使用 `latest`。")
 
     return Snapshot.from_json(_wait(client.get_backup(wanted)))
 
@@ -276,7 +286,7 @@ def _note_cell(snapshot: Snapshot) -> str:
 def cmd_auth() -> int:
     session = Session()
     if session.load():
-        print(f"Already signed in as {session.tokens.email}. Use `yasbc cloud logout` to switch.")
+        print(f"已登录为 {session.tokens.email}。如需切换，请运行 `yasbc cloud logout`。")
         return 0
 
     client = ApiClient(session)
@@ -287,10 +297,10 @@ def cmd_auth() -> int:
     if not approve:
         raise _Failed(BAD_SIGN_IN)
 
-    print(f"\n  Your code: {code.get('user_code', '')}")
-    print(f"  Approve it at: {approve}\n")
+    print(f"\n  你的代码：{code.get('user_code', '')}")
+    print(f"  授权地址：{approve}\n")
     shell_open(approve)
-    print("Waiting for you to approve in the browser. Ctrl-C to cancel.")
+    print("请在浏览器中完成授权。按 Ctrl-C 取消。")
 
     deadline = time.monotonic() + DEVICE_CODE_TTL_S
     while True:
@@ -301,14 +311,14 @@ def cmd_auth() -> int:
         if payload is not None:
             if not session.apply_login(payload):
                 raise _Failed(BAD_SIGN_IN)
-            print(f"Signed in as {session.tokens.email}.")
+            print(f"已登录为 {session.tokens.email}。")
             return 0
 
         if error is not None and error.code == "expired_token":
             raise _Failed(EXPIRED_CODE_CLI)
         if error is not None and error.code not in ("authorization_pending", "slow_down"):
             if error.code == "access_denied":
-                raise _Failed("The request was denied in the browser.")
+                raise _Failed("请求已在浏览器中被拒绝。")
             raise _Failed(str(error))
 
         _sleep(DEVICE_POLL_INTERVAL_S)
@@ -328,9 +338,9 @@ def cmd_logout() -> int:
         failed_to_revoke = error is not None
 
     session.sign_out()
-    print("Signed out.")
+    print("已退出登录。")
     if failed_to_revoke:
-        print("Could not reach YASB Cloud, so this device may still be listed. Remove it on the website.")
+        print("无法连接 YASB Cloud，此设备可能仍列在账户中。请在网站上移除。")
     return 0
 
 
@@ -338,16 +348,16 @@ def cmd_status() -> int:
     session = _session()
     account = Account.from_json(_wait(ApiClient(session).me()))
 
-    print(f"Signed in as  {account.email}")
+    print(f"已登录为      {account.email}")
     subscription = account.subscription
-    plan = "none" if subscription is None else f"{subscription.plan_id} ({subscription.status})"
-    print(f"Plan          {plan}")
+    plan = "无" if subscription is None else f"{subscription.plan_id} ({subscription.status})"
+    print(f"套餐          {plan}")
 
     allowance = (
-        "unlimited" if account.limits.max_storage_bytes == UNLIMITED else format_size(account.limits.max_storage_bytes)
+        "无限制" if account.limits.max_storage_bytes == UNLIMITED else format_size(account.limits.max_storage_bytes)
     )
-    print(f"Storage       {format_size(account.usage.bytes)} of {allowance}")
-    print(f"Backups       {account.usage.snapshots}")
+    print(f"存储          {format_size(account.usage.bytes)} / {allowance}")
+    print(f"备份数量      {account.usage.snapshots}")
     return 0
 
 
@@ -361,20 +371,19 @@ def cmd_list(search: str = "", page: int = 1) -> int:
 
     if not rows:
         if search:
-            print(f"No backup matches {search!r}.")
+            print(f"没有匹配 {search!r} 的备份。")
         elif total:
             # Asked for a page past the end. Saying so beats printing nothing, which reads
             # like the account is empty.
             print(
-                f"Page {page} does not exist. There {'is' if total == 1 else 'are'} {total}, "
-                f"ending at page {_pages(total)}."
+                f"第 {page} 页不存在。共有 {total} 个备份，最后一页是第 {_pages(total)} 页。"
             )
         else:
-            print("You have no backups yet. Run `yasbc cloud backup`.")
+            print("你还没有备份。请运行 `yasbc cloud backup`。")
         return 0
 
     # Id first so it is in the same column on every row, note last because its width varies.
-    print(f"{'ID':<{SHORT_ID}}  {'WHEN':<16}  {'SIZE':>8}  {'PUBLIC':<6}  NOTE")
+    print(f"{'ID':<{SHORT_ID}}  {'时间':<16}  {'大小':>8}  {'公开':<6}  备注")
     for snapshot in rows:
         print(
             f"{snapshot.id[:SHORT_ID]:<{SHORT_ID}}  {_when(snapshot.created_at):<16}  "
@@ -384,7 +393,7 @@ def cmd_list(search: str = "", page: int = 1) -> int:
 
     # Only when there is more than one. On a short list it says nothing the rows do not.
     if _pages(total) > 1:
-        print(f"\nPage {page} of {_pages(total)}  -  {offset + 1}-{offset + len(rows)} of {total}")
+        print(f"\n第 {page}/{_pages(total)} 页  -  {offset + 1}-{offset + len(rows)}，共 {total} 个")
     return 0
 
 
@@ -397,13 +406,13 @@ def cmd_share(wanted: str) -> int:
         print(snapshot.share_url)
         return 0
 
-    print("Anyone with this link can download this backup, including any")
-    print("API keys or tokens your configuration contains.")
+    print("任何拥有此链接的人都可以下载此备份，包括其中可能包含的")
+    print("API 密钥或令牌。")
     # .get, like every other reply is read: a missing key here would be a KeyError, which the
     # handler in run() does not catch, so the user would get a traceback rather than a line.
     url = _wait(client.share_backup(snapshot.id)).get("url", "")
     if not url:
-        raise _Failed("The backup was shared, but the server did not return its link.")
+        raise _Failed("备份已分享，但服务器未返回链接。")
     print(url)
     return 0
 
@@ -413,16 +422,16 @@ def cmd_delete(wanted: str, assume_yes: bool) -> int:
     client = ApiClient(session)
     snapshot = _find(client, wanted)
 
-    print(f"Delete {_when(snapshot.created_at)} {snapshot.note!r}?")
-    print("This removes it from YASB Cloud for good. Your configuration is not touched.")
+    print(f"删除 {_when(snapshot.created_at)} {snapshot.note!r}？")
+    print("此操作会从 YASB Cloud 永久移除该备份，不会改动你的配置。")
     if snapshot.share_url:
-        print("Its public link stops working too.")
-    if not assume_yes and not _confirm("Continue?"):
-        print("Nothing was deleted.")
+        print("其公开链接也将失效。")
+    if not assume_yes and not _confirm("继续？"):
+        print("未删除任何内容。")
         return 1
 
     _wait(client.delete_backup(snapshot.id))
-    print("Deleted.")
+    print("已删除。")
     return 0
 
 
@@ -432,11 +441,11 @@ def cmd_unshare(wanted: str) -> int:
     snapshot = _find(client, wanted)
 
     if not snapshot.share_url:
-        print("That backup is not shared.")
+        print("该备份未分享。")
         return 0
 
     _wait(client.unshare_backup(snapshot.id))
-    print("Stopped sharing. That link no longer works.")
+    print("已停止分享。该链接不再有效。")
     return 0
 
 
@@ -445,7 +454,7 @@ def cmd_backup(note: str) -> int:
     client = ApiClient(session)
     account = Account.from_json(_wait(client.me()))
     if not account.access.can_write:
-        raise _Failed("An active subscription is required to create backups.")
+        raise _Failed("创建备份需要有效订阅。")
 
     _run_operation(
         BackupOperation(
@@ -456,7 +465,7 @@ def cmd_backup(note: str) -> int:
         )
     )
 
-    print("Backed up.")
+    print("备份完成。")
     return 0
 
 
@@ -465,19 +474,19 @@ def cmd_restore(wanted: str, assume_yes: bool) -> int:
     client = ApiClient(session)
     snapshot = _find(client, wanted)
 
-    print(f"Restore {_when(snapshot.created_at)} {snapshot.note!r}?")
-    print("YASB will stop and your configuration folder will be replaced by this backup.")
-    print("Anything added since is removed. A copy of the current one is saved first.")
-    if not assume_yes and not _confirm("Continue?"):
-        print("Nothing was changed.")
+    print(f"还原 {_when(snapshot.created_at)} {snapshot.note!r}？")
+    print("YASB 将停止，配置文件夹会被此备份替换。")
+    print("此后新增的内容会被移除。替换前会先保存当前配置的副本。")
+    if not assume_yes and not _confirm("继续？"):
+        print("未做任何更改。")
         return 1
 
     # After the prompt, so waiting on stdin does not hold the lock.
-    result = _run_operation(RestoreOperation(client, session, snapshot.id))
+    result = cast(RestoreOutcome, _run_operation(RestoreOperation(client, session, snapshot.id)))
 
-    print(f"Restored {len(result.restore.restored)} files.")
+    print(f"已还原 {len(result.restore.restored)} 个文件。")
     if result.bar_was_running and not result.bar_restarted:
-        print("YASB did not restart. Start it with `yasbc start`.")
+        print("YASB 未重新启动。请运行 `yasbc start` 启动。")
     return 0
 
 
@@ -489,50 +498,51 @@ def cmd_save(wanted: str, folder: str) -> int:
     stamp = snapshot.created_at[:19].replace(":", "-").replace("T", "-")
     target = Path(folder).expanduser().resolve() / f"yasb-backup-{stamp}"
 
-    print(f"Saved to {_run_operation(SaveCopyOperation(client, session, snapshot.id, target))}")
+    print(f"已保存到 {_run_operation(SaveCopyOperation(client, session, snapshot.id, target))}")
     return 0
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="yasbc cloud", description="Back up and restore your YASB configuration.")
+    parser = argparse.ArgumentParser(prog="yasbc cloud", description="备份并还原 YASB 配置。")
     # `metavar` and `title`, or argparse prints the whole brace-delimited command list twice
     # and sizes every description column to its width.
-    commands = parser.add_subparsers(dest="action", metavar="<command>", title="commands")
+    commands = parser.add_subparsers(dest="action", metavar="<命令>", title="命令")
 
-    commands.add_parser("auth", help="Sign in through your browser")
-    commands.add_parser("logout", help="Sign out on this machine")
-    commands.add_parser("status", help="Show the signed-in account, plan and usage")
-    listing = commands.add_parser("list", help="List your backups")
-    listing.add_argument("-s", "--search", default="", help="Only backups whose note or PC name contains this")
-    listing.add_argument("-p", "--page", type=int, default=1, help=f"Which page to show, {PAGE_SIZE} per page")
+    commands.add_parser("auth", help="通过浏览器登录")
+    commands.add_parser("logout", help="在此设备上退出登录")
+    commands.add_parser("status", help="显示当前账户、套餐与用量")
+    listing = commands.add_parser("list", help="列出备份")
+    listing.add_argument("-s", "--search", default="", help="仅显示备注或电脑名包含此内容的备份")
+    listing.add_argument("-p", "--page", type=int, default=1, help=f"显示第几页，每页 {PAGE_SIZE} 个")
 
-    backup = commands.add_parser("backup", help="Back up the configuration directory now")
-    backup.add_argument("-n", "--note", default="", help="Label for this backup")
+    backup = commands.add_parser("backup", help="立即备份配置文件夹")
+    backup.add_argument("-n", "--note", default="", help="此备份的标签")
 
-    restore = commands.add_parser("restore", help="Replace the configuration with a backup")
-    restore.add_argument("backup", help="Backup id from `yasbc cloud list`, or `latest`")
-    restore.add_argument("-y", "--yes", action="store_true", help="Skip the confirmation")
+    restore = commands.add_parser("restore", help="用备份替换当前配置")
+    restore.add_argument("backup", help="来自 `yasbc cloud list` 的备份 ID，或 `latest`")
+    restore.add_argument("-y", "--yes", action="store_true", help="跳过确认")
 
-    save = commands.add_parser("save", help="Save a backup to a folder without restoring it")
-    save.add_argument("backup", help="Backup id from `yasbc cloud list`, or `latest`")
-    save.add_argument("folder", help="Where to write it")
+    save = commands.add_parser("save", help="将备份保存到文件夹，不执行还原")
+    save.add_argument("backup", help="来自 `yasbc cloud list` 的备份 ID，或 `latest`")
+    save.add_argument("folder", help="保存位置")
 
-    delete = commands.add_parser("delete", help="Delete a backup from YASB Cloud")
-    delete.add_argument("backup", help="Backup id from `yasbc cloud list`, or `latest`")
-    delete.add_argument("-y", "--yes", action="store_true", help="Skip the confirmation")
+    delete = commands.add_parser("delete", help="从 YASB Cloud 删除备份")
+    delete.add_argument("backup", help="来自 `yasbc cloud list` 的备份 ID，或 `latest`")
+    delete.add_argument("-y", "--yes", action="store_true", help="跳过确认")
 
-    share = commands.add_parser("share", help="Publish a backup and print its link")
-    share.add_argument("backup", help="Backup id from `yasbc cloud list`, or `latest`")
+    share = commands.add_parser("share", help="公开分享备份并输出链接")
+    share.add_argument("backup", help="来自 `yasbc cloud list` 的备份 ID，或 `latest`")
 
-    unshare = commands.add_parser("unshare", help="Stop sharing a backup")
-    unshare.add_argument("backup", help="Backup id from `yasbc cloud list`, or `latest`")
+    unshare = commands.add_parser("unshare", help="停止分享备份")
+    unshare.add_argument("backup", help="来自 `yasbc cloud list` 的备份 ID，或 `latest`")
     return parser
 
 
 def run(argv: list[str]) -> int:
     # A Windows console is cp1252, so an emoji in a note would abort the command mid-table.
     for stream in (sys.stdout, sys.stderr):
-        stream.reconfigure(encoding="utf-8", errors="replace")
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
     parser = _parser()
     args = parser.parse_args(argv)
@@ -542,7 +552,7 @@ def run(argv: list[str]) -> int:
 
     # Each entry reads its own arguments off the namespace, so adding a command is one line
     # here and one in _parser rather than a branch in the middle of the error handling.
-    actions = {
+    actions: dict[str, Callable[[argparse.Namespace], int]] = {
         "auth": lambda a: cmd_auth(),
         "logout": lambda a: cmd_logout(),
         "status": lambda a: cmd_status(),
@@ -567,5 +577,5 @@ def run(argv: list[str]) -> int:
         print(str(exc), file=sys.stderr)
         return 1
     except KeyboardInterrupt:
-        print("\nCancelled.", file=sys.stderr)
+        print("\n已取消。", file=sys.stderr)
         return 1

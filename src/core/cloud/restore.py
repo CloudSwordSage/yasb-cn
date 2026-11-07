@@ -166,7 +166,7 @@ def restore_archive(
     try:
         with zipfile.ZipFile(archive_path) as archive:
             if archive.testzip() is not None:
-                raise RestoreError("Snapshot archive is corrupt")
+                raise RestoreError("快照存档已损坏")
             members = _validated_members(archive)
 
             if safety_dir is not None:
@@ -195,15 +195,15 @@ def restore_archive(
         if not _rollback(root, safety):
             logger.error("rollback failed; previous configuration is at %s", safety)
             raise RestoreError(
-                "The restore failed and your previous configuration could not be put back. "
-                f"A copy of it is saved at {safety}."
+                "还原失败，且无法恢复之前的配置。"
+                f"其副本保存在 {safety}。"
             ) from exc
         if isinstance(exc, RestoreError | UnsafePathError):
             raise
         if isinstance(exc, zipfile.BadZipFile):
-            raise RestoreError(f"Snapshot archive is not a valid ZIP: {exc}") from exc
+            raise RestoreError(f"快照存档不是有效的 ZIP：{exc}") from exc
         if isinstance(exc, OSError):
-            raise RestoreError(f"Restore failed: {exc.strerror or exc}") from exc
+            raise RestoreError(f"还原失败：{exc.strerror or exc}") from exc
         raise
     finally:
         shutil.rmtree(staging, ignore_errors=True)
@@ -225,7 +225,7 @@ def extract_archive(
     written: list[str] = []
     with zipfile.ZipFile(archive_path) as archive:
         if archive.testzip() is not None:
-            raise RestoreError("Snapshot archive is corrupt")
+            raise RestoreError("快照存档已损坏")
         members = _validated_members(archive)
         target.mkdir(parents=True, exist_ok=True)
         for info, relative in members:

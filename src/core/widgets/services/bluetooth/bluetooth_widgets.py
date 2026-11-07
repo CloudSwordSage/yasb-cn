@@ -104,7 +104,7 @@ class BluetoothItem(QFrame):
         actions = QHBoxLayout(self._actions)
         actions.setContentsMargins(0, 0, 0, 0)
         actions.setSpacing(0)
-        self.connect_button = QPushButton("Connect", self._actions)
+        self.connect_button = QPushButton("连接", self._actions)
         self.connect_button.setProperty("class", "connect")
         self.connect_button.clicked.connect(self._on_action_clicked)
         actions.addStretch(1)
@@ -235,7 +235,7 @@ class BluetoothSection(QFrame):
             item = self._items.get(device.address)
             if item is None:
                 item = BluetoothItem(self)
-                item.clicked.connect(lambda _=False, i=item: self.item_clicked.emit(i))
+                item.clicked.connect(partial(self.item_clicked.emit, item))
                 item.connect_pressed.connect(self.connect_pressed.emit)
                 item.disconnect_pressed.connect(self.disconnect_pressed.emit)
                 item.settings_pressed.connect(self.settings_pressed.emit)
@@ -272,7 +272,9 @@ class BluetoothList(QScrollArea):
         self.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustIgnored)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setViewportMargins(0, 0, -4, 0)
-        self.viewport().setAutoFillBackground(False)
+        viewport = self.viewport()
+        if viewport is not None:
+            viewport.setAutoFillBackground(False)
 
         container = QFrame(self)
         container.setProperty("class", "bluetooth-list")
@@ -437,15 +439,15 @@ class BluetoothMenu(QObject):
         self.popup.adjustSize()
 
     @override
-    def eventFilter(self, obj: QObject, event) -> bool:
-        if obj is self.popup and event.type() == QEvent.Type.Hide:
+    def eventFilter(self, a0: QObject | None, a1: QEvent | None) -> bool:
+        if a0 is self.popup and a1 is not None and a1.type() == QEvent.Type.Hide:
             self._scanning = False
             if is_valid_qobject(self.progress):
                 self.progress.stop()
             if self.list is not None:
                 self.list.clear_busy()
                 self.list.clear_active()
-        return super().eventFilter(obj, event)
+        return super().eventFilter(a0, a1)
 
     def _open(self) -> None:
         if not is_valid_qobject(self.popup):
@@ -517,10 +519,10 @@ class BluetoothMenu(QObject):
             self._apply_list()
             return
         if status == ScanResultStatus.API_UNAVAILABLE:
-            self._show_error("Bluetooth API unavailable")
+            self._show_error("蓝牙 API 不可用")
             return
         if status == ScanResultStatus.ERROR:
-            self._show_error("Failed to scan for devices")
+            self._show_error("扫描设备失败")
             return
 
         self._set_radio_ui(True)
@@ -608,7 +610,7 @@ class BluetoothMenu(QObject):
         if not self.manager.set_radio(checked):
             self._set_radio_ui(not checked)
             self._stop_loader()
-            self._show_error("Unable to change Bluetooth power")
+            self._show_error("无法更改蓝牙电源状态")
             return
 
     def _decorate(self, device: DeviceInfo) -> DeviceInfo:

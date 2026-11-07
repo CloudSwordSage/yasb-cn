@@ -25,12 +25,12 @@ SHUTDOWN_WAIT_MS = 5000
 DEVICE_POLL_INTERVAL_S = 3
 DEVICE_CODE_TTL_S = 600
 
-BAD_SIGN_IN = "Sign-in did not complete. Please try again."
-EXPIRED_CODE_APP = "This sign-in request expired. Start again when you are ready."
-EXPIRED_CODE_CLI = "That code expired. Run `yasbc cloud auth` again when you are ready."
-BUSY_MESSAGE = "Something else is still running. Wait for it to finish and try again."
-EMPTY_BACKUPS = "No cloud backup snapshots found."
-BACKUPS_UNAVAILABLE = "Your backups are not available on this plan."
+BAD_SIGN_IN = "登录未完成，请重试。"
+EXPIRED_CODE_APP = "此登录请求已过期。请准备好后重新开始。"
+EXPIRED_CODE_CLI = "该代码已过期。准备好后请重新运行 `yasbc cloud auth`。"
+BUSY_MESSAGE = "其他操作仍在运行。请等待完成后再试。"
+EMPTY_BACKUPS = "未找到云端备份快照。"
+BACKUPS_UNAVAILABLE = "当前套餐无法使用备份功能。"
 
 UNLIMITED = -1
 """What the server sends for a plan limit that does not apply."""
@@ -69,7 +69,7 @@ MAX_EXCLUDE_RULE_LENGTH = 200
 """Bounds on what the settings page will store. A rule list is a handful of globs; anything
 approaching these is a mistake or a paste accident."""
 
-TASK_NAME = "YASB Cloud Automatic Backup"
+TASK_NAME = "YASB Cloud 自动备份"
 """Name of the scheduled task. Shown to the user in Task Scheduler, so it reads as English
 rather than an identifier."""
 
