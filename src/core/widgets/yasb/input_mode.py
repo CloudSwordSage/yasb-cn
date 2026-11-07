@@ -21,6 +21,8 @@ class InputModeWidget(BaseWidget):
         self._monitor = InputModeMonitor(self)
         self._monitor.changed.connect(self._on_mode_changed)
         self.destroyed.connect(self._cleanup_events)
+        # 先按 unknown 渲染，避免 helper 尚未连接时显示未替换的 {input_mode_label} 占位符。
+        self._render("unknown")
         self._monitor.start()
 
     def _cleanup_events(self, *_args) -> None:
