@@ -1,35 +1,39 @@
 import logging
+from collections.abc import Mapping
 from importlib import import_module
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
-from PyQt6.QtCore import QObject
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import QObject, QThread
 
 from core.utils.alert_dialog import raise_info_alert
 from core.utils.validation_errors import format_pydantic_errors_to_yaml
 from settings import DEFAULT_CONFIG_FILENAME
 
+if TYPE_CHECKING:
+    from core.widgets.base import BaseWidget
+
 
 class WidgetBuilder(QObject):
-    def __init__(self, widget_configs: dict):
+    def __init__(self, widget_configs: Mapping[str, Any]):
         super().__init__()
-        self._widget_event_listeners = set()
+        self._widget_event_listeners: set[type[QThread]] = set()
         self._widget_configurations = widget_configs
-        self._missing_widget_types = set()
-        self._invalid_widget_names = set()
-        self._invalid_widget_types = {}
-        self._invalid_widget_options = {}
+        self._missing_widget_types: set[str] = set()
+        self._invalid_widget_names: set[str] = set()
+        self._invalid_widget_types: dict[str, str] = {}
+        self._invalid_widget_options: dict[str, str] = {}
 
-    def build_widgets(self, widget_map: dict[str, list[str]]) -> tuple[dict[str, list[QWidget]], set]:
-        bar_widgets = {}
+    def build_widgets(self, widget_map: dict[str, list[str]]) -> tuple[dict[str, list[BaseWidget]], set[type[QThread]]]:
+        bar_widgets: dict[str, list[BaseWidget]] = {}
 
         for column, widget_names in widget_map.items():
-            built_widgets = [self._build_widget(widget_name) for widget_name in widget_names]
+            built_widgets = [self.build_widget(widget_name) for widget_name in widget_names]
             bar_widgets[column] = [widget for widget in built_widgets if widget is not None]
 
         return bar_widgets, self._widget_event_listeners
 
-    def _build_widget(self, widget_name: str) -> QWidget | None:
+    def build_widget(self, widget_name: str) -> BaseWidget | None:
         widget_config = self._widget_configurations.get(widget_name, None)
 
         if (widget_name in self._invalid_widget_names) or (widget_name in self._invalid_widget_options):
@@ -71,7 +75,7 @@ class WidgetBuilder(QObject):
                 # If this widget is a Grouper, proactively collect child listeners so BarManager can manage them
                 try:
                     if widget_cls.__name__ == "GrouperWidget" and widget_module.__name__.endswith("yasb.grouper"):
-                        child_names = normalized_options.get("widgets", []) or []
+                        child_names: list[str] = normalized_options.get("widgets") or []
                         self._collect_nested_listeners(child_names)
                 except Exception:
                     logging.debug("WidgetBuilder failed to collect nested listeners for Grouper")
@@ -95,13 +99,13 @@ class WidgetBuilder(QObject):
     def raise_alerts_if_errors_present(self):
         if self._invalid_widget_names:
             undefined_widgets = "\n".join(
-                [f' - The widget "{widget_name}" is undefined.' for widget_name in self._invalid_widget_names]
+                [f' - 小组件 "{widget_name}" 未定义。' for widget_name in self._invalid_widget_names]
             )
             logging.error("Failed to add undefined widget(s) %s", undefined_widgets)
             raise_info_alert(
-                title=f"Failed to add undefined widget(s) in {DEFAULT_CONFIG_FILENAME}",
-                msg="Failed to add undefined widget(s) to bar.",
-                informative_msg="Please click 'Show Details' to find out more.",
+                title=f"无法在 {DEFAULT_CONFIG_FILENAME} 中添加未定义的小组件",
+                msg="无法将未定义的小组件添加到状态栏。",
+                informative_msg="请点击“显示详细信息”了解更多。",
                 additional_details=undefined_widgets,
             )
         if self._invalid_widget_options:
@@ -113,34 +117,34 @@ class WidgetBuilder(QObject):
             )
             logging.error("Failed to validate widget(s) due to invalid options %s", additional_details)
             raise_info_alert(
-                title=f"Failed to validate widget(s) in {DEFAULT_CONFIG_FILENAME}",
-                msg="Failed to validate widget(s) due to invalid options",
-                informative_msg="Please click 'Show Details' to find out more.",
+                title=f"无法在 {DEFAULT_CONFIG_FILENAME} 中校验小组件",
+                msg="由于选项无效，无法校验小组件。",
+                informative_msg="请点击“显示详细信息”了解更多。",
                 additional_details=additional_details,
             )
 
         if self._invalid_widget_types:
             widget_names_and_types = "\n".join(
                 [
-                    f' - {widget_name} has unknown type "{widget_type}"'
+                    f' - {widget_name} 的类型未知："{widget_type}"'
                     for widget_name, widget_type in self._invalid_widget_types.items()
                 ]
             )
             logging.error("Failed to build widget(s) due to unknown widget type(s) %s", widget_names_and_types)
             raise_info_alert(
-                title=f"Failed to build widget(s) in {DEFAULT_CONFIG_FILENAME}",
-                msg="Failed to build widget(s) of unknown widget type(s)",
-                informative_msg="Click 'Show Details' to find out more.",
+                title=f"无法在 {DEFAULT_CONFIG_FILENAME} 中构建小组件",
+                msg="由于小组件类型未知，无法构建小组件。",
+                informative_msg="点击“显示详细信息”了解更多。",
                 additional_details=widget_names_and_types,
             )
         if self._missing_widget_types:
             widget_names = "\n".join([f" - {widget_name}" for widget_name in self._missing_widget_types])
             logging.error("Failed to import widget(s) due to missing widget type(s) %s", widget_names)
             raise_info_alert(
-                title=f"Failed to import widget(s) in {DEFAULT_CONFIG_FILENAME}",
-                msg="Failed to import widget(s) with missing widget type(s)",
-                informative_msg="Please click 'Show Details' to find out more.",
-                additional_details=f"The following widget(s) have no widget type defined:\n{widget_names}",
+                title=f"无法在 {DEFAULT_CONFIG_FILENAME} 中导入小组件",
+                msg="由于缺少小组件类型，无法导入小组件。",
+                informative_msg="请点击“显示详细信息”了解更多。",
+                additional_details=f"以下小组件未定义类型：\n{widget_names}",
             )
 
     def _collect_nested_listeners(self, widget_names: list[str]) -> None:
@@ -159,7 +163,7 @@ class WidgetBuilder(QObject):
                 # If nested grouper, recurse into its configured child names
                 if cls.__name__ == "GrouperWidget" and mod.__name__.endswith("yasb.grouper"):
                     child_opts = cfg.get("options", {})
-                    child_names = child_opts.get("widgets", []) or []
+                    child_names: list[str] = child_opts.get("widgets") or []
                     if child_names:
                         self._collect_nested_listeners(child_names)
             except Exception:

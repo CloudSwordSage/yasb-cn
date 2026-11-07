@@ -55,7 +55,7 @@ def device_name() -> str:
     try:
         return socket.gethostname()
     except OSError:
-        return "Windows PC"
+        return "Windows 电脑"
 
 
 class PrepareWorker(QObject):

@@ -76,11 +76,11 @@ class VolumeSessionTests(unittest.TestCase):
 
         with (
             patch(
-                "core.widgets.services.media.aumid_process.AudioUtilities.GetAllSessions",
+                "core.utils.win32.aumid_process.AudioUtilities.GetAllSessions",
                 return_value=[live],
             ),
             patch(
-                "core.widgets.services.media.aumid_process.get_process_aumid",
+                "core.utils.win32.aumid_process.get_aumid_for_process",
                 return_value=None,
             ),
         ):
@@ -95,11 +95,11 @@ class VolumeSessionTests(unittest.TestCase):
 
         with (
             patch(
-                "core.widgets.services.media.aumid_process.AudioUtilities.GetAllSessions",
+                "core.utils.win32.aumid_process.AudioUtilities.GetAllSessions",
                 return_value=[live],
             ),
             patch(
-                "core.widgets.services.media.aumid_process.get_process_aumid",
+                "core.utils.win32.aumid_process.get_aumid_for_process",
                 return_value=None,
             ),
         ):

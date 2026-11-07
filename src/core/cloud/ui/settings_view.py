@@ -21,8 +21,8 @@ from core.ui.theme import FONT_FAMILIES, get_tokens
 
 # The card's two descriptions. A switch that will not move says nothing about why, so the
 # second names the reason and the limit of it.
-AUTO_BACKUP_DESCRIPTION = "Back up your configuration shortly after you change it"
-AUTO_BACKUP_NEEDS_PLAN = "Needs an active subscription. Your exclude rules are kept either way."
+AUTO_BACKUP_DESCRIPTION = "配置更改后自动备份"
+AUTO_BACKUP_NEEDS_PLAN = "需要有效订阅。排除规则始终会保留。"
 
 
 def label(text: str, font_size: int = 14, font_weight: int = 600, color_key: str = "text_primary") -> QLabel:
@@ -84,7 +84,7 @@ class RuleRow(Card):
         row.setSpacing(8)
         row.addWidget(label(rule, 14, 600, "text_primary"), 1)
 
-        remove = Button("Remove", variant="default", font_size=13)
+        remove = Button("移除", variant="default", font_size=13)
         remove.setFixedHeight(24)
         remove.clicked.connect(lambda: self.removed.emit(self.rule))
         row.addWidget(remove)
@@ -111,16 +111,16 @@ class ExcludedFilesCard(Card):
         heading = QVBoxLayout()
         heading.setContentsMargins(0, 0, 0, 0)
         heading.setSpacing(2)
-        heading.addWidget(label("Excluded files", 14, 600, "text_primary"))
-        heading.addWidget(label("Files and folders left out of every backup", 12, 600, "text_secondary"))
+        heading.addWidget(label("排除的文件", 14, 600, "text_primary"))
+        heading.addWidget(label("不包含在任何备份中的文件和文件夹", 12, 600, "text_secondary"))
         header.addLayout(heading, 1)
 
-        preview = Button("Preview", variant="default")
+        preview = Button("预览", variant="default")
         preview.setFixedHeight(28)
         preview.clicked.connect(self.preview_requested.emit)
         header.addWidget(preview, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        add = Button("Add rule", variant="accent")
+        add = Button("添加规则", variant="accent")
         add.setFixedHeight(28)
         add.clicked.connect(self.add_requested.emit)
         header.addWidget(add, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -130,14 +130,14 @@ class ExcludedFilesCard(Card):
         always = " and ".join(sorted(ALWAYS_INCLUDE))
         layout.addWidget(
             label(
-                f"Logs, caches and temporary files are already excluded. {always} are always kept.",
+                f"日志、缓存和临时文件已自动排除。{always} 始终保留。",
                 12,
                 600,
                 "text_secondary",
             )
         )
 
-        docs = Link("Learn more", font_size=13, font_weight="demibold")
+        docs = Link("了解更多", font_size=13, font_weight="demibold")
         docs.clicked.connect(self.docs_requested.emit)
         layout.addWidget(docs, 0, Qt.AlignmentFlag.AlignLeft)
 
@@ -164,13 +164,14 @@ class ExcludedFilesCard(Card):
 
     def _rebuild(self) -> None:
         while self._rule_box.count():
-            widget = self._rule_box.takeAt(0).widget()
+            item = self._rule_box.takeAt(0)
+            widget = item.widget() if item is not None else None
             if widget is not None:
                 widget.setParent(None)
                 widget.deleteLater()
 
         if not self._rules:
-            self._rule_box.addWidget(label("No patterns yet", 12, 600, "text_secondary"))
+            self._rule_box.addWidget(label("暂无规则", 12, 600, "text_secondary"))
 
         for rule in self._rules:
             row = RuleRow(rule)
@@ -182,7 +183,7 @@ class ExcludedFilesCard(Card):
         if not rule or rule in self._rules:
             return
         if len(self._rules) >= MAX_EXCLUDE_RULES:
-            self.show_message("Too many rules", f"The limit is {MAX_EXCLUDE_RULES}.", InfoBarSeverity.WARNING)
+            self.show_message("规则过多", f"上限为 {MAX_EXCLUDE_RULES} 条。", InfoBarSeverity.WARNING)
             return
 
         self._rules = list(clean_rules([*self._rules, rule]))
@@ -221,13 +222,13 @@ class SettingsView(QWidget):
 
         header = QHBoxLayout()
         header.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        header.addWidget(TextBlock("Settings", variant="subtitle"), alignment=Qt.AlignmentFlag.AlignVCenter)
+        header.addWidget(TextBlock("设置", variant="subtitle"), alignment=Qt.AlignmentFlag.AlignVCenter)
         header.addStretch()
         back = Button("", variant="default", padding="0")
         back.setIcon(svg_icon(BACK, 14, t["text_primary"]))
         back.setIconSize(QSize(14, 14))
         back.setFixedSize(32, 28)
-        back.setToolTip("Back")
+        back.setToolTip("返回")
         back.clicked.connect(self.back_requested.emit)
         header.addWidget(back)
         root.addLayout(header)
@@ -238,26 +239,26 @@ class SettingsView(QWidget):
         self.excluded.add_requested.connect(self.add_rule_requested)
         self.excluded.docs_requested.connect(self.docs_requested)
 
-        self.auto_switch = ToggleSwitchWithLabel(on_text="On", off_text="Off")
+        self.auto_switch = ToggleSwitchWithLabel(on_text="开", off_text="关")
         self.auto_switch.toggled.connect(self._on_auto_toggled)
         self._auto_card = SettingCard(
-            "Automatic backup",
+            "自动备份",
             AUTO_BACKUP_DESCRIPTION,
             self.auto_switch,
         )
 
-        self.debug_switch = ToggleSwitchWithLabel(on_text="On", off_text="Off")
+        self.debug_switch = ToggleSwitchWithLabel(on_text="开", off_text="关")
         self.debug_switch.toggled.connect(self._on_debug_toggled)
         debug = SettingCard(
-            "Detailed logging",
-            "Record everything the app does, not only problems. Turn on before reporting a bug.",
+            "详细日志",
+            "记录应用的全部操作，而不仅是问题。报告 Bug 前请开启。",
             self.debug_switch,
         )
 
-        open_log = Button("Open", variant="default")
+        open_log = Button("打开", variant="default")
         open_log.setFixedHeight(28)
         open_log.clicked.connect(self.open_log_requested.emit)
-        log = SettingCard("Log file", str(Path(cloud_dir()) / APP_LOG_FILE), open_log)
+        log = SettingCard("日志文件", str(Path(cloud_dir()) / APP_LOG_FILE), open_log)
 
         body = QWidget()
         cards = QVBoxLayout(body)
@@ -316,7 +317,7 @@ class SettingsView(QWidget):
 
     def show_preview(self, excluded: int, total: int, saved: str) -> None:
         if excluded:
-            message = f"{excluded} of {total} files would be left out, saving {saved}."
+            message = f"{excluded}/{total} 个文件将被排除，可节省 {saved}。"
         else:
-            message = "Your rules do not match anything in the configuration folder."
-        self.excluded.show_message("Preview", message, InfoBarSeverity.INFORMATIONAL)
+            message = "规则未匹配配置文件夹中的任何内容。"
+        self.excluded.show_message("预览", message, InfoBarSeverity.INFORMATIONAL)

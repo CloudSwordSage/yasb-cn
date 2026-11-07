@@ -4,7 +4,6 @@ import subprocess
 import threading
 from typing import Any
 
-
 EMPTY_USAGE = {
     "primary": {"used_percent": "--", "window_duration_mins": "--", "resets_at": "--"},
     "secondary": {"used_percent": "--", "window_duration_mins": "--", "resets_at": "--"},

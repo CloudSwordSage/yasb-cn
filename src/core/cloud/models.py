@@ -1,6 +1,5 @@
 """Typed views over the API's JSON, so parsing lives in one place."""
 
-import base64
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -9,13 +8,6 @@ from typing import Any
 def _int(source: dict[str, Any], key: str, default: int = 0) -> int:
     value = source.get(key, default)
     return value if isinstance(value, int) and not isinstance(value, bool) else default
-
-
-def _b64(value: Any) -> bytes:
-    try:
-        return base64.b64decode(value or "")
-    except ValueError, TypeError:
-        return b""
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +109,7 @@ class Snapshot:
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> Snapshot:
+        share: dict[str, Any] = data.get("share") or {}
         return cls(
             id=str(data.get("id", "")),
             size_bytes=_int(data, "size_bytes"),
@@ -125,7 +118,7 @@ class Snapshot:
             app_version=str(data.get("app_version", "")),
             note=str(data.get("note", "")),
             device_name=str(data.get("device_name", "")),
-            share_url=str((data.get("share") or {}).get("url", "")),
+            share_url=str(share.get("url", "")),
         )
 
 
@@ -138,7 +131,7 @@ def parse_timestamp(value: str) -> datetime | None:
 
 def format_timestamp(value: str) -> str:
     moment = parse_timestamp(value)
-    return moment.astimezone().strftime("%d %b %Y, %H:%M") if moment else value
+    return moment.astimezone().strftime("%Y-%m-%d %H:%M") if moment else value
 
 
 def relative_time(value: str) -> str:
@@ -148,15 +141,15 @@ def relative_time(value: str) -> str:
 
     seconds = (datetime.now(UTC) - moment).total_seconds()
     if seconds < 90:
-        return "Just now"
+        return "刚刚"
     if seconds < 3600:
-        return f"{int(seconds // 60)} min ago"
+        return f"{int(seconds // 60)} 分钟前"
     if seconds < 86400:
         hours = int(seconds // 3600)
-        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+        return f"{hours} 小时前"
     days = int(seconds // 86400)
     if days < 30:
-        return f"{days} day{'s' if days != 1 else ''} ago"
+        return f"{days} 天前"
     return format_timestamp(value)
 
 
