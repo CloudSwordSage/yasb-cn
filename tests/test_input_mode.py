@@ -3,6 +3,7 @@ import sys
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -22,15 +23,12 @@ class _PendingPipeKernel:
         self.release = threading.Event()
         self.calls: list[str] = []
 
-    def CreateEventW(self, *_args) -> int:
+    def CreateEvent(self, *_args) -> int:
         return 2
 
-    def ReadFile(self, _handle, _payload, _size, _count, overlapped) -> bool:
+    def ReadFileOverlapped(self, _handle, _payload, _overlapped) -> bool:
         self.read_started.set()
-        if overlapped is None:
-            self.release.wait()
-        else:
-            ctypes.set_last_error(997)
+        ctypes.set_last_error(997)
         return False
 
     def WaitForMultipleObjects(self, *_args) -> int:
@@ -46,13 +44,11 @@ class _PendingPipeKernel:
         self.calls.append("cancel")
         return True
 
-    def GetOverlappedResult(self, *_args) -> bool:
+    def GetOverlappedResult(self, *_args, **_kwargs) -> tuple[bool, int]:
         self.calls.append("complete")
-        return False
+        return False, 0
 
     def CloseHandle(self, _handle) -> bool:
-        if _handle not in (None, 1, 2):
-            return bool(ctypes.windll.kernel32.CloseHandle(_handle))
         return True
 
 
@@ -86,29 +82,37 @@ class InputModeTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == "win32", "Windows named-pipe lifecycle")
     def test_close_cancels_pending_pipe_read_and_joins_thread(self) -> None:
-        monitor = InputModeMonitor()
         kernel = _PendingPipeKernel()
-        monitor._kernel32 = kernel
-        monitor._open_pipe = lambda: (1, 0)
-        monitor.start()
-        self.assertTrue(kernel.read_started.wait(1))
-        thread = monitor._thread
+        patches = {
+            "CreateEvent": kernel.CreateEvent,
+            "ReadFileOverlapped": kernel.ReadFileOverlapped,
+            "WaitForMultipleObjects": kernel.WaitForMultipleObjects,
+            "SetEvent": kernel.SetEvent,
+            "CancelIoEx": kernel.CancelIoEx,
+            "GetOverlappedResult": kernel.GetOverlappedResult,
+            "CloseHandle": kernel.CloseHandle,
+        }
+        with patch.multiple("core.widgets.services.language.input_mode", **patches):
+            monitor = InputModeMonitor()
+            monitor._open_pipe = lambda: (1, 0)
+            monitor.start()
+            self.assertTrue(kernel.read_started.wait(1))
+            thread = monitor._thread
 
-        try:
-            monitor.close()
-            self.assertIsNotNone(thread)
-            self.assertFalse(thread.is_alive())
-            self.assertLess(kernel.calls.index("cancel"), kernel.calls.index("complete"))
-        finally:
-            kernel.release.set()
-            if thread is not None:
-                thread.join(1)
+            try:
+                monitor.close()
+                self.assertIsNotNone(thread)
+                self.assertFalse(thread.is_alive())
+                self.assertLess(kernel.calls.index("cancel"), kernel.calls.index("complete"))
+            finally:
+                kernel.release.set()
+                if thread is not None:
+                    thread.join(1)
 
     @unittest.skipUnless(sys.platform == "win32", "Windows named-pipe lifecycle")
     def test_stop_during_completed_read_does_not_emit(self) -> None:
         monitor = InputModeMonitor()
         kernel = _PendingPipeKernel()
-        monitor._kernel32 = kernel
         monitor._open_pipe = lambda: (1, 0)
 
         def completed_read(_handle: int) -> bytes:

@@ -151,6 +151,12 @@ kernel32.CreateFileW.argtypes = [
 ]
 kernel32.CreateFileW.restype = HANDLE
 
+kernel32.GetCurrentProcessId.argtypes = []
+kernel32.GetCurrentProcessId.restype = DWORD
+
+kernel32.ProcessIdToSessionId.argtypes = [DWORD, LPDWORD]
+kernel32.ProcessIdToSessionId.restype = BOOL
+
 kernel32.FindFirstChangeNotificationW.argtypes = [LPCWSTR, BOOL, DWORD]
 kernel32.FindFirstChangeNotificationW.restype = HANDLE
 
@@ -687,6 +693,15 @@ def IsWow64Process2(hProcess: int, lpProcessMachine: CArgObject, lpNativeMachine
 
 def GetCurrentProcess() -> int:
     return int(kernel32.GetCurrentProcess())
+
+
+def GetCurrentProcessId() -> int:
+    return int(kernel32.GetCurrentProcessId())
+
+
+def ProcessIdToSessionId(process_id: int) -> int | None:
+    session_id = DWORD()
+    return session_id.value if kernel32.ProcessIdToSessionId(process_id, byref(session_id)) else None
 
 
 def GetSystemWindowsDirectoryW(lpBuffer: Array[c_wchar], uSize: int) -> int:

@@ -796,6 +796,28 @@ class SHELLEXECUTEINFO(ct.Structure):
     ]
 
 
+class SECURITY_ATTRIBUTES(ct.Structure):
+    _fields_ = [
+        ("nLength", DWORD),
+        ("lpSecurityDescriptor", LPVOID),
+        ("bInheritHandle", BOOL),
+    ]
+
+
+class GUITHREADINFO(ct.Structure):
+    _fields_ = [
+        ("cbSize", DWORD),
+        ("flags", DWORD),
+        ("hwndActive", HWND),
+        ("hwndFocus", HWND),
+        ("hwndCapture", HWND),
+        ("hwndMenuOwner", HWND),
+        ("hwndMoveSize", HWND),
+        ("hwndCaret", HWND),
+        ("rcCaret", wintypes.RECT),
+    ]
+
+
 class APPBARDATA(ct.Structure):
     _fields_ = [
         ("cbSize", DWORD),
