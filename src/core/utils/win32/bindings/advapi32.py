@@ -59,6 +59,14 @@ advapi32.AdjustTokenPrivileges.restype = BOOL
 advapi32.GetUserNameW.argtypes = [LPWSTR, LPDWORD]
 advapi32.GetUserNameW.restype = BOOL
 
+advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [
+    LPCWSTR,
+    DWORD,
+    POINTER(c_void_p),
+    LPDWORD,
+]
+advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW.restype = BOOL
+
 
 def RegNotifyChangeKeyValue(
     hKey: int, bWatchSubtree: bool, dwNotifyFilter: int, hEvent: int | None, fAsynchronous: bool
@@ -124,6 +132,14 @@ def get_current_user_sid() -> str | None:
         return get_token_user_sid(token)
     finally:
         CloseHandle(token)
+
+
+def security_descriptor_from_sddl(sddl: str) -> int | None:
+    """Build a self-relative security descriptor from an SDDL string."""
+    descriptor = c_void_p()
+    if not advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, 1, byref(descriptor), None):
+        return None
+    return descriptor.value
 
 
 def GetUserName() -> str | None:

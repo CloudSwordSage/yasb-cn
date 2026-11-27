@@ -15,7 +15,7 @@ requires-python = ">= 3.14"
 dependencies = [
     "pyqt6==6.10.2",
     "pydantic==2.14.1",
-    "certifi==2026.10.19",
+    "certifi==2026.11.20",
     "humanize==4.16.0",
     "pyyaml==6.0.3",
     "holidays==0.107",
@@ -64,7 +64,7 @@ Changelog = "https://github.com/amnweb/yasb/releases/latest"
 dev = [
     "YASB[test,packaging]",
     "pre-commit",
-    "ruff==0.17.1",
+    "ruff==0.17.6",
     "pyright==1.1.414",
     "pyqt6-stubs==20250824",
     "pycaw-stubs==20260927.20261008",
